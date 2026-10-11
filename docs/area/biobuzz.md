@@ -1905,6 +1905,10 @@ false at every mount, and the coercer silently reset a SIDE or FRONT+BACK sweepe
 pinned the chassis half an inch over the ceiling. The game's own floor is capped to the intake's
 own ceiling now. It only ever reached a spec carried over from another game, because the BIOBUZZ
 builder has no intake-STYLE picker.
+**THE FLOOR IS 10 × 10 AND IS THE GAME'S OWN** (owner, 2026-10-10). `bbEnvelope` no longer reads
+the shared per-intake / swerve floors (13.5–14.5), so that triangle bug cannot recur. Not
+re-measured: turret and dumper shapes are clamped into `robotExtents`, so a 10-in chassis is
+legal but its mechanisms are cramped. `smoke-biobuzz/robot.ts` pins 10 × 10 on three drivetrains.
 
 **THE CHASSIS GOES TO 18 × 18** (owner, 2026-09-24: "why is max width/length 17 not 18?").
 `BB_MAX_LENGTH`/`BB_MAX_WIDTH` are `ROBOT_MAX_SIZE` (R102's cube); the 17 was a "working inch"

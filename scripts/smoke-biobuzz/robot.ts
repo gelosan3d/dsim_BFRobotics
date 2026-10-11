@@ -864,6 +864,9 @@ export function robotChecks(check: Check): void {
       check('size: the flank-tube build at 18 long gets the width that rectangle allows, and stays in the prism', long.length === 18 && long.width === 15.5 && inPrism(long), `${long.length} × ${long.width} → ${ll.ex.toFixed(2)} × ${ll.ey.toFixed(2)}`);
       check('size: ...and its dial range agrees with the coercer', bbSizeLimits(long).maxWidth === 15.5 && bbSizeLimits(flank).maxWidth === 18 && bbSizeLimits(flank).maxLength === 18, `${bbSizeLimits(long).maxWidth} / ${bbSizeLimits(flank).maxWidth} / ${bbSizeLimits(flank).maxLength}`);
       check('size: coercion is still idempotent across the dependent range', JSON.stringify(bbCoerce(long)) === JSON.stringify(long));
+      // a 10 × 10 chassis is legal on every drivetrain (swerve and the sloped sweeper used to floor at 13.5 / 14.5)
+      const tiny = (drivetrain: RobotSpec['drivetrain']) => bbCoerce({ ...oldMax, drivetrain, length: 10, width: 10 });
+      check('size: a 10 × 10 chassis is legal, swerve included', (['mecanum', 'swerve', 'tank'] as const).every((d) => { const t = tiny(d); return t.length === 10 && t.width === 10; }));
     }
     // NO 15-DIGIT SIZES (owner report, 2026-09-13): a corner tube's reach is 2.36·√½, and the
     // clamp used to land a chassis on 16.331227996399747. Every size limit sits on the slider grid.
