@@ -2,6 +2,77 @@
 
 ![DSIM](./dsim-logo.png)
 
+> ## About this fork
+>
+> This is **gelosan3d's fork** of [genius0412/dsim](https://github.com/genius0412/dsim), the
+> simulator behind [playdsim.com](https://www.playdsim.com/). Everything below the line is the
+> original project's README; this box covers what is different here.
+>
+> **What this fork adds**
+>
+> - **Switch drive style mid-match.** Press **H** to swap between field-centric ("headless")
+>   and robot-centric driving at any time, on keyboard or gamepad. The match starts in the
+>   style picked under *Configure → Robot → Driving → Drive style*; a label under the status
+>   bar (FIELD-CENTRIC / ROBOT-CENTRIC) shows when you have switched away from it, and
+>   restarting puts you back. The key can be rebound, and a gamepad button assigned, under
+>   *Configure → Controls → All games → Driving → Switch drive style* (the gamepad starts
+>   unbound). A pure tank drivetrain ignores it.
+>
+> **Branches**
+>
+> - `my-changes` holds this fork's work. Use it.
+> - `main` is kept as an unchanged copy of genius0412's `main`, so the original project's
+>   updates can be merged into `my-changes` without overwriting anything here.
+>
+> These changes run only when you run this fork yourself. playdsim.com and the official desktop
+> app are the original project and do not include them.
+>
+> ### Run it locally
+>
+> You need **[Node.js](https://nodejs.org/) 22 LTS or newer** and
+> **[Git](https://git-scm.com/)**.
+>
+> 1. Open a terminal (on Windows: *Terminal* or *PowerShell* from the Start menu) in the folder
+>    you want the project in, and download it:
+>
+>    ```bash
+>    git clone https://github.com/gelosan3d/dsim_BFRobotics.git
+>    cd dsim_BFRobotics
+>    git switch my-changes
+>    ```
+>
+> 2. Install the dependencies (a few minutes the first time; warnings are normal):
+>
+>    ```bash
+>    npm ci
+>    ```
+>
+> 3. Start it, then open **<http://localhost:5173>** in your browser:
+>
+>    ```bash
+>    npm run dev
+>    ```
+>
+>    Leave that terminal open while you play; press **Ctrl + C** in it to stop.
+>
+> On Windows, if PowerShell says *running scripts is disabled on this system*, run
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, answer **Y**, and try again.
+>
+> To check nothing is broken after a change: `npm test` (headless simulation checks,
+> a few minutes) and `npm run build`.
+>
+> **What works when you run it yourself.** All three games, solo practice, free drive, the
+> tutorial, the robot builder, and every control and setting (saved in your browser).
+>
+> **What does not.** Accounts, sign-in, ranked play, leaderboards and records all depend on the
+> original project's private servers, so they are unavailable. Multiplayer is hidden unless you
+> run your own game server: create a file named `.env` in the project folder containing
+> `VITE_GAME_SERVER_URL=ws://localhost:8787`, run `npm run server` in a second terminal, and
+> restart `npm run dev`. That lets you test multiplayer on your own computer, for example from
+> two browser tabs, with no leaderboards.
+
+---
+
 A 2D/3D driver-practice simulator for FIRST Tech Challenge. Vite + React +
 TypeScript on Canvas 2D, with a Rapier3D + Three.js path for games that use it.
 
