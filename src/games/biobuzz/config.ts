@@ -41,7 +41,6 @@
 import type { Alliance, AssistConfig, DrivetrainType, RobotSpec, StartCat, Vec2, World } from '../../types';
 import { DRIVETRAIN_LIMITS, INTAKE_PRESETS, ROBOT_MAX_SIZE } from '../../config';
 import { clamp, datan2, dcos, dsin, hyp, wrapAngle } from '../../math';
-import { lengthLimits, widthLimits } from '../../sim/drivetrain';
 import {
   BB_DEFAULT_INTAKE_MOUNT,
   type BbIntakeMount,
@@ -2574,9 +2573,9 @@ export const BB_EXPANSION = BB_PRISM - ROBOT_MAX_SIZE; // 6" past the starting c
  * minimum, and its start rule (G304) is a set of pose clauses rather than a start zone a small
  * chassis would have to fill. The floors are APPROX.
  */
-export const BB_MIN_LENGTH = 13.5;
+export const BB_MIN_LENGTH = 10;
 export const BB_MAX_LENGTH = ROBOT_MAX_SIZE;
-export const BB_MIN_WIDTH = 14.5;
+export const BB_MIN_WIDTH = 10;
 export const BB_MAX_WIDTH = ROBOT_MAX_SIZE;
 
 /**
@@ -2695,10 +2694,10 @@ function bbEnvelope(spec: RobotSpec): {
   prismFits: boolean;
 } {
   const ext = bbEnvelopeReach(spec);
-  // the shared per-intake / per-drivetrain FLOORS only — their ceilings are DECODE's in-cube
-  // intake rule, which a deploying sweeper does not answer to (see `bbSizeLimits`)
-  const minLength = Math.max(BB_MIN_LENGTH, lengthLimits(spec.intake).min);
-  const minWidth = Math.max(BB_MIN_WIDTH, widthLimits(spec.intake, spec.drivetrain).min);
+  // ponytail: BIOBUZZ's own 10 in floor only (owner: 10 × 10 robots). DECODE's per-intake and
+  // swerve floors housed a funnel / corner modules that this game's sweeper does not have.
+  const minLength = BB_MIN_LENGTH;
+  const minWidth = BB_MIN_WIDTH;
   const candidate = (lengthLong: boolean) => {
     const capL = lengthLong ? BB_PRISM : BB_PRISM_NARROW;
     const capW = lengthLong ? BB_PRISM_NARROW : BB_PRISM;
