@@ -1159,7 +1159,7 @@ function Hud({
                       (`GamePinnedNotice` / `eventlog-pinned`), because each is a call to action
                       rather than a standing fact — shown whatever the messages toggle says;
                     · FOULS → `FoulChip`, in every game's breakdown row (design review C39);
-                    · REVERSED / butterfly / card → the `.sub-hud` under this card;
+                    · drive style / REVERSED / butterfly / card → the `.sub-hud` under this card;
                     · Chain Reaction's mult/catalyst/hold state → `ChainHudChips` (`GameChips`
                       above), its ASCENDED/PARKED status → the `.park-status` card below;
                     · 🎮 gamepad → nowhere. A pad that is plugged in says so by driving the
@@ -1177,8 +1177,22 @@ function Hud({
               a new driver could not learn what two amber rings meant. The word is `aria-hidden`
               because the glyph's own `aria-label` already says it in full. This card is NOT in
               `[data-hud-band]`, so a word here never re-frames the 3D field. */}
-          {(hud.frontFlipped || hud.butterflyMode || hud.card) && (
+          {(hud.driveStyleSwitched || hud.frontFlipped || hud.butterflyMode || hud.card) && (
             <div className="sub-hud">
+              {/* the mid-match drive style switch, shown only while it differs from the menu's
+                  Drive style: that is the one the driver chose, and needs no reminder */}
+              {hud.driveStyleSwitched && (
+                <span className="sub-hud-item">
+                  <span
+                    className={`drive-style-icon ${hud.fieldCentric ? 'field' : 'robot'}`}
+                    role="img"
+                    aria-label={`Drive style switched: ${hud.fieldCentric ? 'field-centric' : 'robot-centric'}.`}
+                  />
+                  <span className="sub-hud-lbl" aria-hidden="true">
+                    {hud.fieldCentric ? 'FIELD-CENTRIC' : 'ROBOT-CENTRIC'}
+                  </span>
+                </span>
+              )}
               {hud.frontFlipped && (
                 <span className="sub-hud-item">
                   <span className="reversed-icon" role="img" aria-label="Front flipped: driving reversed." />

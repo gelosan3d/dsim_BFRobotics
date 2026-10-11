@@ -1,3 +1,13 @@
+# HANDOFF — 2026-10-11 (Controls: switch drive style mid-match — field-centric ⇄ robot-centric)
+
+**State: on branch `my-changes` of the fork (gelosan3d/dsim_BFRobotics), not on upstream `main`.** `npm test` (2965 shared + 5178 BIOBUZZ), `build`, `server:check`, `uiaudit`, `docaudit` pass; offscreen Electron drive checked the Controls row (H / UNBOUND), the sub-HUD item toggling with H, REVERSED hiding in field-centric, and RESET clearing it. The owner also tested it by hand. Client only; no server, wire or `SIM_VERSION` change.
+
+- **Owner:** add headless / field-oriented driving for keyboard and controller, with a keybind to switch between it and robot-oriented; "do not break anything else".
+- **Field-centric already existed** as the menu's Drive style (`spec.assists.fieldCentric`, sim-side). New: a SHARED action `driveFrame` ("Switch drive style"), keyboard **H**, pad **unbound** by default (no free button; on `PAD_DEFAULT_EXEMPT`). It flips the drive style for the rest of the run by re-expressing the stick in the robot's spawn frame at input level (`src/input/driveFrame.ts`, `GameController.fieldCentricLive`), so the sim flag is never touched. Rules: `docs/area/ui.md`, "DRIVE STYLE IS THE ONE EXCEPTION".
+- **Files:** `bindings.ts` (action, defaults), `gamepad.ts`/`input.ts` (edge), `game.ts` (switch, HUD `driveStyleSwitched`, live `fieldCentric`, REVERSED only while flip applies), `GameView.tsx` + `styles.css` (sub-HUD item), `controlsLayout.ts` (Driving panel, both devices), `mobileActions.ts` (`TOUCH_OTHER_ACTIONS`).
+- **New smoke block** after "driving: forward vs strafe ratio": a switched robot drives exactly as one spawned in that style (both directions, both alliances, keyboard diagonal), unit-square scaling, bind defaults, the new-action merge rule, the pad edge.
+- The round-trip check's tolerance is 1e-9, not 1e-12: `rot` runs on the deterministic `dsin`/`dcos`, which land ~6e-12 off.
+
 # HANDOFF — 2026-10-10 (BIOBUZZ 3D: the online wall bump fix reaches main)
 
 **State: on `main` (d0739721); DEPLOYED to PRODUCTION 2026-10-10 19:01Z from `main` (2-minute announcement, 17 clients notified, all 8 machines on the new image, client build d073972).** `npm test` (5176), `build`, `server:check`, `docaudit`, `bundleaudit`, `test:workers` (83) pass. Sim change behind `SIM_PATCH` 8 (it is 3 on `alpha`). No `SIM_VERSION` bump, no wire change.

@@ -66,6 +66,7 @@ export const ACTION_LABELS: Record<KeyAction, string> = {
   eyeUp: 'Camera higher',
   eyeDown: 'Camera lower',
   driveMode: 'Swap wheel set (Butterfly)',
+  driveFrame: 'Switch drive style',
   flipFront: 'Flip front',
   park: 'Park mode',
   start: 'Start match',
@@ -89,7 +90,7 @@ const inKeyOrder = (list: readonly PadAction[]): PadAction[] =>
 
 /**
  * THE ALL GAMES SCOPE. Movement reads forward/back, strafe, turn, and then the tank's second
- * side, which only a tank uses; the three drive toggles close the panel on both devices. The
+ * side, which only a tank uses; the four drive toggles close the panel on both devices. The
  * match panel's Menu row is not an action (Escape is reserved, the pad's is `menuButton`), so
  * the component adds it.
  */
@@ -107,10 +108,11 @@ export const ALL_GAMES_PANELS: readonly BindPanel[] = [
       'tankRightUp',
       'tankRightDown',
       'driveMode',
+      'driveFrame',
       'flipFront',
       'park',
     ],
-    pads: ['driveMode', 'flipFront', 'park'],
+    pads: ['driveMode', 'driveFrame', 'flipFront', 'park'],
   },
   {
     id: 'mechanisms',

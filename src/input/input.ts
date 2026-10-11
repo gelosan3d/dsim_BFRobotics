@@ -35,6 +35,8 @@ export class InputManager {
   restartPressed = false;
   /** edge-triggered "flip robot front" from either device */
   flipPressed = false;
+  /** edge-triggered "toggle field-centric / robot-centric" from either device */
+  driveFramePressed = false;
   /** edge-triggered "toggle park mode" from either device */
   parkPressed = false;
 
@@ -167,6 +169,7 @@ export class InputManager {
     this.startPressed = pressedAny(keys.start) || g.start || vStart;
     this.restartPressed = pressedAny(keys.restart) || g.restart || vRestart;
     this.flipPressed = pressedAny(keys.flipFront) || g.flipFront || vFlip;
+    this.driveFramePressed = pressedAny(keys.driveFrame) || g.driveFrame;
     this.parkPressed = pressedAny(keys.park) || g.park || vPark;
 
     const cmd: RobotCommand = {

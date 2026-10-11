@@ -265,6 +265,10 @@ export const TOUCH_OTHER_ACTIONS: Readonly<Record<string, string>> = {
   cameraCycle: 'Graphics ▸ Camera',
   eyeUp: 'Graphics ▸ Your height',
   eyeDown: 'Graphics ▸ Your height',
+  // the mid-match field-centric ⇄ robot-centric switch. A phone picks its drive style where
+  // every device does, before the match (Configure ▸ Robot ▸ Driving); a sixth utility button
+  // for a press a touch driver makes once a season would only crowd the thumb columns.
+  driveFrame: 'Robot ▸ Drive style',
 };
 
 /** every button `game` could show, in thumb order — the shared ones interleaved with its own

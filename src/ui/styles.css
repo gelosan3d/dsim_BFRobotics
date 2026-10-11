@@ -861,6 +861,39 @@ button {
   right: 0;
 }
 
+/* DRIVE STYLE, switched mid-match — a ring with what the stick is anchored to inside it: a
+   pointer fixed to the field's far wall (field-centric), or a chassis square (robot-centric).
+   `--ds-warn` like REVERSED: both say the sticks no longer do what the menu set up. */
+.drive-style-icon {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--ds-warn);
+}
+
+.drive-style-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.drive-style-icon.field::after {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid var(--ds-warn);
+}
+
+.drive-style-icon.robot::after {
+  width: 6px;
+  height: 6px;
+  background: var(--ds-warn);
+}
+
 /* BUTTERFLY — two triangles meeting at the centre, standing in for the wing shape the
    drivetrain is named after. Recolours per which set is down, reusing existing tokens
    rather than the archetype getting its own. */

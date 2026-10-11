@@ -80,6 +80,7 @@ export interface GamepadSample {
   bbRamp: boolean;
   bbPass: boolean;
   driveMode: boolean;
+  driveFrame: boolean;
   flipFront: boolean;
   park: boolean;
   start: boolean;
@@ -103,6 +104,7 @@ const EMPTY: GamepadSample = {
   bbRamp: false,
   bbPass: false,
   driveMode: false,
+  driveFrame: false,
   flipFront: false,
   park: false,
   start: false,
@@ -129,6 +131,7 @@ export class GamepadInput {
   private prevStart = false;
   private prevRestart = false;
   private prevFlip = false;
+  private prevFrame = false;
   private prevPark = false;
   private chords = new PadChordResolver();
   /** `livePad(bindings)`, kept until the bindings object changes: it copies the lists when the
@@ -144,7 +147,7 @@ export class GamepadInput {
       if (this.last) {
         if (this.lostAt === 0) this.lostAt = now;
         if (now - this.lostAt < PAD_DROPOUT_GRACE_MS) {
-          return { ...this.last, flipFront: false, park: false, start: false, restart: false };
+          return { ...this.last, driveFrame: false, flipFront: false, park: false, start: false, restart: false };
         }
       }
       this.last = null;
@@ -152,6 +155,7 @@ export class GamepadInput {
       this.prevStart = false;
       this.prevRestart = false;
       this.prevFlip = false;
+      this.prevFrame = false;
       this.prevPark = false;
       this.chords.reset();
       clearPadMask();
@@ -200,6 +204,7 @@ export class GamepadInput {
       bbRamp: on.bbRamp,
       bbPass: on.bbPass,
       driveMode: on.driveMode,
+      driveFrame: on.driveFrame && !this.prevFrame,
       flipFront: on.flipFront && !this.prevFlip,
       park: on.park && !this.prevPark,
       start: on.start && !this.prevStart,
@@ -208,6 +213,7 @@ export class GamepadInput {
     this.prevStart = on.start;
     this.prevRestart = on.restart;
     this.prevFlip = on.flipFront;
+    this.prevFrame = on.driveFrame;
     this.prevPark = on.park;
     this.last = sampleOut;
     return sampleOut;

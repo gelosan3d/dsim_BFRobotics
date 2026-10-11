@@ -83,7 +83,9 @@ import {
   activeStartLegal,
   footprintExtents,
   footprintCorners,
+  viewAngleOf,
 } from '../src/sim/field';
+import { reframeStick } from '../src/input/driveFrame';
 import { addClassified, addOverflow, assessMatchEnd, awardCard, awardFoul } from '../src/sim/scoring';
 import type { Alliance, ArtifactColor, AssistConfig, AutoPathData, DrivetrainType, GameId, GameMode, MatchPhase, RobotCommand, RobotSpec, RobotState, World } from '../src/types';
 import {
@@ -1101,6 +1103,118 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
   const strafe = Math.abs(r2.pos.x);
   const ratio = strafe / fwd;
   check('strafe slower than forward (~0.8x)', ratio > 0.7 && ratio < 0.95, `ratio=${ratio.toFixed(3)}`);
+}
+
+// ---- the mid-match drive style switch (`driveFrame`, `src/input/driveFrame.ts`) -------------
+// The switch never touches `RobotState.fieldCentric`: the controller re-expresses the stick in
+// the frame the robot spawned with. So the one property that matters is END TO END — a robot
+// spawned in one style, fed `reframeStick` every tick off its own heading, must drive exactly as
+// a robot spawned in the other style fed the raw stick. Both directions, both alliances, three
+// headings, and a keyboard diagonal (the case `quantizeCommand`'s per-axis clamp would bend).
+{
+  const sticks = [{ x: 1, y: 0 }, { x: 0.6, y: 0.8 }, { x: 1, y: 1 }, { x: -1, y: 0.5 }];
+  let worst = 0;
+  let worstAt = '';
+  let differ = 0;
+  for (const alliance of ['red', 'blue'] as const) {
+    for (const heading of [0.4, 2.0, -2.5]) {
+      for (const stick of sticks) {
+        for (const wantField of [true, false]) {
+          const native = mkWorld('free', alliance, 11);
+          const switched = mkWorld('free', alliance, 11);
+          const plain = mkWorld('free', alliance, 11);
+          for (const w of [native, switched, plain]) {
+            w.balls.length = 0;
+            w.robots[0].pos = { x: 0, y: 0 };
+            w.robots[0].heading = heading;
+          }
+          native.robots[0].fieldCentric = wantField;
+          switched.robots[0].fieldCentric = !wantField;
+          plain.robots[0].fieldCentric = !wantField;
+          const raw = cmd({ driveX: stick.x, driveY: stick.y });
+          for (let i = 0; i < 30; i++) {
+            const r = switched.robots[0];
+            const s = reframeStick(stick, wantField, r.heading, viewAngleOf(r.alliance));
+            step(native, SIM_DT, new Map([[0, raw]]));
+            step(switched, SIM_DT, new Map([[0, cmd({ driveX: s.x, driveY: s.y })]]));
+            step(plain, SIM_DT, new Map([[0, raw]]));
+          }
+          const a = native.robots[0].pos;
+          const b = switched.robots[0].pos;
+          const err = hyp(a.x - b.x, a.y - b.y);
+          if (err > worst) {
+            worst = err;
+            worstAt = `${alliance} h=${heading} stick=${stick.x},${stick.y} field=${wantField}`;
+          }
+          const c = plain.robots[0].pos;
+          if (hyp(a.x - c.x, a.y - c.y) > 1) differ++;
+        }
+      }
+    }
+  }
+  check('drive style switch: a switched robot drives exactly as one spawned in that style', worst < 1e-6, `worst=${worst.toExponential(2)} at ${worstAt}`);
+  check('drive style switch: ...and the two styles really do drive differently (non-vacuity)', differ >= 40, `differ=${differ}/48`);
+
+  // the wire clamps each axis to [-1, 1], so the result must fit, and fit by a UNIFORM scale
+  let fits = true;
+  let bent = 0;
+  for (let h = -Math.PI; h < Math.PI; h += 0.13) {
+    for (const v of [viewAngleOf('red'), viewAngleOf('blue')]) {
+      for (const field of [true, false]) {
+        const out = reframeStick({ x: 1, y: 1 }, field, h, v);
+        if (Math.abs(out.x) > 1 + 1e-12 || Math.abs(out.y) > 1 + 1e-12) fits = false;
+        const ideal = field ? rot(rot({ x: 1, y: 1 }, -v), -h) : rot(rot({ x: 1, y: -1 }, h), v);
+        const dir = field ? { x: -ideal.y, y: ideal.x } : ideal;
+        bent = Math.max(bent, Math.abs(dir.x * out.y - dir.y * out.x) / hyp(dir.x, dir.y));
+      }
+    }
+  }
+  check('drive style switch: a keyboard diagonal stays inside the unit square', fits);
+  check('drive style switch: ...scaled, never bent off its direction', bent < 1e-9, `bent=${bent.toExponential(2)}`);
+  const s0 = { x: 0.3, y: -0.5 };
+  const back = reframeStick(reframeStick(s0, true, 1.1, viewAngleOf('blue')), false, 1.1, viewAngleOf('blue'));
+  // 1e-9, not 1e-12: `rot` runs on the deterministic `dsin`/`dcos`, which land ~1e-12 off per call
+  check('drive style switch: the two directions are inverses', hyp(back.x - s0.x, back.y - s0.y) < 1e-9, `${back.x},${back.y}`);
+
+  // the bind: a SHARED control, H on the keyboard, and on the pad unbound until the player picks
+  const J = (v: unknown): string => JSON.stringify(v);
+  check(
+    'drive style bind: shared, in every game, H by default, no default pad button',
+    actionIsShared('driveFrame') && GAME_IDS.every((g) => actionUsedBy('driveFrame', g)) &&
+      J(DEFAULT_BINDINGS.keys.driveFrame) === J(['h']) && DEFAULT_BINDINGS.pad.buttons.driveFrame.length === 0,
+  );
+  const driving = ALL_GAMES_PANELS.find((p) => p.id === 'driving');
+  check(
+    'drive style bind: listed on Driving, on both devices',
+    !!driving && driving.keys.includes('driveFrame') && driving.pads.includes('driveFrame'),
+  );
+  // a map older than the action, with H already on Shoot: Shoot keeps H and the switch loads
+  // unbound rather than stacking a second action on the key (the new-action rule)
+  const old = mergeBindings({ keys: { fire: ['h'] } });
+  check(
+    'drive style bind: an older map holding H keeps it, and the switch loads unbound',
+    J(old.keys.fire) === J(['h']) && old.keys.driveFrame.length === 0,
+    J({ fire: old.keys.fire, driveFrame: old.keys.driveFrame }),
+  );
+
+  // the pad press is ONE edge, like Flip front, however long the button is held
+  const nav = globalThis.navigator as unknown as { getGamepads?: () => unknown[] };
+  const had = Object.getOwnPropertyDescriptor(nav, 'getGamepads');
+  const pad = { connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+  Object.defineProperty(nav, 'getGamepads', { value: () => [pad], configurable: true, writable: true });
+  try {
+    const bound = assignPadBind(DEFAULT_BINDINGS, 'driveFrame', 0, [13]).pad;
+    const gi = new GamepadInput();
+    const edges: boolean[] = [];
+    for (const down of [false, true, true, true, false, true]) {
+      pad.buttons[13] = { pressed: down, value: down ? 1 : 0 };
+      edges.push(gi.sample(bound).driveFrame);
+    }
+    check('drive style bind: a held pad button switches once per press', J(edges) === J([false, true, false, false, false, true]), J(edges));
+  } finally {
+    if (had) Object.defineProperty(nav, 'getGamepads', had);
+    else delete nav.getGamepads;
+  }
 }
 
 // ---- wall contact squares the robot up --------------------------------------
@@ -6192,7 +6306,12 @@ function queueTenth(w: World): void {
      button "because there is no button left to give it", while two chain-only actions sat on
      LB and L3. Sharing those by role bound it, so the exemption is gone — and the check
      immediately below fails if a member ever gains a default and is not removed from here. */
-  const PAD_DEFAULT_EXEMPT: readonly string[] = [];
+  /* `driveFrame` (the mid-match drive style switch, 2026-10-11) joined it on purpose. Every
+     standard-mapping button is spoken for, D-DOWN (13) is held free and pinned unbound by the
+     ramp checks, and a default combo has the cost above. It is a press a driver makes rarely,
+     on purpose, and pressed by accident it re-aims the sticks mid-match — the last thing to put
+     on a button a thumb lands on. It has a default KEY (H), so the key half below still holds. */
+  const PAD_DEFAULT_EXEMPT: readonly string[] = ['driveFrame'];
   const noKey = KEY_ACTIONS.filter((a) => DEFAULT_BINDINGS.keys[a].length === 0);
   const noPad = PAD_ACTIONS.filter((a) => DEFAULT_BINDINGS.pad.buttons[a].length === 0 && !PAD_DEFAULT_EXEMPT.includes(a));
   const exemptBound = PAD_DEFAULT_EXEMPT.filter((a) => (DEFAULT_BINDINGS.pad.buttons[a as PadAction] ?? []).length > 0);

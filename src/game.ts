@@ -58,6 +58,8 @@ import { LeadController } from './net/leadControl';
 import { REMOTE_SMOOTH_HALFLIFE, blendPose, followDrawn, nearDrawWeight, type Pose } from './net/contactDraw';
 import { FULL_RESYNC_EVERY, cmdsAgree, digestsAgree, worldDigest, type WorldDigest } from './net/worldDigest';
 import { clamp } from './math';
+import { viewAngleOf } from './sim/field';
+import { reframeStick } from './input/driveFrame';
 import type { RecordRankInfo } from './net/protocol';
 
 /** online, how long after the buzzer (wall seconds) to stop waiting for the server's final score
@@ -407,7 +409,12 @@ export interface HudSnapshot {
   /** ...and whether the local alliance's score has been VOIDED by a red card, which is
    * what the score bar and the results screen have to say rather than a number. */
   voided: boolean;
+  /** the drive style the local robot is driven in RIGHT NOW: its spawn style, or the other one
+   *  while the driver has switched (`driveStyleSwitched`) */
   fieldCentric: boolean;
+  /** has the driver switched drive style mid-match away from the one the robot spawned with
+   *  (the menu's Drive style)? Shows the drive-style item in the sub-HUD. */
+  driveStyleSwitched: boolean;
   aimAssist: boolean;
   autoIntake: boolean;
   autoFire: boolean;
@@ -557,6 +564,11 @@ export class GameController {
   private hudCountdown: number | null = null;
   /** drive controls reversed so the shooter side leads (robot-centric only) */
   private frontFlipped = false;
+  /** THE MID-MATCH DRIVE STYLE (`driveFrame` bind): null drives in the style the robot spawned
+   *  with (`RobotState.fieldCentric`, the menu's Drive style); true / false is the driver's
+   *  switch. Applied to the stick at INPUT level (`reframeStick`), never to the robot: see
+   *  `src/input/driveFrame.ts`. Reset with `frontFlipped`, so every run starts in the menu's. */
+  private fieldCentricLive: boolean | null = null;
   /** park mode: caps drive command magnitude to settings.parkSpeedPct while on */
   private parked = false;
   // action-SFX edge trackers per robot id, in TICKS (seeded in seedActionAudio)
@@ -1629,6 +1641,11 @@ export class GameController {
     return n; // > 3 means the "Match begins in" lead-in
   }
 
+  /** the drive style the local robot is driven in now: the driver's switch, else its spawn style */
+  private liveFieldCentric(): boolean {
+    return this.fieldCentricLive ?? this.localRobot().fieldCentric;
+  }
+
   /** can park mode be turned ON right now? Any time the robot can actually move —
    * auto, teleop, or free drive — so precision/slow-drive is available throughout
    * a match, not only in the endgame window. */
@@ -1639,14 +1656,33 @@ export class GameController {
   /** everything a frame does EXCEPT render: sample input, step, audio, toasts */
   private frameLogic(dtMs: number): void {
     const cmd = this.input.poll();
+    const lr = this.localRobot();
+    // A BUTTERFLY with its traction set down drives as a tank, and the sim's tank branch reads
+    // only leftDrive/rightDrive — no drive style reaches it.
+    const drivingTank =
+      lr.spec.drivetrain === 'tank' || (lr.spec.drivetrain === 'butterfly' && lr.butterflyTank);
+    // drive style switch: field-centric ⇄ robot-centric for the rest of this run. A pure tank
+    // has no strafe to re-aim, so the press does nothing there rather than light a HUD item
+    // that changes nothing.
+    if (this.input.driveFramePressed && lr.spec.drivetrain !== 'tank') {
+      const next = !this.liveFieldCentric();
+      this.fieldCentricLive = next === lr.fieldCentric ? null : next;
+    }
+    const fieldCentric = this.liveFieldCentric();
     // "flip front": reverse robot-centric drive so the shooter side leads.
     // Meaningless in field-centric (translation is driver-frame there).
-    if (!this.localRobot().fieldCentric) {
+    if (!fieldCentric) {
       if (this.input.flipPressed) this.frontFlipped = !this.frontFlipped;
       if (this.frontFlipped) {
         cmd.driveX = -cmd.driveX;
         cmd.driveY = -cmd.driveY;
       }
+    }
+    // the switched style, re-expressed in the frame the robot reads (`reframeStick`)
+    if (fieldCentric !== lr.fieldCentric && !drivingTank) {
+      const s = reframeStick({ x: cmd.driveX, y: cmd.driveY }, fieldCentric, lr.heading, viewAngleOf(lr.alliance));
+      cmd.driveX = s.x;
+      cmd.driveY = s.y;
     }
     // park mode: toggle on press. Turning it ON is gated to when the robot can
     // drive (auto/teleop/free drive); turning it back OFF is always allowed. While
@@ -1671,10 +1707,7 @@ export class GameController {
     // A BUTTERFLY that currently has its traction set down drives as a tank, so it takes
     // the same control-style resolution — otherwise swapping wheel sets mid-match would
     // silently stop responding (the sim's tank branch reads ONLY leftDrive/rightDrive,
-    // which nothing would have been filling).
-    const lr = this.localRobot();
-    const drivingTank =
-      lr.spec.drivetrain === 'tank' || (lr.spec.drivetrain === 'butterfly' && lr.butterflyTank);
+    // which nothing would have been filling). `drivingTank` is resolved at the top.
     if (drivingTank && this.settings.tankControlMode === 'normal') {
       cmd.leftDrive = clamp(cmd.driveY - cmd.rotate, -1, 1);
       cmd.rightDrive = clamp(cmd.driveY + cmd.rotate, -1, 1);
@@ -2007,6 +2040,7 @@ export class GameController {
     this.settleDone = false;
     this.hudCountdown = null;
     this.frontFlipped = false;
+    this.fieldCentricLive = null;
     this.parked = false;
     this.seedActionAudio();
     this.toasts = [];
@@ -3232,6 +3266,7 @@ export class GameController {
     this.settleDone = false;
     this.hudCountdown = null;
     this.frontFlipped = false;
+    this.fieldCentricLive = null;
     this.parked = false;
     this.acc = 0;
     this.inputBuf = [];
@@ -3371,6 +3406,7 @@ export class GameController {
     this.practice = null;
     this.drivenTicks = 0;
     this.frontFlipped = false;
+    this.fieldCentricLive = null;
     this.parked = false;
     this.seedActionAudio();
     this.toasts = [];
@@ -3502,7 +3538,8 @@ export class GameController {
       fouls: { red: { ...w.match.fouls.red }, blue: { ...w.match.fouls.blue } },
       card: w.penalties.carded[r.id] ?? null,
       voided: w.match.scores[a].voided ?? false,
-      fieldCentric: r.fieldCentric,
+      fieldCentric: this.liveFieldCentric(),
+      driveStyleSwitched: this.liveFieldCentric() !== r.fieldCentric,
       aimAssist: r.aimAssist,
       autoIntake: r.autoIntake,
       autoFire: r.autoFire,
@@ -3512,7 +3549,8 @@ export class GameController {
       inLaunchZone: w.mode === 'free' || robotInLaunchZone(r),
       gamepadConnected: this.input.gamepadConnected,
       windowFocused: this.input.keyboard.hasFocus(),
-      frontFlipped: this.frontFlipped,
+      // only while it applies: a flip set in robot-centric does nothing after a switch to field
+      frontFlipped: this.frontFlipped && !this.liveFieldCentric(),
       butterflyMode:
         r.spec.drivetrain === 'butterfly' ? (r.butterflyTank ? 'tank' : 'mecanum') : null,
       parked: this.parked,

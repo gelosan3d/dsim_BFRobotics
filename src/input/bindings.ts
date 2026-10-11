@@ -28,6 +28,7 @@ export type KeyAction =
   | 'eyeUp'
   | 'eyeDown'
   | 'driveMode'
+  | 'driveFrame'
   | 'flipFront'
   | 'park'
   | 'start'
@@ -54,6 +55,7 @@ export type PadAction =
   | 'bbRamp'
   | 'bbPass'
   | 'driveMode'
+  | 'driveFrame'
   | 'flipFront'
   | 'park'
   | 'start'
@@ -237,6 +239,8 @@ export interface ControlBindings {
 //   bbRamp → `src/games/biobuzz/robot.ts` (the `ramp` intake archetype only)
 //   intake / fire → all three, through three unrelated sites each
 //   driveMode → `src/sim/robot.ts`, which every game's step routes through (`updateRobot`)
+//   driveFrame → no command bit at all: `GameController` re-expresses the drive stick in the
+//                frame the robot spawned with, so it acts wherever `updateRobot` drives
 //   the drive/rotate/tank actions → every game, through `updateRobot`
 // `PadAction` is a strict subset of `KeyAction`, so one table answers for both devices.
 
@@ -265,6 +269,7 @@ export const ACTION_GAMES: Readonly<Record<KeyAction, readonly GameId[]>> = {
   eyeUp: ['biobuzz'],
   eyeDown: ['biobuzz'],
   driveMode: ALL,
+  driveFrame: ALL,
   flipFront: ALL,
   park: ALL,
   start: ALL,
@@ -317,7 +322,7 @@ export function actionsConflict(a: KeyAction, b: KeyAction): boolean {
 /**
  * THE SHARED CONTROLS. Every game reads each of these (`ACTION_GAMES` says ALL, and `npm test`
  * holds it to that) and they mean the same thing in every game — the drive keys, the wheel-set
- * swap, flip front, park, start and restart. `park` belongs here because park mode is a SPEED
+ * swap, the drive-frame toggle, flip front, park, start and restart. `park` belongs here because park mode is a SPEED
  * CAP on the drive command (`GameController`, `parkSpeedPct`), a drivetrain control whatever
  * endgame it is used for.
  */
@@ -331,6 +336,7 @@ export const SHARED_ACTIONS: readonly KeyAction[] = [
   'rotateCCW',
   'rotateCW',
   'driveMode',
+  'driveFrame',
   'flipFront',
   'park',
   'start',
@@ -386,6 +392,7 @@ export const KEY_ACTIONS: KeyAction[] = [
   'eyeUp',
   'eyeDown',
   'driveMode',
+  'driveFrame',
   'flipFront',
   'park',
   'start',
@@ -403,6 +410,7 @@ export const PAD_ACTIONS: PadAction[] = [
   'bbRamp',
   'bbPass',
   'driveMode',
+  'driveFrame',
   'flipFront',
   'park',
   'start',
@@ -493,6 +501,11 @@ export const DEFAULT_BINDINGS: ControlBindings = {
     eyeDown: ['o'],
     // BUTTERFLY: drop the other wheel set. 'b' for butterfly; free on the default map.
     driveMode: ['b'],
+    // FIELD-CENTRIC ⇄ ROBOT-CENTRIC, mid-match (`GameController.fieldCentricLive`). 'h' for
+    // headless, the name FTC drivers use for it. The ramp's note above keeps g/h/j/y free for
+    // the smoke lane's conflict fixtures; the two that use 'h' edit MAIN, where a shared
+    // default is an ordinary steal victim, and none edits a season scope with it.
+    driveFrame: ['h'],
     flipFront: ['f'],
     park: ['p'],
     start: ['enter'],
@@ -537,6 +550,10 @@ export const DEFAULT_BINDINGS: ControlBindings = {
       bbRamp: [11],
       bbPass: [10], // L3 — shared with `fling`
       driveMode: [5], // RB — the only unused face/shoulder button
+      // UNBOUND on the pad: every standard-mapping button is spoken for, D-DOWN (13) is held
+      // free on purpose (see `bbRamp`), and a default combo would move every player onto the
+      // chord resolver's stateful path. A player binds it in Controls ▸ Driving.
+      driveFrame: [],
       flipFront: [3], // Y
       park: [2], // X
       start: [9],

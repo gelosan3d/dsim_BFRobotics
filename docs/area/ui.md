@@ -28,7 +28,7 @@ and then the code. **`uiaudit`** is what actually enforces both, as ratchets.
 - **Controls are fully rebindable** (`src/input/bindings.ts`, `src/ui/ControlsSection.tsx`):
   every keyboard action, gamepad buttons, AND the drive/turn stick assignment. Escape is
   reserved (menu/cancel — never bindable). Defaults: WASD drive, Q/E or ←/→ turn, Shift/K intake,
-  Space fire, C catalyst (CR), F flip-front, P park, Enter start, R restart.
+  Space fire, C catalyst (CR), H drive style, F flip-front, P park, Enter start, R restart.
   ⚠️ **CONFLICT POLICY: A TAKEN BIND IS REFUSED, NEVER STOLEN** (owner, 2026-09-24: binding a
   key another function uses "shouldn't unbind the other one. Instead, it should show a
   conflict error"). The screen asks `keyConflict` / `padConflict` (`bindings.ts`) BEFORE it
@@ -223,8 +223,24 @@ that season has none) — then the bind panels —
 - All `GameSettings` persist to `localStorage['decodesim.settings.v1']` via `src/settings.ts`
   (validated field-by-field on load — corrupt/stale data falls back per field) and sync to
   Postgres per account.
-- **Assists are menu-only** (field/robot-centric, auto intake, auto fire) — NO in-game toggle
-  keybinds. Auto-fire/intake must respect match phases (no firing in `pre`/`transition`).
+- **Assists are menu-only** (auto intake, auto fire) — NO in-game toggle keybinds. Auto-fire/
+  intake must respect match phases (no firing in `pre`/`transition`).
+- **DRIVE STYLE IS THE ONE EXCEPTION: it switches mid-match** (`driveFrame` bind, "Switch drive
+  style", owner 2026-10-11: "a keybind to switch between headless and bot-orientated"). Shared
+  action; keyboard H, pad UNBOUND by default (no free button: D-DOWN is pinned unbound, and it
+  is on `PAD_DEFAULT_EXEMPT` in smoke). ⚠️ **It never touches `RobotState.fieldCentric`.** The
+  robot keeps the style it spawned with (Configure ▸ Robot ▸ Drive style, `spec.assists`), and
+  `GameController` re-expresses the stick in THAT frame (`reframeStick`,
+  `src/input/driveFrame.ts`), the way Flip front negates it: no wire, replay, server or
+  `SIM_VERSION` change, and records still show the spawn style. The result is scaled back into
+  the unit square, never clamped per axis, because `quantizeCommand` clamps each axis and a
+  rotated keyboard diagonal is 1.41 long. Reset with `frontFlipped` on every rebuild, so each
+  run starts in the menu's style. A pure tank ignores the press. The sub-HUD shows FIELD-CENTRIC
+  / ROBOT-CENTRIC only while it differs from the menu's, and REVERSED only while flip applies.
+  `HudSnapshot.fieldCentric` is the LIVE style, so the touch pad's FLIP can now appear mid-match
+  on a touch device that also has a keyboard or pad; touch itself has no button for it
+  (`TOUCH_OTHER_ACTIONS`). `npm test` holds the switch end to end against the sim's own
+  field-centric drive.
 - **AIM ASSIST IS ALWAYS ON, in BOTH games, and is NOT configurable.** `coerceAssists`
   (sim/spawn.ts) forces `aimAssist` true — deliberately in the SHARED coercer, not the UI,
   because a stored `false` can arrive from localStorage, a synced account blob, a saved robot
