@@ -1719,8 +1719,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       return json(200, { users }), true;
     }
 
-    // which GAME's boards/periods to read — DECODE and Chain Reaction each have their own
-    // ranked/record boards and Act → Season progression (default DECODE for old clients).
+    // which GAME's boards/periods to read — each game has its own ranked/record boards and
+    // Act → Season progression (`DEFAULT_GAME` for a client that names none).
     const game: GameId = coerceGameId(url.searchParams.get('game'));
     // default board view = the live season FOR THIS GAME (which may be admin-advanced past
     // the code's BALANCE_VERSION); an explicit ?season= picks an archived one.

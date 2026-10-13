@@ -414,23 +414,23 @@ async function main(): Promise<void> {
   );
 
   const SEASON = 99;
-  await repo.ensureSeason(SEASON, 'decode', 7);
-  const act = await repo.actForSeason(SEASON, 'decode');
+  await repo.ensureSeason(SEASON, 'chain', 7);
+  const act = await repo.actForSeason(SEASON, 'chain');
 
   // RANKED — the board that shipped bare. Placement gates the board, so each
   // player needs the board's 10 rated 1v1 results (`boardMinGames`) before they appear at all.
   for (let i = 0; i < 10; i++) {
-    await repo.upsertRating('badge-own', '1v1', act, 1600, 60, 0.06, 'decode');
-    await repo.upsertRating('badge-nil', '1v1', act, 1400, 60, 0.06, 'decode');
+    await repo.upsertRating('badge-own', '1v1', act, 1600, 60, 0.06, 'chain');
+    await repo.upsertRating('badge-nil', '1v1', act, 1400, 60, 0.06, 'chain');
   }
-  await repo.upsertEloHistory('badge-own', '1v1', SEASON, 1600, 60, 0.06, 10, 'decode');
-  const eloRows = await repo.eloLeaderboard({ mode: '1v1', act, game: 'decode' });
+  await repo.upsertEloHistory('badge-own', '1v1', SEASON, 1600, 60, 0.06, 10, 'chain');
+  const eloRows = await repo.eloLeaderboard({ mode: '1v1', act, game: 'chain' });
   const eloOwn = eloRows.find((r) => r.userId === 'badge-own');
   const eloNil = eloRows.find((r) => r.userId === 'badge-nil');
   check('badges/ranked: the live board carries the role', eloOwn?.role === 'owner');
   check('badges/ranked: ...and the supporter flag it implies', eloOwn?.supporter === true);
   check('badges/ranked: a plain player carries neither', !eloNil?.role && eloNil?.supporter === false);
-  const eloHist = await repo.eloHistoryLeaderboard({ mode: '1v1', balanceVersion: SEASON, game: 'decode' });
+  const eloHist = await repo.eloHistoryLeaderboard({ mode: '1v1', balanceVersion: SEASON, game: 'chain' });
   check(
     'badges/ranked: the ARCHIVED season board carries them too',
     eloHist.find((r) => r.userId === 'badge-own')?.role === 'owner',
@@ -441,28 +441,28 @@ async function main(): Promise<void> {
   // exactly 1000", and the placement flag is games-based — so the matcher needs
   // `games` in the same row, which neither existing read selects.
   {
-    const placed = await repo.getSkill('badge-own', '1v1', act, 'decode');
+    const placed = await repo.getSkill('badge-own', '1v1', act, 'chain');
     check('skill: a played board returns the real rating', placed.rating === 1600, String(placed.rating));
     check('skill: ...and the games count that decides placement', placed.games === 10, String(placed.games));
     check('skill: past the matchmaker’s 5 games is PLACED', placed.placed === true);
 
     // the ambiguity the matcher must not fall into: an ACCOUNT WITH NO ROW reads
     // 1000, and that must surface as UNPLACED so a matcher declines to gate on it
-    const unknown = await repo.getSkill('badge-nobody', '1v1', act, 'decode');
+    const unknown = await repo.getSkill('badge-nobody', '1v1', act, 'chain');
     check('skill: an unplayed board defaults to 1000', unknown.rating === 1000, String(unknown.rating));
     check('skill: ...but reports UNPLACED, so 1000 is never mistaken for a real rating',
       unknown.placed === false && unknown.games === 0);
 
     // a partially-placed player is the case that breaks a rating-only read
     await repo.ensureProfile('badge-new', 'Newbie');
-    for (let i = 0; i < 2; i++) await repo.upsertRating('badge-new', '1v1', act, 1000, 300, 0.06, 'decode');
-    const partial = await repo.getSkill('badge-new', '1v1', act, 'decode');
+    for (let i = 0; i < 2; i++) await repo.upsertRating('badge-new', '1v1', act, 1000, 300, 0.06, 'chain');
+    const partial = await repo.getSkill('badge-new', '1v1', act, 'chain');
     check('skill: 2 games is still UNPLACED', partial.placed === false && partial.games === 2, String(partial.games));
 
     // the board key is (mode, game, act) — a rating must not leak across any of them
-    const otherMode = await repo.getSkill('badge-own', '2v2', act, 'decode');
+    const otherMode = await repo.getSkill('badge-own', '2v2', act, 'chain');
     check('skill: a 1v1 rating does not leak into the 2v2 board', otherMode.placed === false);
-    const otherGame = await repo.getSkill('badge-own', '1v1', act, 'chain');
+    const otherGame = await repo.getSkill('badge-own', '1v1', act, 'biobuzz');
     check('skill: ...nor across games', otherGame.placed === false);
 
 
@@ -470,15 +470,15 @@ async function main(): Promise<void> {
     // rating was three sequential round trips, which is fine once per staged match and
     // not fine once per JOIN
     repo.clearActCache();
-    const a1 = await repo.actFor('decode');
+    const a1 = await repo.actFor('chain');
     check('actFor: resolves the same act as the two-query path', a1 === act, `${a1} vs ${act}`);
-    const a2 = await repo.actFor('decode');
+    const a2 = await repo.actFor('chain');
     check('actFor: a second call is served from the memo', a2 === a1);
-    // and the memo is per-GAME, or a Chain queuer would be priced on DECODE's act
-    const aChain = await repo.actFor('chain');
-    check('actFor: the memo is keyed per game', typeof aChain === 'number');
+    // and the memo is per-GAME, or a BIOBUZZ queuer would be priced on Chain Reaction's act
+    const aOther = await repo.actFor('biobuzz');
+    check('actFor: the memo is keyed per game', typeof aOther === 'number');
     // the TTL is what lets an admin roll an act without a redeploy
-    const aStale = await repo.actFor('decode', Date.now() + 120_000);
+    const aStale = await repo.actFor('chain', Date.now() + 120_000);
     check('actFor: past the TTL it re-reads rather than serving a stale act', aStale === act);
   }
 
@@ -492,7 +492,7 @@ async function main(): Promise<void> {
     score: 250,
     balanceVersion: SEASON,
     replayId: null as unknown as string, // nullable FK; no replay needed here
-    game: 'decode',
+    game: 'chain',
   });
   await repo.submitRecord({
     userId: 'badge-nil',
@@ -501,14 +501,14 @@ async function main(): Promise<void> {
     score: 100,
     balanceVersion: SEASON,
     replayId: null as unknown as string,
-    game: 'decode',
+    game: 'chain',
   });
-  const recRows = await repo.recordLeaderboard({ mode: 'duo', balanceVersion: SEASON, game: 'decode' });
+  const recRows = await repo.recordLeaderboard({ mode: 'duo', balanceVersion: SEASON, game: 'chain' });
   const duo = recRows.find((r) => r.userId === 'badge-sup');
   check('badges/records: the runner keeps their supporter flag', duo?.supporter === true);
   check('badges/records: the duo PARTNER carries their own role', duo?.partnerRole === 'owner');
   check('badges/records: ...and their own supporter flag', duo?.partnerSupporter === true);
-  const solo = (await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'decode' }))[0];
+  const solo = (await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'chain' }))[0];
   check(
     'badges/records: a SOLO row reports the absent partner as false, not null',
     solo?.partnerSupporter === false,
@@ -516,7 +516,7 @@ async function main(): Promise<void> {
 
   // MATCH HISTORY — the Career page's list, and the one place a name appears
   // for BOTH alliances of somebody else's match.
-  const matchId = await repo.saveMatch('1v1', SEASON, null as unknown as string, true, 'decode');
+  const matchId = await repo.saveMatch('1v1', SEASON, null as unknown as string, true, 'chain');
   await repo.addMatchParticipant({
     matchId, userId: 'badge-nil', alliance: 'red', drivetrain: 'tank',
     score: 80, won: false, ratingBefore: 1000, ratingAfter: 990,
@@ -525,7 +525,7 @@ async function main(): Promise<void> {
     matchId, userId: 'badge-own', alliance: 'blue', drivetrain: 'tank',
     score: 120, won: true, ratingBefore: 1000, ratingAfter: 1010,
   });
-  const vsHist = await repo.userMatchHistory('badge-nil', { balanceVersion: SEASON, game: 'decode' });
+  const vsHist = await repo.userMatchHistory('badge-nil', { balanceVersion: SEASON, game: 'chain' });
   const versus = vsHist.rows.find((r) => r.kind === 'versus');
   const oppo = versus?.players.find((p) => p.userId === 'badge-own');
   check('badges/history: an opponent in the list carries their role', oppo?.role === 'owner');
@@ -533,7 +533,7 @@ async function main(): Promise<void> {
     'badges/history: ...and a plain participant carries neither',
     versus?.players.find((p) => p.userId === 'badge-nil')?.supporter === false,
   );
-  const runHist = await repo.userMatchHistory('badge-sup', { balanceVersion: SEASON, game: 'decode' });
+  const runHist = await repo.userMatchHistory('badge-sup', { balanceVersion: SEASON, game: 'chain' });
   const run = runHist.rows.find((r) => r.kind === 'record');
   check(
     'badges/history: a record run badges its PARTNER too',
@@ -551,13 +551,13 @@ async function main(): Promise<void> {
   check('badges/friends: a friend row carries the role', friendList.friends[0]?.role === 'owner');
   check('badges/friends: ...and the supporter flag', friendList.friends[0]?.supporter === true);
 
-  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOM01', 'decode', 'match', null, 'casual1v1');
+  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOM01', 'chain', 'match', null, 'casual1v1');
   const invited = await repo.listFriends('badge-nil');
   check('badges/friends: the CHALLENGE sender is badged', invited.invites[0]?.from.role === 'owner');
   // the SENT list shows the OTHER party, so it must project the badge from a
   // different join than the received list does — assert it against staff, or the
   // check passes on a query that selects nothing at all
-  await repo.inviteToRoom('badge-nil', 'badge-own', 'ROOM02', 'decode', 'match', null, 'casual1v1');
+  await repo.inviteToRoom('badge-nil', 'badge-own', 'ROOM02', 'chain', 'match', null, 'casual1v1');
   const asSender = await repo.listFriends('badge-nil');
   check('badges/friends: and the recipient on the SENDER’s side', asSender.sent[0]?.to.role === 'owner');
   check(
@@ -578,7 +578,7 @@ async function main(): Promise<void> {
   // joined (`server/index.ts` `joinRoom`) or once a rated party token's match is
   // staged (`server/matchmaking.ts` `assign`) — this only covers the repo-level
   // half, which both call sites share.
-  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOMCLR', 'decode', 'versus', null, 'casual1v1');
+  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOMCLR', 'chain', 'versus', null, 'casual1v1');
   check(
     'challenge: a fresh invite shows on both the recipient’s and the sender’s side',
     (await repo.listRoomInvites('badge-nil')).some((i) => i.room === 'ROOMCLR') &&
@@ -595,7 +595,7 @@ async function main(): Promise<void> {
   );
   // scoped to the one room code: clearing a spent challenge must never touch a
   // different, still-live one polled in the same request.
-  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOMKEEP', 'decode', 'versus', null, 'casual1v1');
+  await repo.inviteToRoom('badge-own', 'badge-nil', 'ROOMKEEP', 'chain', 'versus', null, 'casual1v1');
   await repo.clearRoomInvites('ROOMCLR'); // already gone — must be a silent no-op
   check(
     'challenge: clearing one room code never touches another',
@@ -954,7 +954,7 @@ async function main(): Promise<void> {
   });
   await repo.claimKofiPayment('user-c', 'txn-c');
   await db.query(
-    `insert into elo_history (user_id, mode, game, balance_version, rating) values ('user-c','1v1','decode',1,1500)`,
+    `insert into elo_history (user_id, mode, game, balance_version, rating) values ('user-c','1v1','chain',1,1500)`,
   );
   const gone = await repo.deleteAccount('user-c');
   check('delete: the account is removed', gone);
@@ -1052,14 +1052,14 @@ async function main(): Promise<void> {
       format: REPLAY_FORMAT,
       balanceVersion: 4,
       sim: 7,
-      game: 'decode' as const,
+      game: 'chain' as const,
       mode: 'match' as const,
       seed: 1234,
       ticks: 120,
       setups: [] as never[],
       tracks: { 0: [1, 2, 3, 4, 5, 6, 7] },
     };
-    const id = await repo.saveReplay(stored, 9, 'decode');
+    const id = await repo.saveReplay(stored, 9, 'chain');
     const back = await repo.getReplay(id);
     check('replays: a stored replay comes back', back !== null);
     check(
@@ -1102,7 +1102,7 @@ async function main(): Promise<void> {
         format: REPLAY_FORMAT,
         balanceVersion: 4,
         sim: 2,
-        game: 'decode' as const,
+        game: 'chain' as const,
         mode: 'match' as const,
         seed: 5,
         ticks: 60,
@@ -1125,7 +1125,7 @@ async function main(): Promise<void> {
         ],
       },
       SEASON,
-      'decode',
+      'chain',
     );
     const got = (await repo.getReplay(dirty))!.setups;
     check(
@@ -1154,7 +1154,7 @@ async function main(): Promise<void> {
       format: 2,
       balanceVersion: 4,
       sim: 2,
-      game: 'decode' as const,
+      game: 'chain' as const,
       mode: 'match' as const,
       seed,
       ticks,
@@ -1162,9 +1162,9 @@ async function main(): Promise<void> {
       tracks: { 0: [1, 2, 3, 4, 5, 6, 7] },
     });
 
-    const first = await repo.savePracticeRun('prac-a', container(1, 9000), 87, SEASON, 'decode');
+    const first = await repo.savePracticeRun('prac-a', container(1, 9000), 87, SEASON, 'chain');
     check('practice: a run comes back with its replay', !!first.replayId && first.score === 87);
-    const listed = await repo.listPracticeRuns('prac-a', 'decode');
+    const listed = await repo.listPracticeRuns('prac-a', 'chain');
     check('practice: ...and is listed for its owner', listed.length === 1 && listed[0].id === first.id);
     check(
       'practice: the stored replay is an ordinary one the viewer can already read',
@@ -1172,7 +1172,7 @@ async function main(): Promise<void> {
     );
 
     // THE POINT OF THE SEPARATE TABLE: a client-reported score cannot reach a board.
-    const board = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'decode' });
+    const board = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'chain' });
     check(
       'practice: a practice run NEVER appears on the record leaderboard',
       !board.some((r) => r.score === 87 && r.userId === 'prac-a'),
@@ -1182,9 +1182,9 @@ async function main(): Promise<void> {
     // PRUNE: the cap holds, and the pruned runs take their replays with them. A replay has no
     // back-reference to its run, so a prune that only deleted rows would leak the logs.
     for (let i = 2; i <= repo.PRACTICE_KEEP + 3; i++) {
-      await repo.savePracticeRun('prac-a', container(i, 100 + i), i, SEASON, 'decode');
+      await repo.savePracticeRun('prac-a', container(i, 100 + i), i, SEASON, 'chain');
     }
-    const capped = await repo.listPracticeRuns('prac-a', 'decode');
+    const capped = await repo.listPracticeRuns('prac-a', 'chain');
     check(
       'practice: an account keeps only PRACTICE_KEEP runs, newest first',
       capped.length === repo.PRACTICE_KEEP,
@@ -1207,33 +1207,33 @@ async function main(): Promise<void> {
      */
     {
       await repo.ensureProfile('prac-b', 'Counter');
-      const before = (await repo.getActivity('prac-b')).byGame['decode']?.games ?? 0;
+      const before = (await repo.getActivity('prac-b')).byGame['chain']?.games ?? 0;
       const rep = container(99, 9000);
-      await repo.savePracticeRun('prac-b', rep, 40, SEASON, 'decode');
-      await repo.addActivity(['prac-b'], rep.ticks / 60, 'decode');
+      await repo.savePracticeRun('prac-b', rep, 40, SEASON, 'chain');
+      await repo.addActivity(['prac-b'], rep.ticks / 60, 'chain');
       const after = await repo.getActivity('prac-b');
       check(
         'practice: a run counts toward GAMES PLAYED',
-        (after.byGame['decode']?.games ?? 0) === before + 1,
-        `${before} → ${after.byGame['decode']?.games}`,
+        (after.byGame['chain']?.games ?? 0) === before + 1,
+        `${before} → ${after.byGame['chain']?.games}`,
       );
       check(
         'practice: ...and adds the match length to PLAYTIME, from the replay ticks',
-        (after.byGame['decode']?.seconds ?? 0) === 150,
-        `${after.byGame['decode']?.seconds}s for ${rep.ticks} ticks`,
+        (after.byGame['chain']?.seconds ?? 0) === 150,
+        `${after.byGame['chain']?.seconds}s for ${rep.ticks} ticks`,
       );
       // pruning a run must NOT un-count it: you played it either way
       for (let i = 0; i < repo.PRACTICE_KEEP + 2; i++) {
-        await repo.savePracticeRun('prac-b', container(500 + i, 60), i, SEASON, 'decode');
+        await repo.savePracticeRun('prac-b', container(500 + i, 60), i, SEASON, 'chain');
       }
       check(
         'practice: pruning old runs does not take back the games you played',
-        ((await repo.getActivity('prac-b')).byGame['decode']?.games ?? 0) === before + 1,
+        ((await repo.getActivity('prac-b')).byGame['chain']?.games ?? 0) === before + 1,
       );
     }
 
     // ...and deleting the account takes the rest, for the same reason
-    const live = (await repo.listPracticeRuns('prac-a', 'decode'))[0];
+    const live = (await repo.listPracticeRuns('prac-a', 'chain'))[0];
     await repo.deleteAccount('prac-a');
     check(
       'practice: deleting an account deletes its practice replays too',
@@ -1342,7 +1342,7 @@ async function main(): Promise<void> {
     await repo.ensureProfile('phys-dec', 'Decoder');
     const decRec = await repo.submitRecord({
       userId: 'phys-dec', mode: 'solo', drivetrain: 'mecanum', score: 77,
-      balanceVersion: SEASON, replayId: id2d, game: 'decode',
+      balanceVersion: SEASON, replayId: id2d, game: 'chain',
     });
     check(
       'ruling: ...but a DECODE record run with no tag is accepted and stored as 2d',
@@ -1434,7 +1434,7 @@ async function main(): Promise<void> {
         `${String(mine2d?.score)}/${String(mine2d?.physics)}`,
       );
       // DECODE is the control: one solve, so no filter is applied and its SQL is unchanged
-      const dec = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'decode' });
+      const dec = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'chain' });
       check(
         'ruling/board: a one-solve game is unfiltered — its 2D rows are its only rows',
         dec.some((r) => r.userId === 'phys-dec'),
@@ -1448,7 +1448,7 @@ async function main(): Promise<void> {
        */
       const pb = await repo.personalBest('phys-a', 'solo', 'mecanum', SEASON, 'biobuzz');
       check('ruling/pb: the personal best is the 3D one, not the higher 2D one', pb === 123, String(pb));
-      const pbDec = await repo.personalBest('phys-dec', 'solo', 'mecanum', SEASON, 'decode');
+      const pbDec = await repo.personalBest('phys-dec', 'solo', 'mecanum', SEASON, 'chain');
       check('ruling/pb: ...and a one-solve game’s PB is untouched', pbDec === 77, String(pbDec));
       const rank = await repo.recordRank('phys-a', 'solo', 'mecanum', SEASON, 'biobuzz');
       check(
@@ -1472,7 +1472,7 @@ async function main(): Promise<void> {
       'physics: a versus match stores its solve',
       ((await db.query(`select physics from matches where id = $1`, [m3d])).rows[0] as { physics: string }).physics === '3d',
     );
-    const mLegacy = await repo.saveMatch('1v1', SEASON, id2d, false, 'decode');
+    const mLegacy = await repo.saveMatch('1v1', SEASON, id2d, false, 'chain');
     check(
       'physics: an untagged match is 2d — which is what every DECODE match is',
       ((await db.query(`select physics from matches where id = $1`, [mLegacy])).rows[0] as { physics: string }).physics === '2d',
@@ -1566,7 +1566,7 @@ async function main(): Promise<void> {
       ['server row after the site, before the server restart', await row('2026-09-27T12:00:00Z'), false],
       ['server row after the restart', await row('2026-09-27T17:20:00Z'), true],
       ['2D row after the restart', await row('2026-09-27T17:20:00Z', 'biobuzz', '2d'), false],
-      ['DECODE row after the restart', await row('2026-09-27T17:20:00Z', 'decode', '2d'), false],
+      ['DECODE row after the restart', await row('2026-09-27T17:20:00Z', 'chain', '2d'), false],
     ];
     await repo.ensureProfile('patch-a', 'Patcher');
     const practice = await row('2026-09-27T12:00:00Z');
@@ -1600,7 +1600,7 @@ async function main(): Promise<void> {
       format: 2,
       balanceVersion: 4,
       sim: 2,
-      game: 'decode' as const,
+      game: 'chain' as const,
       mode: 'match' as const,
       seed,
       ticks,
@@ -1616,10 +1616,10 @@ async function main(): Promise<void> {
       `0000${n.toString(16).padStart(4, '0')}-0000-4000-8000-000000000000`;
     const MATCH_A = mid(1);
 
-    const one = await repo.saveLanRun('lan-host', MATCH_A, container(1, 9000), { red: 120, blue: 98 }, roster, SEASON, 'decode');
+    const one = await repo.saveLanRun('lan-host', MATCH_A, container(1, 9000), { red: 120, blue: 98 }, roster, SEASON, 'chain');
     check('lan: a hosted match comes back with its replay', !!one.replayId && one.score.red === 120);
     check('lan: the roster round-trips as names, not ids', one.participants.length === 2 && one.participants[0].name === 'Ana');
-    const listed = await repo.listLanRuns('lan-host', 'decode');
+    const listed = await repo.listLanRuns('lan-host', 'chain');
     check('lan: ...and is listed for the HOST', listed.length === 1 && listed[0].matchId === MATCH_A);
     check(
       'lan: the stored replay is an ordinary one the viewer can already read',
@@ -1627,7 +1627,7 @@ async function main(): Promise<void> {
     );
 
     // THE POINT OF THE SEPARATE TABLE: a score reported by an untrusted server cannot reach a board.
-    const board = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'decode' });
+    const board = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: SEASON, game: 'chain' });
     check(
       'lan: a LAN match NEVER appears on the record leaderboard',
       !board.some((r) => r.score === 120),
@@ -1637,10 +1637,10 @@ async function main(): Promise<void> {
     // IDEMPOTENCE. The same match offered twice is ONE row — this is what makes a retry safe,
     // and it is the difference between a flaky venue connection and a duplicated history.
     const replaysBefore = await db.query(`select count(*)::int as n from replays`);
-    const again = await repo.saveLanRun('lan-host', MATCH_A, container(99, 50), { red: 1, blue: 2 }, roster, SEASON, 'decode');
+    const again = await repo.saveLanRun('lan-host', MATCH_A, container(99, 50), { red: 1, blue: 2 }, roster, SEASON, 'chain');
     check('lan: re-uploading the same matchId returns the SAME row', again.id === one.id);
     check('lan: ...and does not overwrite the first report', again.score.red === 120);
-    const afterRetry = await repo.listLanRuns('lan-host', 'decode');
+    const afterRetry = await repo.listLanRuns('lan-host', 'chain');
     check('lan: ...and creates no second row', afterRetry.length === 1);
     // the rejected upload must not leave its replay behind. A replay has no back-reference to
     // the run that owns it, so one written for a row that never existed is unreachable forever.
@@ -1665,16 +1665,16 @@ async function main(): Promise<void> {
      */
     let claimed: string | null = null;
     try {
-      await repo.saveLanRun('lan-host2', MATCH_A, container(7, 60), { red: 999, blue: 0 }, roster, SEASON, 'decode');
+      await repo.saveLanRun('lan-host2', MATCH_A, container(7, 60), { red: 999, blue: 0 }, roster, SEASON, 'chain');
       claimed = 'accepted';
     } catch (err) {
       claimed = err instanceof repo.LanRunOwnedByAnother ? 'refused' : `wrong error: ${String(err)}`;
     }
     check('lan: another account claiming a filed matchId is REFUSED, not quietly answered', claimed === 'refused', String(claimed));
-    check('lan: ...and it still belongs to the original host', (await repo.listLanRuns('lan-host2', 'decode')).length === 0);
+    check('lan: ...and it still belongs to the original host', (await repo.listLanRuns('lan-host2', 'chain')).length === 0);
     check(
       'lan: ...and the original host still owns the row it filed',
-      (await repo.listLanRuns('lan-host', 'decode'))[0]?.hostUserId === 'lan-host',
+      (await repo.listLanRuns('lan-host', 'chain'))[0]?.hostUserId === 'lan-host',
     );
     // the refused claim must not leave its replay behind either
     const afterClaim = await db.query(`select count(*)::int as n from replays`);
@@ -1696,7 +1696,7 @@ async function main(): Promise<void> {
     try {
       await db.query(
         `insert into lan_runs (match_id, host_user_id, game, balance_version, score, participants)
-         values ('not-a-uuid', 'lan-host', 'decode', $1, '{}'::jsonb, '[]'::jsonb)`,
+         values ('not-a-uuid', 'lan-host', 'chain', $1, '{}'::jsonb, '[]'::jsonb)`,
         [SEASON],
       );
     } catch {
@@ -1717,9 +1717,9 @@ async function main(): Promise<void> {
 
     // PRUNE: the cap holds and pruned runs take their replays with them.
     for (let i = 2; i <= repo.LAN_KEEP + 3; i++) {
-      await repo.saveLanRun('lan-host', mid(i), container(i, 100 + i), { red: i, blue: 0 }, roster, SEASON, 'decode');
+      await repo.saveLanRun('lan-host', mid(i), container(i, 100 + i), { red: i, blue: 0 }, roster, SEASON, 'chain');
     }
-    const capped = await repo.listLanRuns('lan-host', 'decode');
+    const capped = await repo.listLanRuns('lan-host', 'chain');
     check('lan: a host keeps only LAN_KEEP matches, newest first', capped.length === repo.LAN_KEEP, `${capped.length} kept`);
     check('lan: the OLDEST went, not the newest', !capped.some((r) => r.matchId === MATCH_A));
     check(
@@ -1728,7 +1728,7 @@ async function main(): Promise<void> {
     );
 
     // ...and deleting the host's account takes the rest, keyed on host_user_id
-    const live = (await repo.listLanRuns('lan-host', 'decode'))[0];
+    const live = (await repo.listLanRuns('lan-host', 'chain'))[0];
     await repo.deleteAccount('lan-host');
     check('lan: deleting the HOST account deletes its LAN replays too', (await repo.getReplay(live.replayId!)) === null);
     const rows = await db.query(`select count(*)::int as n from lan_runs where host_user_id = 'lan-host'`);
@@ -1757,7 +1757,7 @@ async function main(): Promise<void> {
         format: 2,
         balanceVersion: 4,
         sim: 2,
-        game: 'decode' as const,
+        game: 'chain' as const,
         mode: 'match' as const,
         seed: 42,
         ticks: 1200,
@@ -1765,9 +1765,9 @@ async function main(): Promise<void> {
         tracks: { 0: [1, 2, 3, 4, 5, 6, 7] },
       },
       SEASON,
-      'decode',
+      'chain',
     );
-    const vsMatch = await repo.saveMatch('1v1', SEASON, vsReplay, false, 'decode');
+    const vsMatch = await repo.saveMatch('1v1', SEASON, vsReplay, false, 'chain');
     for (const [userId, alliance] of [
       ['vs-a', 'red'],
       ['vs-b', 'blue'],
@@ -1828,7 +1828,7 @@ async function main(): Promise<void> {
       (await db.query<{ n: number }>(`select count(*)::int as n from replays`)).rows[0].n;
     const oneSided = (userId: string, ranked: boolean, bots?: boolean) =>
       persistMatch({
-        game: 'decode',
+        game: 'chain',
         config: { kind: 'versus' },
         ranked,
         bots,
@@ -1837,7 +1837,7 @@ async function main(): Promise<void> {
           format: 2,
           balanceVersion: 4,
           sim: 2,
-          game: 'decode',
+          game: 'chain',
           mode: 'match',
           seed: 77,
           ticks: 1200,
@@ -1884,7 +1884,7 @@ async function main(): Promise<void> {
     const bv = (
       await db.query<{ balance_version: number }>(`select balance_version from matches where id = $1`, [custom.matchId])
     ).rows[0]?.balance_version;
-    const hist = await repo.userMatchHistory('solo-custom', { balanceVersion: bv, game: 'decode', viewerId: 'solo-custom' });
+    const hist = await repo.userMatchHistory('solo-custom', { balanceVersion: bv, game: 'chain', viewerId: 'solo-custom' });
     const row = hist.rows.find((r) => r.id === custom.matchId);
     check('versus/custom: ...it is in the player’s history with a Watch button', !!row?.replayId, JSON.stringify(row));
     check(
@@ -1895,7 +1895,7 @@ async function main(): Promise<void> {
       'versus/custom: ...a stranger may not (a short roster never goes public)',
       !!row?.replayId && (await repo.replayAccess(row.replayId, 'rp-nosy-custom')).access === 'private',
     );
-    const stats = await repo.getUserStats('solo-custom', bv, 'decode');
+    const stats = await repo.getUserStats('solo-custom', bv, 'chain');
     check(
       'versus/custom: ...and its win is NOT on the "Ranked W–L"',
       stats.match.played === 0 && stats.match.wins === 0,
@@ -1929,11 +1929,11 @@ async function main(): Promise<void> {
     await repo.ensureProfile('mis-filer', 'Filer Two');
 
     const replayId = await repo.saveReplay(
-      { format: 2, balanceVersion: SEASON, sim: 3, game: 'decode', mode: 'match', seed: 7, ticks: 10, setups: [], tracks: {} },
+      { format: 2, balanceVersion: SEASON, sim: 3, game: 'chain', mode: 'match', seed: 7, ticks: 10, setups: [], tracks: {} },
       SEASON,
-      'decode',
+      'chain',
     );
-    const mid = await repo.saveMatch('1v1', SEASON, replayId, true, 'decode');
+    const mid = await repo.saveMatch('1v1', SEASON, replayId, true, 'chain');
     await repo.addMatchParticipant({
       matchId: mid, userId: 'mis-red', alliance: 'red', drivetrain: 'tank',
       score: 40, won: false, ratingBefore: 1000, ratingAfter: 980,
@@ -2036,7 +2036,7 @@ async function main(): Promise<void> {
 
     // ---- the inbox
     const sent = await repo.addNotices([
-      { userId: 'nt-red', kind: 'match.corrected', game: 'decode', data: { refund: 20 }, message: 'two artifacts uncounted' },
+      { userId: 'nt-red', kind: 'match.corrected', game: 'chain', data: { refund: 20 }, message: 'two artifacts uncounted' },
       { userId: 'nt-gone', kind: 'report.closed', data: {} },
       { userId: 'nt-red', kind: 'standing.edited', data: { scoreBefore: 60, scoreAfter: 100 } },
     ]);
@@ -2061,9 +2061,9 @@ async function main(): Promise<void> {
     check('notices: ...and then nothing is unread', (await repo.listNotices('nt-red')).every((n) => n.readAt !== null));
 
     // ---- triage returns who to tell
-    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep', reason: 'throwing', roomCode: 'NT1', game: 'decode' });
-    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep', reason: 'afk', roomCode: 'NT1', game: 'decode' });
-    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep2', reason: 'afk', roomCode: 'NT1', game: 'decode' });
+    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep', reason: 'throwing', roomCode: 'NT1', game: 'chain' });
+    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep', reason: 'afk', roomCode: 'NT1', game: 'chain' });
+    await repo.submitReport({ reportedId: 'nt-bad', reporterId: 'nt-rep2', reason: 'afk', roomCode: 'NT1', game: 'chain' });
     const closed = await repo.setReportsStatus('nt-bad', 'reviewed', 'admin-1');
     check(
       'notices: triage returns every report it closed, with who filed it and why',
@@ -2094,22 +2094,22 @@ async function main(): Promise<void> {
     const { BALANCE_VERSION } = await import('../src/config');
     const { ratingRefund } = await import('../src/notices');
     repo.clearActCache();
-    const liveBv = await repo.currentSeasonNumber(BALANCE_VERSION, 'decode');
-    const act = await repo.actFor('decode');
+    const liveBv = await repo.currentSeasonNumber(BALANCE_VERSION, 'chain');
+    const act = await repo.actFor('chain');
     const rid = await repo.saveReplay(
-      { format: 2, balanceVersion: liveBv, sim: 3, game: 'decode', mode: 'match', seed: 11, ticks: 10, setups: [], tracks: {} },
+      { format: 2, balanceVersion: liveBv, sim: 3, game: 'chain', mode: 'match', seed: 11, ticks: 10, setups: [], tracks: {} },
       liveBv,
-      'decode',
+      'chain',
     );
-    const mid = String(await repo.saveMatch('1v1', liveBv, rid, true, 'decode'));
+    const mid = String(await repo.saveMatch('1v1', liveBv, rid, true, 'chain'));
     await repo.addMatchParticipant({
       matchId: mid, userId: 'nt-red', alliance: 'red', drivetrain: 'tank', score: 40, won: false, ratingBefore: 1000, ratingAfter: 980,
     });
     await repo.addMatchParticipant({
       matchId: mid, userId: 'nt-blue', alliance: 'blue', drivetrain: 'mecanum', score: 55, won: true, ratingBefore: 1000, ratingAfter: 1020,
     });
-    await repo.upsertRating('nt-red', '1v1', act, 980, 200, 0.06, 'decode');
-    await repo.upsertRating('nt-blue', '1v1', act, 1020, 200, 0.06, 'decode');
+    await repo.upsertRating('nt-red', '1v1', act, 980, 200, 0.06, 'chain');
+    await repo.upsertRating('nt-blue', '1v1', act, 1020, 200, 0.06, 'chain');
 
     const pre = await repo.matchScoreDetail(mid);
     check(
@@ -2132,8 +2132,8 @@ async function main(): Promise<void> {
       applied.length === 1 && applied[0].userId === 'nt-red' && applied[0].points === 20,
       JSON.stringify(applied),
     );
-    const redNow = await repo.getRatingFull('nt-red', '1v1', act, 'decode');
-    const blueNow = await repo.getRatingFull('nt-blue', '1v1', act, 'decode');
+    const redNow = await repo.getRatingFull('nt-red', '1v1', act, 'chain');
+    const blueNow = await repo.getRatingFull('nt-blue', '1v1', act, 'chain');
     check(
       'refund: the rating moved by the refund, and the wrongly-awarded winner kept theirs',
       Math.round(redNow.rating) === 1000 && Math.round(blueNow.rating) === 1020,
@@ -2142,14 +2142,14 @@ async function main(): Promise<void> {
     const again = await repo.refundMatchRatings(mid, [{ userId: 'nt-red', points: 20 }], 'admin-1');
     check(
       'refund: ONCE per player per match — a later correction cannot refund the same loss twice',
-      again.length === 0 && Math.round((await repo.getRatingFull('nt-red', '1v1', act, 'decode')).rating) === 1000,
+      again.length === 0 && Math.round((await repo.getRatingFull('nt-red', '1v1', act, 'chain')).rating) === 1000,
     );
     check(
       'refund: the match records who was given what',
       (await repo.matchScoreDetail(mid))?.refunds.some((r) => r.userId === 'nt-red' && r.points === 20) === true,
     );
 
-    const cmid = String(await repo.saveMatch('1v1', liveBv, rid, false, 'decode'));
+    const cmid = String(await repo.saveMatch('1v1', liveBv, rid, false, 'chain'));
     await repo.addMatchParticipant({
       matchId: cmid, userId: 'nt-blue', alliance: 'red', drivetrain: 'tank', score: 1, won: false, ratingBefore: null, ratingAfter: null,
     });
@@ -2169,7 +2169,7 @@ async function main(): Promise<void> {
     );
 
     // ---- the account's own data
-    await repo.addNotices([{ userId: 'nt-blue', kind: 'match.corrected', game: 'decode', data: {}, message: null }]);
+    await repo.addNotices([{ userId: 'nt-blue', kind: 'match.corrected', game: 'chain', data: {}, message: null }]);
     const ex = await repo.exportAccount('nt-blue');
     check('notices: they are in the account’s data export', (ex?.notices.length ?? 0) === 1);
     await repo.deleteAccount('nt-red');
@@ -2198,13 +2198,13 @@ async function main(): Promise<void> {
 
     // a corrected match: both players, each from their own side
     const { BALANCE_VERSION } = await import('../src/config');
-    const bv = await repo.currentSeasonNumber(BALANCE_VERSION, 'decode');
+    const bv = await repo.currentSeasonNumber(BALANCE_VERSION, 'chain');
     const rid = await repo.saveReplay(
-      { format: 2, balanceVersion: bv, sim: 3, game: 'decode', mode: 'match', seed: 12, ticks: 10, setups: [], tracks: {} },
+      { format: 2, balanceVersion: bv, sim: 3, game: 'chain', mode: 'match', seed: 12, ticks: 10, setups: [], tracks: {} },
       bv,
-      'decode',
+      'chain',
     );
-    const mid = String(await repo.saveMatch('1v1', bv, rid, true, 'decode'));
+    const mid = String(await repo.saveMatch('1v1', bv, rid, true, 'chain'));
     await repo.addMatchParticipant({
       matchId: mid, userId: 'wt-red', alliance: 'red', drivetrain: 'tank', score: 40, won: false, ratingBefore: 1000, ratingAfter: 980,
     });
@@ -2238,7 +2238,7 @@ async function main(): Promise<void> {
     );
 
     // a misscore claim upheld after the correction: the filer sees the original → now
-    await nt.noticeMisscore({ reporterId: 'wt-rep', matchId: mid, game: 'decode', verdict: 'upheld', cost: null, message: 'good catch' });
+    await nt.noticeMisscore({ reporterId: 'wt-rep', matchId: mid, game: 'chain', verdict: 'upheld', cost: null, message: 'good catch' });
     const up = (await words('wt-rep'))[0];
     check(
       'who: the filer of an upheld claim is told the corrected numbers, and the moderator’s note',
@@ -2248,7 +2248,7 @@ async function main(): Promise<void> {
       JSON.stringify(up),
     );
     await nt.noticeMisscore({
-      reporterId: 'wt-rep', matchId: null, game: 'decode', verdict: 'rejected',
+      reporterId: 'wt-rep', matchId: null, game: 'chain', verdict: 'rejected',
       cost: { points: 40, scoreAfter: 60, cooldownMin: 120, ratingCharge: 0 }, message: null,
     });
     const rej = (await words('wt-rep'))[0];
@@ -2263,9 +2263,9 @@ async function main(): Promise<void> {
       target: 'wt-bad',
       status: 'reviewed',
       closed: [
-        { reporterId: 'wt-rep', reason: 'throwing', game: 'decode' },
-        { reporterId: 'wt-rep', reason: 'afk', game: 'decode' },
-        { reporterId: 'wt-red', reason: 'afk', game: 'decode' },
+        { reporterId: 'wt-rep', reason: 'throwing', game: 'chain' },
+        { reporterId: 'wt-rep', reason: 'afk', game: 'chain' },
+        { reporterId: 'wt-red', reason: 'afk', game: 'chain' },
       ],
       verdict: {
         kind: 'reportUpheld', points: 25, scoreBefore: 75, scoreAfter: 50, tierBefore: 'warning', tierAfter: 'restricted',
@@ -2292,7 +2292,7 @@ async function main(): Promise<void> {
       JSON.stringify(pen),
     );
     const dismissed = await nt.noticeReportTriage({
-      target: 'wt-bad', status: 'dismissed', closed: [{ reporterId: 'wt-rep', reason: 'afk', game: 'decode' }],
+      target: 'wt-bad', status: 'dismissed', closed: [{ reporterId: 'wt-rep', reason: 'afk', game: 'chain' }],
       verdict: null, reporterMessage: null, playerMessage: 'never sent',
     });
     check(
@@ -2490,7 +2490,7 @@ async function main(): Promise<void> {
      the per-row version — and they sit on the path a player is watching for their rating, so
      they are exercised against the real schema here. */
   {
-    const mid = await repo.saveMatch('2v2', SEASON, null as unknown as string, true, 'decode');
+    const mid = await repo.saveMatch('2v2', SEASON, null as unknown as string, true, 'chain');
     for (const id of ['batch-a', 'batch-b', 'batch-c', 'batch-d']) await repo.ensureProfile(id, id);
     await repo.addMatchParticipants(mid, [
       { userId: 'batch-a', alliance: 'red', drivetrain: 'tank', score: 90, won: true, ratingBefore: 1000, ratingAfter: 1012 },
@@ -2528,10 +2528,10 @@ async function main(): Promise<void> {
 
     // getRatingsFull must agree with getRatingFull for a player WITH a row and for one
     // without — a default that drifted between them would silently re-place a rated player
-    await repo.upsertRating('batch-a', '2v2', 1, 1234, 40, 0.05, 'decode');
-    const many = await repo.getRatingsFull(['batch-a', 'batch-nobody'], '2v2', 1, 'decode');
-    const single = await repo.getRatingFull('batch-a', '2v2', 1, 'decode');
-    const singleMissing = await repo.getRatingFull('batch-nobody', '2v2', 1, 'decode');
+    await repo.upsertRating('batch-a', '2v2', 1, 1234, 40, 0.05, 'chain');
+    const many = await repo.getRatingsFull(['batch-a', 'batch-nobody'], '2v2', 1, 'chain');
+    const single = await repo.getRatingFull('batch-a', '2v2', 1, 'chain');
+    const singleMissing = await repo.getRatingFull('batch-nobody', '2v2', 1, 'chain');
     check('batch: getRatingsFull matches getRatingFull for a rated player',
       many.get('batch-a')?.rating === single.rating && many.get('batch-a')?.rd === single.rd);
     check('batch: ...and uses the SAME defaults for a player with no row',
@@ -2642,11 +2642,11 @@ async function main(): Promise<void> {
       assists: DEFAULT_ASSISTS,
     });
     const outcome = (over: Partial<Parameters<typeof persistMatch>[0]>): Parameters<typeof persistMatch>[0] => ({
-      game: 'decode',
+      game: 'chain',
       config: { kind: 'versus' },
       ranked: false,
       result: { score: { red: 0, blue: 0 }, foulPoints: { red: 0, blue: 0 }, hash: 0, ticks: 60 },
-      replay: { format: 2, balanceVersion: 4, sim: 2, game: 'decode', mode: 'match', seed: 1, ticks: 60, setups: [], tracks: {} },
+      replay: { format: 2, balanceVersion: 4, sim: 2, game: 'chain', mode: 'match', seed: 1, ticks: 60, setups: [], tracks: {} },
       participants: [part('red'), part('blue')],
       ...over,
     });
@@ -2655,12 +2655,12 @@ async function main(): Promise<void> {
     check('plays: a ranked room is ranked/<its mode>', src(outcome({ ranked: true, mode: '2v2' })) === 'ranked/2v2');
     check('plays: a Discord room is discord, not custom', src(outcome({ discord: true })) === 'discord/1v1');
     check('plays: a code room is custom', src(outcome({})) === 'custom/1v1');
-    const beforeAnon = await counted(`game = 'decode' and source = 'discord'`);
+    const beforeAnon = await counted(`game = 'chain' and source = 'discord'`);
     await persistMatch(outcome({ discord: true }));
     let afterAnon = beforeAnon;
     for (let i = 0; i < 50 && afterAnon === beforeAnon; i++) {
       await new Promise((r) => setTimeout(r, 10));
-      afterAnon = await counted(`game = 'decode' and source = 'discord'`);
+      afterAnon = await counted(`game = 'chain' and source = 'discord'`);
     }
     check('plays: a room with NO signed-in player is still counted', afterAnon === beforeAnon + 1, `${beforeAnon} → ${afterAnon}`);
   }
@@ -2841,7 +2841,7 @@ async function main(): Promise<void> {
   */
   {
     const SEA = 1041;
-    await repo.ensureSeason(SEA, 'decode', 9);
+    await repo.ensureSeason(SEA, 'chain', 9);
     await repo.ensureProfile('exp-me', 'Exporter');
     await repo.ensureProfile('exp-other', 'Bystander');
     await repo.setUsername('exp-me', 'exporter');
@@ -2851,7 +2851,7 @@ async function main(): Promise<void> {
       format: 2,
       balanceVersion: SEA,
       sim: 3,
-      game: 'decode' as const,
+      game: 'chain' as const,
       mode: 'match' as const,
       seed,
       ticks: 600,
@@ -2864,22 +2864,22 @@ async function main(): Promise<void> {
     await repo.acceptTerms('exp-me', '2026-08-04');
     await repo.setReplaysPublic('exp-me', true);
 
-    const recReplay = await repo.saveReplay(container(1), SEA, 'decode');
+    const recReplay = await repo.saveReplay(container(1), SEA, 'chain');
     await repo.submitRecord({
       userId: 'exp-me', mode: 'solo', drivetrain: 'swerve', score: 321,
-      balanceVersion: SEA, replayId: recReplay, game: 'decode',
+      balanceVersion: SEA, replayId: recReplay, game: 'chain',
     });
     // ...and one belonging to the OTHER account, with a score nothing of mine shares
-    const otherReplay = await repo.saveReplay(container(2), SEA, 'decode');
+    const otherReplay = await repo.saveReplay(container(2), SEA, 'chain');
     await repo.submitRecord({
       userId: 'exp-other', mode: 'solo', drivetrain: 'tank', score: 777,
-      balanceVersion: SEA, replayId: otherReplay, game: 'decode',
+      balanceVersion: SEA, replayId: otherReplay, game: 'chain',
     });
 
-    const prac = await repo.savePracticeRun('exp-me', container(3), 45, SEA, 'decode');
+    const prac = await repo.savePracticeRun('exp-me', container(3), 45, SEA, 'chain');
 
     // A MATCH WITH BOTH OF THEM IN IT — the shape the "no other players" rule exists for.
-    const mid = await repo.saveMatch('1v1', SEA, null as unknown as string, true, 'decode');
+    const mid = await repo.saveMatch('1v1', SEA, null as unknown as string, true, 'chain');
     await repo.addMatchParticipant({
       matchId: mid, userId: 'exp-me', alliance: 'red', drivetrain: 'swerve',
       score: 88, won: true, ratingBefore: 1000, ratingAfter: 1016,
@@ -3061,7 +3061,7 @@ async function main(): Promise<void> {
   */
   {
     const SEA = 1037;
-    await repo.ensureSeason(SEA, 'decode', 7);
+    await repo.ensureSeason(SEA, 'chain', 7);
     for (const [id, name] of [
       ['rp-red', 'Red'], ['rp-red2', 'Red Two'],
       ['rp-blue', 'Blue'], ['rp-blue2', 'Blue Two'],
@@ -3078,13 +3078,13 @@ async function main(): Promise<void> {
 
     const mkReplay = (seed: number): Promise<string> =>
       repo.saveReplay(
-        { format: 2, balanceVersion: SEA, sim: 3, game: 'decode', mode: 'match', seed, ticks: 10, setups: [], tracks: {} },
+        { format: 2, balanceVersion: SEA, sim: 3, game: 'chain', mode: 'match', seed, ticks: 10, setups: [], tracks: {} },
         SEA,
-        'decode',
+        'chain',
       );
 
     const vsReplay = await mkReplay(1);
-    const mid = await repo.saveMatch('1v1', SEA, vsReplay, true, 'decode');
+    const mid = await repo.saveMatch('1v1', SEA, vsReplay, true, 'chain');
     await repo.addMatchParticipant({
       matchId: mid, userId: 'rp-red', alliance: 'red', drivetrain: 'tank',
       score: 40, won: false, ratingBefore: 1000, ratingAfter: 980,
@@ -3141,7 +3141,7 @@ async function main(): Promise<void> {
     let anonMid = '';
     {
       const anonReplay = await mkReplay(10);
-      anonMid = String(await repo.saveMatch('1v1', SEA, anonReplay, true, 'decode'));
+      anonMid = String(await repo.saveMatch('1v1', SEA, anonReplay, true, 'chain'));
       await repo.addMatchParticipant({
         matchId: anonMid, userId: 'rp-red', alliance: 'red', drivetrain: 'tank',
         score: 30, won: true, ratingBefore: 1000, ratingAfter: 1010,
@@ -3158,7 +3158,7 @@ async function main(): Promise<void> {
 
       // a 2v2 needs FOUR, so three consenting players is still not the roster
       const duoReplay = await mkReplay(11);
-      const duoMid = await repo.saveMatch('2v2', SEA, duoReplay, true, 'decode');
+      const duoMid = await repo.saveMatch('2v2', SEA, duoReplay, true, 'chain');
       for (const [uid, side] of [['rp-red', 'red'], ['rp-red2', 'red'], ['rp-blue', 'blue']] as [string, string][]) {
         await repo.addMatchParticipant({
           matchId: duoMid, userId: uid, alliance: side as 'red' | 'blue', drivetrain: 'tank',
@@ -3198,7 +3198,7 @@ async function main(): Promise<void> {
     const recReplay = await mkReplay(2);
     await repo.submitRecord({
       userId: 'rp-blue', mode: 'solo', drivetrain: 'tank', score: 120,
-      balanceVersion: SEA, replayId: recReplay, game: 'decode',
+      balanceVersion: SEA, replayId: recReplay, game: 'chain',
     });
     await repo.setReplaysPublic('rp-blue', false);
     check(
@@ -3211,10 +3211,10 @@ async function main(): Promise<void> {
     // else. Only the unguessable uuid was protecting it.
     const prac = await repo.savePracticeRun(
       'rp-red',
-      { format: 2, balanceVersion: SEA, sim: 3, game: 'decode', mode: 'match', seed: 3, ticks: 10, setups: [], tracks: {} },
+      { format: 2, balanceVersion: SEA, sim: 3, game: 'chain', mode: 'match', seed: 3, ticks: 10, setups: [], tracks: {} },
       50,
       SEA,
-      'decode',
+      'chain',
     );
     const pracReplay = String(prac.replayId);
     check(
@@ -3231,11 +3231,11 @@ async function main(): Promise<void> {
       const lanRun = await repo.saveLanRun(
         'rp-host',
         '11111111-2222-3333-4444-555555555555',
-        { format: 2, balanceVersion: SEA, sim: 3, game: 'decode', mode: 'match', seed: 20, ticks: 10, setups: [], tracks: {} },
+        { format: 2, balanceVersion: SEA, sim: 3, game: 'chain', mode: 'match', seed: 20, ticks: 10, setups: [], tracks: {} },
         { red: 40, blue: 50 },
         [{ name: 'Guest One', alliance: 'red' }, { name: 'Guest Two', alliance: 'blue' }],
         SEA,
-        'decode',
+        'chain',
       );
       const lanReplay = String(lanRun.replayId);
       check('privacy/lan: the HOST who uploaded it can watch it', (await acc(lanReplay, 'rp-host')) === 'ok');
@@ -3287,7 +3287,7 @@ async function main(): Promise<void> {
     await repo.setReplaysPublic('rp-red', false);
     const hist = (subject: string, viewer: string | null, staff = false): Promise<repo.MatchHistoryPage> =>
       repo.userMatchHistory(subject, {
-        balanceVersion: SEA, game: 'decode', viewerId: viewer, viewerIsStaff: staff,
+        balanceVersion: SEA, game: 'chain', viewerId: viewer, viewerIsStaff: staff,
       });
 
     const asStranger = await hist('rp-red', 'rp-nosy');
@@ -3394,9 +3394,9 @@ async function main(): Promise<void> {
     check('analytics/country: a known zone maps, an unknown one contributes nothing', an.countryForTimezone('Europe/Berlin') === 'DE' && an.countryForTimezone('Etc/GMT+5') === '');
 
     // ---- the beacon validator ------------------------------------------------------------
-    check('analytics/parse: a beacon with no path is not a partial record, it is not a record', an.parsePageview({ g: 'decode' }) === null);
+    check('analytics/parse: a beacon with no path is not a partial record, it is not a record', an.parsePageview({ g: 'chain' }) === null);
     {
-      const pv = an.parsePageview({ p: '/decode/records', g: 'decode', w: 'lg', x: 'web', r: 'GOOGLE.COM', z: 'Europe/Berlin' });
+      const pv = an.parsePageview({ p: '/decode/records', g: 'chain', w: 'lg', x: 'web', r: 'GOOGLE.COM', z: 'Europe/Berlin' });
       check('analytics/parse: a good beacon comes back normalized', pv?.path === '/decode/records' && pv.ref === 'google.com' && pv.screen === 'lg');
       const junk = an.parsePageview({ p: '/x', w: '9000', x: 'curl', g: 'DECODE!', evil: 'select 1' });
       check(
@@ -4374,7 +4374,7 @@ async function main(): Promise<void> {
     await repo.ensureProfile('aw-1', 'Champ');
     await repo.ensureProfile('aw-2', 'Runner');
 
-    const GAME = 'decode' as const;
+    const GAME = 'chain' as const;
     // A season with no boards behind it still rolls, and awards nothing. That is the
     // ordinary case on a fresh install and it must not throw.
     const before = await repo.startNewSeason(1, 'awards-a', false, GAME);
@@ -4439,6 +4439,13 @@ async function main(): Promise<void> {
    */
   {
     const G = 'chain' as const;
+    // THE BLOCKS ABOVE THAT WERE DECODE'S seed Chain Reaction seasons since this fork removed
+    // DECODE (99, 1037, 1041 and the 1042 a season roll adds, all act 7). This block and the
+    // season checks after it read "the game's latest act" off their own rows, as they did while
+    // those were another game's — so hand the namespace back, empty, before seeding.
+    await db.query(`delete from seasons where game = $1`, [G]);
+    repo.clearSeasonsCache();
+    repo.clearActCache();
     for (const u of ['rw-a', 'rw-b', 'rw-c', 'rw-d', 'rw-e', 'rw-z', 'rw-s']) await repo.ensureProfile(u, u.toUpperCase());
     for (const [bv, act] of [[901, 0], [902, 1], [903, 1], [904, 2], [905, 2]] as const) {
       await db.query(
@@ -4692,7 +4699,7 @@ async function main(): Promise<void> {
 
     check('era: the live BIOBUZZ season is 3D', (await repo.boardPhysics(G, 952)) === '3d');
     check('⚠️ era: an archived BIOBUZZ season is the solve most of its runs were played on', (await repo.boardPhysics(G, 951)) === '2d');
-    check('era: a one-solve game has no era filter, live or archived', (await repo.boardPhysics('decode', 1)) === undefined);
+    check('era: a one-solve game has no era filter, live or archived', (await repo.boardPhysics('chain', 1)) === undefined);
 
     const old = await repo.recordLeaderboard({ mode: 'solo', balanceVersion: 951, game: G });
     check('⚠️ era: the archived Act 1 board shows its 2D runs', old.map((r) => r.userId).join(',') === 'era-a,era-b,era-c',
@@ -5168,11 +5175,11 @@ async function main(): Promise<void> {
 
     // ---- the behaviour charge is arithmetic on the stored row --------------------------
     await repo.ensureProfile('race-a', 'RaceA');
-    await repo.upsertRating('race-a', '1v1', 5, 1200, 80, 0.06, 'decode');
+    await repo.upsertRating('race-a', '1v1', 5, 1200, 80, 0.06, 'chain');
     // the ranked write lands AFTER any read the charge could have made, and must survive it
-    await repo.upsertRating('race-a', '1v1', 5, 1215, 78, 0.06, 'decode');
-    const ch = await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 50, 100, 'decode');
-    const afterCharge = await repo.getRatingFull('race-a', '1v1', 5, 'decode');
+    await repo.upsertRating('race-a', '1v1', 5, 1215, 78, 0.06, 'chain');
+    const ch = await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 50, 100, 'chain');
+    const afterCharge = await repo.getRatingFull('race-a', '1v1', 5, 'chain');
     check(
       '⚠️ rating charge: subtracts from what is STORED (1215 − 50), reporting the real before/after',
       afterCharge.rating === 1165 && ch.before === 1215 && ch.after === 1165,
@@ -5182,27 +5189,27 @@ async function main(): Promise<void> {
     // PGlite's one connection, which is exactly where the old read-then-write lost one of them
     await db.query(`update elo_ratings set rating = 1200 where user_id = 'race-a' and mode = '1v1' and act = 5`);
     await Promise.all([
-      repo.chargeRatingForBehaviour('race-a', '1v1', 5, 50, 100, 'decode'),
+      repo.chargeRatingForBehaviour('race-a', '1v1', 5, 50, 100, 'chain'),
       db.query(`update elo_ratings set rating = rating + 15 where user_id = 'race-a' and mode = '1v1' and act = 5`),
     ]);
-    const both = (await repo.getRatingFull('race-a', '1v1', 5, 'decode')).rating;
+    const both = (await repo.getRatingFull('race-a', '1v1', 5, 'chain')).rating;
     check('\u26a0\ufe0f rating charge: a concurrent result write and the charge BOTH land (1200 + 15 \u2212 50)', both === 1165, `stored ${both}`);
     await db.query(`update elo_ratings set rating = 1165 where user_id = 'race-a' and mode = '1v1' and act = 5`);
     const gamesKept = await db.query<{ games: number; rd: number }>(
-      `select games, rd from elo_ratings where user_id = 'race-a' and mode = '1v1' and act = 5 and game = 'decode'`,
+      `select games, rd from elo_ratings where user_id = 'race-a' and mode = '1v1' and act = 5 and game = 'chain'`,
     );
     check('rating charge: ...leaving games and RD alone', gamesKept.rows[0].games === 2 && Number(gamesKept.rows[0].rd) === 78);
-    await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 5000, 100, 'decode');
-    check('rating charge: floored', (await repo.getRatingFull('race-a', '1v1', 5, 'decode')).rating === 100);
+    await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 5000, 100, 'chain');
+    check('rating charge: floored', (await repo.getRatingFull('race-a', '1v1', 5, 'chain')).rating === 100);
     await db.query(`update elo_ratings set rating = 60 where user_id = 'race-a' and mode = '1v1' and act = 5`);
-    const under = await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 10, 100, 'decode');
+    const under = await repo.chargeRatingForBehaviour('race-a', '1v1', 5, 10, 100, 'chain');
     check(
       'rating charge: a charge never RAISES a rating already under the floor',
-      under.after === 60 && (await repo.getRatingFull('race-a', '1v1', 5, 'decode')).rating === 60,
+      under.after === 60 && (await repo.getRatingFull('race-a', '1v1', 5, 'chain')).rating === 60,
       JSON.stringify(under),
     );
     await repo.ensureProfile('race-b', 'RaceB');
-    const seeded = await repo.chargeRatingForBehaviour('race-b', '2v2', 5, 30, 100, 'decode');
+    const seeded = await repo.chargeRatingForBehaviour('race-b', '2v2', 5, 30, 100, 'chain');
     const seedRow = await db.query<{ rating: number; games: number }>(
       `select rating, games from elo_ratings where user_id = 'race-b' and mode = '2v2' and act = 5`,
     );
@@ -5389,8 +5396,8 @@ async function main(): Promise<void> {
     await repo.ensureProfile('inv-b', 'InvB');
     check('friends: a request still works under the lock', (await repo.sendFriendRequest('inv-a', 'inv-b')) === 'sent');
     check('friends: ...and the mirror still folds into an accept', (await repo.sendFriendRequest('inv-b', 'inv-a')) === 'accepted');
-    await repo.inviteToRoom('inv-a', 'inv-b', 'TOKEN1', 'decode', 'versus', null, 'rated1v1');
-    await repo.inviteToRoom('inv-a', 'inv-b', 'TOKEN2', 'decode', 'versus', null, 'rated1v1');
+    await repo.inviteToRoom('inv-a', 'inv-b', 'TOKEN1', 'chain', 'versus', null, 'rated1v1');
+    await repo.inviteToRoom('inv-a', 'inv-b', 'TOKEN2', 'chain', 'versus', null, 'rated1v1');
     const invRows = await db.query<{ room: string }>(`select room from room_invites where from_user_id = 'inv-a' and to_user_id = 'inv-b'`);
     check('challenge: a re-send REPLACES, one live token', invRows.rows.length === 1 && invRows.rows[0].room === 'TOKEN2');
 
@@ -5574,8 +5581,8 @@ async function main(): Promise<void> {
 
     // the board minimums (owner, 2026-10-03): live 10 / 7, archived seasons keep 5
     check('board: 1v1 needs 10 games, 2v2 needs 7', repo.boardMinGames('1v1', G) === 10 && repo.boardMinGames('2v2', G) === 7);
-    check('board: an archived season before the change keeps 5', repo.boardMinGames('1v1', 'decode', 6) === 5 && repo.boardMinGames('2v2', G, 4) === 5);
-    check('board: ...the season it shipped in and later take the new rule', repo.boardMinGames('1v1', 'decode', 7) === 10 && repo.boardMinGames('2v2', G, 5) === 7);
+    check('board: an archived season before the change keeps 5', repo.boardMinGames('1v1', 'chain', 4) === 5 && repo.boardMinGames('2v2', G, 4) === 5);
+    check('board: ...the season it shipped in and later take the new rule', repo.boardMinGames('1v1', 'chain', 5) === 10 && repo.boardMinGames('2v2', G, 5) === 7);
     const lb = await repo.eloLeaderboard({ mode: '1v1', act, game: G });
     check('board: nobody with under 10 1v1 games is on the board', lb.length === 0, JSON.stringify(lb));
   }

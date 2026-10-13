@@ -4564,20 +4564,6 @@ tr.lb-detail td {
     right: 4px;
   }
 }
-/* "save current" / "add" slot: dashed, muted until hovered */
-.ds-opt-add {
-  border-style: dashed;
-  color: var(--ds-mut);
-  justify-content: center;
-}
-.ds-opt-add:not(:disabled):hover {
-  color: var(--ds-ink);
-  border-color: var(--ds-accent);
-}
-.ds-opt-add:disabled {
-  opacity: var(--ds-disabled-opacity);
-  cursor: not-allowed;
-}
 @media (hover: hover) {
   .ds-opt:where(:not(:disabled)):hover {
     border-color: color-mix(in srgb, var(--ds-accent) 45%, var(--ds-line));

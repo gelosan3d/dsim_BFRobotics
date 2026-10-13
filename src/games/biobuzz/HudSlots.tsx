@@ -377,8 +377,8 @@ export function BiobuzzPinnedNotice({ hud }: GameHudProps) {
 /**
  * The whole bottom bar — red | timer | blue, each alliance's up-CELL line under its total.
  *
- * It exists because the SHARED bar is DECODE's: it draws the motif dots for every game that
- * is not Chain Reaction, and BIOBUZZ has no motif. The LAYOUT is the shared one on purpose
+ * It exists because the SHARED bar was DECODE's: it drew the motif dots for every game that
+ * was not Chain Reaction, and BIOBUZZ has no motif. The LAYOUT is the shared one on purpose
  * (the same `scorebar` / `score-panel` / `timer-panel` classes), so it themes identically and
  * a driver who plays two games reads the same bar in both. The one addition is the sub-line,
  * which is `.score-panel.bb` stacking its children instead of centring one.

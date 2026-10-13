@@ -74,13 +74,13 @@ interface Shape {
 const SHAPES: Shape[] = [
   {
     id: 'decode-solo',
-    game: 'decode',
+    game: 'chain',
     config: (game) => ({ kind: 'record', record: 'solo', game }),
     seats: [{ alliance: 'red', startIndex: 0 }],
   },
   {
     id: 'decode-1v1',
-    game: 'decode',
+    game: 'chain',
     config: (game) => ({ kind: 'versus', game }),
     seats: [
       { alliance: 'red', startIndex: 0 },
@@ -89,7 +89,7 @@ const SHAPES: Shape[] = [
   },
   {
     id: 'decode-2v2',
-    game: 'decode',
+    game: 'chain',
     config: (game) => ({ kind: 'versus', game }),
     seats: [
       { alliance: 'red', startIndex: 0 },

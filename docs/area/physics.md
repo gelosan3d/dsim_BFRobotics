@@ -7,6 +7,14 @@ The Rapier solve, the two-solve round loop, pins, artifact contact, the wall squ
 session and this is not needed by most of them. The `governs:` line above is read by
 `scripts/docaudit.mjs` and by the editor hook, so keep it accurate when paths move.*
 
+> ⚠️ **DECODE WAS REMOVED FROM THIS FORK (2026-10-12).** Its world step (`src/sim/world.ts` and
+> the two-solve round loop's DECODE driver), `goal.ts`, the human player, the gate / classifier /
+> basin, auto paths and their kinematic bodies are gone. The paragraphs below still name them,
+> because the measurements that shaped the SHARED solve were taken there and the reasons are
+> still the reasons: read a `world.ts` / goal-face / gate / auto-path reference as the history of
+> why `physicsEngine.ts`, `artifactSolids.ts` and the robot core are shaped as they are. The
+> ground-element solve now runs under BIOBUZZ's 2D step; Chain Reaction runs the robot solve only.
+
 ---
 
 ## Physics
@@ -58,7 +66,7 @@ session and this is not needed by most of them. The `governs:` line above is rea
   `recordRobotContacts` is the record half. BIOBUZZ 3D uses the pair (`SIM_PATCH` 8; 3 on `alpha`): its Rapier
   world persists, and a heading written after the solve came back as a rotation teleport the solver
   fought every tick — the online wall bump, `docs/area/biobuzz.md`. The 2D solves rebuild their
-  world each tick and keep the post-solve write; DECODE and Chain Reaction step byte-identically.
+  world each tick and keep the post-solve write; Chain Reaction steps byte-identically.
 - **THE PAIR PASS ACCUMULATES; IT DOES NOT WRITE** (`ContactAcc`). It used to rotate both chassis
   before the walls / goal faces / classifier / gate arm were asked anything, so those surfaces
   worked out their geometry against a robot an opponent had already turned — the exact
@@ -336,9 +344,9 @@ modeled motor is the **MATRIX / goBILDA 5000-series 12VDC** brushed motor (5800 
   drift + yaw wobble driving straight. **X-drive renders as a DIAMOND, not an X**: the omnis
   are at ±45° but lie ACROSS their corners, not along the diagonals. Both renderers had them
   radial — every wheel aimed at the centre, which is a machine with no moment arm and so no
-  yaw at all — and that is what read as an X. Fixed in BOTH `src/render/drawRobot.ts` (which
-  DECODE's builder preview also uses, since it renders a real `RobotState`) and
-  `src/games/chain/parts.ts`; CR's builder preview was already correct. Keep the two in step.
+  yaw at all — and that is what read as an X. Each game draws its own wheels now
+  (`src/games/chain/parts.ts`, `src/games/biobuzz/parts.ts`; the shared copy in
+  `src/render/drawRobot.ts` was DECODE's and went with it), by the same expression. Keep the two in step.
 - **NICHES:** tank raw power/no-strafe · swerve strongest-but-imprecise · mecanum
   light/instant/precise but weaker · x-drive deliberately-weak novelty.
 - **PUSHING POWER IS A FORCE, and the collider mass is DERIVED from it** (`drivetrain.ts`):

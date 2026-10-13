@@ -126,7 +126,7 @@ export function aiChecks(check: Check): void {
     check('BIOBUZZ registers a bot driver on the sim module', simModuleFor('biobuzz').bot !== undefined);
     check(
       'DECODE and Chain Reaction register NO bot (absent is what "this game has none" means)',
-      simModuleFor('decode').bot === undefined && simModuleFor('chain').bot === undefined,
+      simModuleFor('chain').bot === undefined,
     );
     const bot = BIOBUZZ_SIM.bot!;
     check('three tiers, in difficulty order', bot.tiers.join(',') === 'easy,medium,hard', bot.tiers.join(','));

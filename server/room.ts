@@ -6,9 +6,9 @@ const randomUUID = (): string => crypto.randomUUID();
 import { envVar } from './runtimeEnv';
 import * as C from '../src/config';
 import { newSettleClock, settleStep, type SettleClock } from '../src/sim/settle';
-import { coerceAutoPath, DEFAULT_SPEC, DEFAULT_ASSISTS, type RobotSetup } from '../src/sim/spawn';
+import { DEFAULT_SPEC, DEFAULT_ASSISTS, type RobotSetup } from '../src/sim/spawn';
 import { simModuleFor } from '../src/games/sim';
-import { serverPhysics } from '../src/games/types';
+import { DEFAULT_GAME, serverPhysics } from '../src/games/types';
 import { scrubName } from './moderation';
 import type { GameId, Physics } from '../src/types';
 import { physicsReady } from '../src/sim/physicsEngine';
@@ -373,7 +373,7 @@ export interface MatchParticipant {
 /** everything the persistence layer needs when a match reaches phase 'post' */
 export interface MatchOutcome {
   /** which game was played. Persistence SKIPS unscored games (CR shell) so they
-   * never touch ELO/records. Absent ⇒ 'decode'. */
+   * never touch ELO/records. Absent ⇒ `DEFAULT_GAME`. */
   game?: GameId;
   config: RoomConfig;
   /** true only for matchmade ranked rooms; custom versus rooms persist for the
@@ -581,11 +581,11 @@ export class Room {
   private readonly slotOf = new Map<string, number>(); // clientId -> roster slot (= robotId)
 
   /** which game this room runs. Ranked comes from the staged PendingMatch, custom
-   * from the room config; DECODE by default (old clients). Resolves the sim module
-   * (createWorld/step) — a CR room and a DECODE room never share a matchmaking
-   * bucket (server/matchmaking.ts), so a room's game is unambiguous. */
+   * from the room config; `DEFAULT_GAME` when neither names one. Resolves the sim module
+   * (createWorld/step) — two games never share a matchmaking bucket
+   * (server/matchmaking.ts), so a room's game is unambiguous. */
   private get game(): GameId {
-    return this.pendingMatch?.game ?? this.config.game ?? 'decode';
+    return this.pendingMatch?.game ?? this.config.game ?? DEFAULT_GAME;
   }
 
   /** which game this room runs (public read for the operator snapshot) */
@@ -972,7 +972,7 @@ export class Room {
       players: this.seatsTaken,
       capacity: roomCapacity(this.config),
       kind: this.config.kind,
-      game: this.config.game ?? 'decode',
+      game: this.config.game ?? DEFAULT_GAME,
       joinable: this.canJoin(),
       state,
     };
@@ -2491,17 +2491,12 @@ export class Room {
     const setups: RobotSetup[] = [];
     this.robotOf.clear();
     p.roster.forEach((r, i) => {
-      // the staged autoPath is a serialized string (and in practice unset); coerce it
-      // to the AutoPathData shape RobotSetup expects (createWorld re-coerces anyway).
-      const autoPath = coerceAutoPath(r.autoPath) ?? undefined;
       setups.push({
         id: i,
         alliance: r.alliance,
         spec: r.spec,
         assists: r.assists,
         startIndex: r.startIndex,
-        autoPath,
-        autoPathEnabled: autoPath ? r.autoPathEnabled === true : false,
       });
       const c = r.userId ? byUser.get(r.userId) : undefined;
       if (c) this.robotOf.set(c.id, i);

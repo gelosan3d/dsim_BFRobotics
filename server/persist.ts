@@ -23,7 +23,7 @@ import { persistVersusMatch } from './ranked';
 import { scrubSpecNames } from './moderation';
 import { recordScore } from '../src/sim/replay';
 import { simModuleFor } from '../src/games/sim';
-import { serverPhysics } from '../src/games/types';
+import { DEFAULT_GAME, serverPhysics } from '../src/games/types';
 import type { BehaviourReport, DodgeReport, MatchOutcome, PersistOutcome } from './room';
 import { type DodgeVerdict } from '../src/dodge';
 import { WINDOW_HOURS } from '../src/standing';
@@ -56,9 +56,9 @@ export async function persistMatch(o: MatchOutcome): Promise<PersistOutcome> {
     `[persist] match end: ${label} participants=${o.participants.length} authed=${authed.length} dbEnabled=${dbEnabled}`,
   );
   // UNSCORED games never touch ELO/records/history (a 0-0 result would pollute the
-  // boards). Both DECODE and Chain Reaction are scored; the boards/periods are keyed
-  // PER GAME (`o.game`), so each game's ranked/records stay fully separate.
-  const game = o.game ?? 'decode';
+  // boards). Every game this fork has is scored; the boards/periods are keyed PER GAME
+  // (`o.game`), so each game's ranked/records stay fully separate.
+  const game = o.game ?? DEFAULT_GAME;
   if (!simModuleFor(game).scored) {
     console.log(`[persist] SKIP — unscored game (${game})`);
     return {};

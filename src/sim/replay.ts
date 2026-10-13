@@ -1,7 +1,8 @@
-import type { Alliance, GameId, GameMode, MatchPhase, Physics, RobotCommand, RobotSpec, World, AutoPathData, StartPose } from '../types';
+import type { Alliance, GameId, GameMode, MatchPhase, Physics, RobotCommand, RobotSpec, World, StartPose } from '../types';
 import * as C from '../config';
 import { DEFAULT_ASSISTS, type RobotSetup } from './spawn';
 import { simModuleFor } from '../games/sim';
+import { DEFAULT_GAME, isGameId } from '../games/types';
 import { MATCH_SETTLE_MAX_S } from './settle';
 import {
   dequantizeCommand,
@@ -74,7 +75,7 @@ export interface Replay {
    * playable (see `SIM_PATCH`). ABSENT ⇒ 0. */
   patch?: number;
   /** which game this replay is of — picks the sim module to re-simulate it (createWorld
-   * + step). Absent on old replays ⇒ DECODE. */
+   * + step). Absent on old replays, which were all DECODE's: refused (`replayGameOf`). */
   game?: GameId;
   /**
    * WHICH PHYSICS BACKEND THIS REPLAY WAS RECORDED UNDER (Day 1 seam,
@@ -139,7 +140,7 @@ export class ReplayRecorder {
     readonly seed: number,
     readonly setups: RobotSetup[],
     readonly mode: GameMode = 'match',
-    readonly game: GameId = 'decode',
+    readonly game: GameId = DEFAULT_GAME,
     /** which physics backend the run being recorded is stepping (`Replay.physics`). Default
      *  `'2d'` so every existing caller records exactly what it always did. */
     readonly physics: Physics = '2d',
@@ -185,8 +186,6 @@ export class ReplayRecorder {
         ...s,
         spec: { ...s.spec },
         assists: { ...s.assists },
-        autoPath: s.autoPath, // Include autoPath
-        autoPathEnabled: s.autoPathEnabled, // Include autoPathEnabled
       })),
       ticks: this.ticks,
       tracks,
@@ -207,8 +206,23 @@ export class ReplayRecorder {
  *                    produced it is genuinely UNKNOWN rather than known-different.
  *  • `tank`       — a FORMAT-1 replay of a tank-steered robot, whose drive input the
  *                    container had nowhere to store.
+ *  • `game`       — a game this build does not have: DECODE, removed from this fork on
+ *                    2026-10-12 (`game: 'decode'`, or no `game` at all — every replay from
+ *                    before the game seam was DECODE's).
  */
-export type ReplayRefusal = 'future' | 'balance' | 'behaviour' | 'unstamped' | 'tank';
+export type ReplayRefusal = 'future' | 'balance' | 'behaviour' | 'unstamped' | 'tank' | 'game';
+
+/**
+ * THE GAME A STORED REPLAY RE-SIMULATES IN, or null when this build cannot play it.
+ *
+ * Deliberately NOT `coerceGameId`: an absent or unknown `game` is a DECODE recording, and
+ * re-simulating its inputs as BIOBUZZ (the fallback game) would play a match that never happened
+ * under the recording's name. A replay is an input log for ONE game, so an unknown game is a
+ * refusal, never a default.
+ */
+export function replayGameOf(r: { game?: unknown }): GameId | null {
+  return isGameId(r.game) ? r.game : null;
+}
 
 /**
  * WHAT, if anything, differs between that container and this build — the ONE authority.
@@ -239,11 +253,12 @@ export type ReplayRefusal = 'future' | 'balance' | 'behaviour' | 'unstamped' | '
  * instead of naming a version the recorder never claimed.
  */
 export function replayRefusal(
-  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups'>,
+  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups' | 'game'>,
   balanceVersion: number,
   simVersion: number,
 ): ReplayRefusal | null {
   if (r.format > REPLAY_FORMAT) return 'future';
+  if (replayGameOf(r) === null) return 'game';
   if (r.balanceVersion !== balanceVersion) return 'balance';
   if (r.format < 2 && r.setups.some((s) => tankSteered(s.spec.drivetrain))) return 'tank';
   if ((r.sim ?? 0) !== simVersion) return r.sim === undefined ? 'unstamped' : 'behaviour';
@@ -285,7 +300,7 @@ const DRIFT_REASONS: ReadonlySet<ReplayRefusal> = new Set<ReplayRefusal>([
 ]);
 
 export function replayFidelity(
-  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups'>,
+  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups' | 'game'>,
   balanceVersion: number,
   simVersion: number,
 ): ReplayFidelity {
@@ -301,7 +316,7 @@ export function replayFidelity(
  * starts to drift is exactly when saving it matters most.
  */
 export function replayPlayable(
-  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups'>,
+  r: Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups' | 'game'>,
   balanceVersion: number,
   simVersion: number,
 ): boolean {
@@ -349,7 +364,7 @@ export class ReplayPlayer {
   private logged = 0; // how much of world.events has been stamped
   private readonly cursor: Record<number, number> = {}; // robotId -> next entry index
   private readonly current = new Map<number, RobotCommand>();
-  private readonly mod; // CR vs DECODE re-sim module (createWorld/step)
+  private readonly mod; // the recording's own game's re-sim module (createWorld/step)
 
   constructor(private readonly replay: Replay) {
     this.mod = simModuleFor(replay.game);
@@ -514,8 +529,6 @@ export function recordSetups(
   spec: RobotSpec,
   mode: RecordMode,
   assists = DEFAULT_ASSISTS,
-  autoPath?: AutoPathData, // Add autoPath parameter
-  autoPathEnabled?: boolean, // Add autoPathEnabled parameter
   startPose?: StartPose, // custom start pose (applied to slot 0 only)
   partnerSpec?: RobotSpec, // duo slot 1's own build (defaults to `spec`)
 ): RobotSetup[] {
@@ -527,8 +540,6 @@ export function recordSetups(
     assists: { ...assists },
     startIndex,
     startPose: pose,
-    autoPath: autoPath, // Pass autoPath
-    autoPathEnabled: autoPathEnabled, // Pass autoPathEnabled
   });
   // slot 1 stays on a preset so a duo can't spawn both robots on one custom spot
   return mode === 'solo'
@@ -574,7 +585,7 @@ export function runRecordMatch(
   opts: { mode?: GameMode; stopTick?: number; game?: GameId; physics?: Physics } = {},
 ): RecordRun {
   const mode = opts.mode ?? 'match';
-  const game = opts.game ?? 'decode';
+  const game = opts.game ?? DEFAULT_GAME;
   const physics = opts.physics ?? '2d';
   const mod = simModuleFor(game);
   const world = mod.createWorld(mode, seed, setups, undefined, physics);

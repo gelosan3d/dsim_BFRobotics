@@ -9,7 +9,6 @@ import type {
   GameId,
   GameMode,
   MatchPhase,
-  Motif,
   Physics,
   RobotCommand,
   RobotState,
@@ -19,7 +18,7 @@ import type {
 } from './types';
 import * as C from './config';
 import type { RobotSetup } from './sim/spawn';
-import { practiceSetups } from './settings';
+import { activeBindings, practiceSeatsFor, practiceSetups, seatAssists, singlePadBindings } from './settings';
 import { moduleFor, gameOf } from './games';
 import { TutorialRunner } from './tutorial/runner';
 import { markTutorialSeen } from './tutorial/flag';
@@ -47,9 +46,10 @@ import { ReplayRecorder, worldResult, type Replay, type ReplayResult } from './s
 import { MATCH_SETTLE_MAX_S, newSettleClock, settleStep } from './sim/settle';
 import { practiceSaveDecision } from './replaySavePolicy';
 import { readRenderStats } from './perfStats';
-import { robotInLaunchZone } from './sim/robot';
 import { InputManager } from './input/input';
-import { effectiveBindings, type ControlBindings } from './input/bindings';
+import { actionUsedBy, effectiveBindings, FTC25_PRESET_ACTIONS, type ControlBindings } from './input/bindings';
+import { DriverShaping, type ShapingCtx } from './input/driverShaping';
+import { forkFeaturesAllowed } from './net/forkScope';
 import { Renderer } from './render/renderer';
 import { MatchAudio } from './audio';
 import type { MatchResultInfo, NetSession, NetStatus, Snapshot } from './net/session';
@@ -59,7 +59,6 @@ import { REMOTE_SMOOTH_HALFLIFE, blendPose, followDrawn, nearDrawWeight, type Po
 import { FULL_RESYNC_EVERY, cmdsAgree, digestsAgree, worldDigest, type WorldDigest } from './net/worldDigest';
 import { clamp } from './math';
 import { viewAngleOf } from './sim/field';
-import { reframeStick } from './input/driveFrame';
 import type { RecordRankInfo } from './net/protocol';
 
 /** online, how long after the buzzer (wall seconds) to stop waiting for the server's final score
@@ -395,12 +394,10 @@ export interface HudSnapshot {
   phase: MatchPhase;
   timeLeft: number;
   alliance: Alliance;
-  motif: Motif;
   score: ScoreBreakdown;
   oppTotal: number;
   /** the opponent alliance's full breakdown (for the match-results screen) */
   oppScore: ScoreBreakdown;
-  provisionalPattern: number;
   /** fouls committed BY each alliance (counts, for the HUD chip) */
   fouls: Record<Alliance, { minor: number; major: number }>;
   /** the CARD the local robot's team currently holds, or null. A card is issued to a TEAM
@@ -415,18 +412,22 @@ export interface HudSnapshot {
   /** has the driver switched drive style mid-match away from the one the robot spawned with
    *  (the menu's Drive style)? Shows the drive-style item in the sub-HUD. */
   driveStyleSwitched: boolean;
+  /** FTC25 controls (`GameSettings.controlScheme`), or null under DSim controls: the shooter
+   *  power preset while the local robot launches at it (`manualShot` — null where it does not:
+   *  online, and in every game whose controls do not use the presets, which today is every game:
+   *  they are reserved for BIOBUZZ, `RESERVED_ACTIONS`), and whether slow mode is held */
+  ftc25: { powerPct: number | null; slow: boolean } | null;
   aimAssist: boolean;
   autoIntake: boolean;
   autoFire: boolean;
   /** Chain Reaction: does the local robot's catalyst have a CATAPULT to throw with? The
    * throw is its own action, so the touch pad only shows its button on a build that
-   * actually has one. False for DECODE and for claw-only catalysts. */
+   * actually has one. False for every other game and for claw-only catalysts. */
   catalystFling: boolean;
   hopper: ArtifactColor[];
   /** local robot's current drive power draw (0..POWER_DRAW_MAX) — flywheel
    * spin-up + intake pulling current off the drive motors; shown as the HUD gauge */
   powerDraw: number;
-  inLaunchZone: boolean;
   gamepadConnected: boolean;
   /** FALSE while this window is not the one receiving keystrokes — the driver clicked away
    * (in a Discord Activity, onto the chat box beside the iframe) and their keys are going
@@ -445,13 +446,6 @@ export interface HudSnapshot {
   /** can park mode be TURNED ON right now (endgame or free drive)? drives the
    * HUD hint so the driver knows why the button isn't doing anything yet */
   canPark: boolean;
-  gateOpen: boolean;
-  /** true when the OPPONENT is the one holding this gate open (`penalties.gateCulprit`) —
-   * drives the gate icon's red "forced" state vs. green "own alliance opened it". */
-  gateForced: boolean;
-  rampCount: number;
-  classifiedCount: number;
-  overflowCount: number;
   /** pre-match "3-2-1" countdown value, or null when not counting down */
   countdown: number | null;
   /** the match's score is FINAL and the results screen may reveal it: online, the server's
@@ -558,27 +552,33 @@ export class GameController {
   /** the finished solo practice run, once the match reaches `post` */
   private practice: { replay: Replay; result: ReplayResult } | null = null;
   /** fired once when a solo practice run finishes, so the app can save + upload it */
-  onPracticeRun: ((replay: Replay, result: ReplayResult) => void) | null = null;
+  onPracticeRun: ((replay: Replay, result: ReplayResult, localOnly: boolean) => void) | null = null;
   private lastBeepAt = -1;
   private lastTransitionBeep = -1;
   private hudCountdown: number | null = null;
-  /** drive controls reversed so the shooter side leads (robot-centric only) */
-  private frontFlipped = false;
-  /** THE MID-MATCH DRIVE STYLE (`driveFrame` bind): null drives in the style the robot spawned
-   *  with (`RobotState.fieldCentric`, the menu's Drive style); true / false is the driver's
-   *  switch. Applied to the stick at INPUT level (`reframeStick`), never to the robot: see
-   *  `src/input/driveFrame.ts`. Reset with `frontFlipped`, so every run starts in the menu's. */
-  private fieldCentricLive: boolean | null = null;
-  /** park mode: caps drive command magnitude to settings.parkSpeedPct while on */
-  private parked = false;
+  /**
+   * THE LOCAL DRIVER'S STICK SHAPING — flip front, the drive-style switch, park mode, and the
+   * FTC25 slow mode, shooter preset and target snap (`DriverShaping`). Input level, never the
+   * robot: see `src/input/driverShaping.ts`. Reset on every rebuild, so every run starts in the
+   * menu's drive style, unflipped, unparked, on preset 1.
+   */
+  private p1 = new DriverShaping();
+  /**
+   * LOCAL VERSUS: a second person on this device, on GAMEPAD 2, driving the practice seat set to
+   * Player 2 (`practiceSetups`). Their own input (the second pad only, on the scheme's
+   * one-controller map) and their own shaping, so the two drivers never share a flip, a preset
+   * or a snap. Solo only — a room has its own seats. null otherwise.
+   */
+  private player2: { id: number; input: InputManager; shaping: DriverShaping } | null = null;
+  /** player 2's command for the frame being stepped, localized; null with no player 2 */
+  private player2Cmd: RobotCommand | null = null;
   // action-SFX edge trackers per robot id, in TICKS (seeded in seedActionAudio)
   private prevFireTick: Record<number, number> = {};
   private prevIntakeTick: Record<number, number> = {};
-  private prevGateOpen: Record<Alliance, boolean> = { red: false, blue: false };
   private prevBeamOn: Record<number, number> = {}; // wheels-on-a-beam per robot (CR terrain SFX)
 
   /** which game this controller builds its INITIAL world for (solo: the player's
-   * setting; networked: DECODE for now). Once running, the STEP/DRAW/HUD always
+   * setting; networked: the room's). Once running, the STEP/DRAW/HUD always
    * resolve the module from `this.world.game` via `this.mod` — a reconciled server
    * world carries its own game, so prediction/replay never use the wrong step. */
   private readonly gameId: GameId;
@@ -976,7 +976,6 @@ export class GameController {
     this.audio.gameVolume = settings.audio.volume.game;
     this.audio.shootVolume = settings.audio.volume.shoot;
     this.audio.intakeVolume = settings.audio.volume.intake;
-    this.audio.gateVolume = settings.audio.volume.gate;
     this.audio.beepVolume = settings.audio.volume.beep;
     this.audio.alertVolume = settings.audio.volume.alert;
     this.audio.voiceVolume = settings.audio.volume.voice;
@@ -993,8 +992,20 @@ export class GameController {
      * the Controls screen is not reachable mid-match. Everything in this file that drives or
      * NAMES a control reads this field, never `this.settings.bindings`.
      */
-    this.bindings = effectiveBindings(settings.bindings, this.gameId);
-    this.input = new InputManager(this.bindings);
+    /* LOCAL VERSUS (a Player 2 practice seat, solo only): BOTH people drive on ONE controller
+       each, so player 1 plays the scheme's one-controller map too, and gamepad 2 is player 2's
+       — never player 1's operator pad. Decided once, like the bindings: the seats are set in
+       Configure, which is not reachable mid-match. */
+    const versus = !session && practiceSeatsFor(settings, this.gameId).some((x) => x.kind === 'player2');
+    this.bindings = effectiveBindings(versus ? singlePadBindings(settings) : activeBindings(settings), this.gameId);
+    this.input = new InputManager(this.bindings, { operatorPad: !versus });
+    if (versus) {
+      this.player2 = {
+        id: -1, // set by `makeWorld` from the seat it lands on
+        input: new InputManager(this.bindings, { padSlot: 1, keyboard: false, operatorPad: false }),
+        shaping: new DriverShaping(),
+      };
+    }
 
     // NO mobile assist override. A touch device used to have autoFire/autoIntake FORCED on
     // here, which dates from before every assist defaulted on and before they lived on the
@@ -1179,16 +1190,17 @@ export class GameController {
         id: 0,
         alliance: s.alliance,
         spec: s.spec,
-        assists: s.assists,
+        // FTC25 controls add the shooter preset table (`seatAssists`, `manualShot`). This is the
+        // solo seat — a room spawns from what its lobby sent, which only a LAN room gets with it.
+        assists: seatAssists(s),
         startIndex: s.startIndex,
         startPose: s.startPose ?? undefined,
-        autoPath: s.autoPath ?? undefined,
-        autoPathEnabled: s.autoPathEnabled,
       },
     ];
     // THE PRACTICE SEATS — partner, opponent 1, opponent 2 — in Solo practice AND Free drive
     // (`practiceSetups`, DOM-free so `npm test` holds the line-up it builds)
-    const { setups: others, botTiers } = practiceSetups(s, this.gameId, seed);
+    const { setups: others, botTiers, player2 } = practiceSetups(s, this.gameId, seed);
+    if (this.player2) this.player2.id = player2 ?? -1;
     setups.push(...others);
     this.soloSetups = setups;
     const world = build(s.mode, seed, setups, this.settings);
@@ -1430,7 +1442,7 @@ export class GameController {
       this.hudInsetsDirty = true;
       this.hudInsetsEpoch = null;
       this.scene = scene;
-      // the 2D overlay projects labels and auto paths through the scene's camera from here on
+      // the 2D overlay projects labels through the scene's camera from here on
       this.renderer.setScene(scene);
       this.sceneEverShown = true;
       this.setSceneLoading(false);
@@ -1544,7 +1556,7 @@ export class GameController {
   }
 
   /** align the SFX edge trackers with a freshly created world so world
-   * creation/restart never plays a phantom shoot/intake/gate cue */
+   * creation/restart never plays a phantom shoot/intake cue */
   private seedActionAudio(): void {
     this.prevFireTick = {};
     this.prevIntakeTick = {};
@@ -1555,13 +1567,9 @@ export class GameController {
       this.prevIntakeTick[r.id] = actionTick(r.lastIntakeAt);
       this.prevBeamOn[r.id] = chain ? beamRide(r).onCount : 0;
     }
-    this.prevGateOpen = {
-      red: this.world.goals.red.gateOpen,
-      blue: this.world.goals.blue.gateOpen,
-    };
   }
 
-  /** shoot / intake / gate effects, edge-detected from world state (the sim
+  /** shoot / intake effects, edge-detected from world state (the sim
    * core stays event-free for these — same pattern as handlePhaseAudio).
    * All robots share the small field, so everyone's actions are audible. */
   /**
@@ -1610,11 +1618,6 @@ export class GameController {
         this.prevBeamOn[r.id] = on;
       }
     }
-    for (const a of ['red', 'blue'] as Alliance[]) {
-      const open = this.world.goals[a].gateOpen;
-      if (open && !this.prevGateOpen[a]) this.audio.sfxGate();
-      this.prevGateOpen[a] = open;
-    }
   }
 
   /** announcer: "Match begins in 3, 2, 1". ONE path now — the SIM owns the countdown and the
@@ -1641,9 +1644,28 @@ export class GameController {
     return n; // > 3 means the "Match begins in" lead-in
   }
 
+  /** what one driver's stick shaping needs to know about the world (`DriverShaping.apply`) */
+  private shapingCtx(r: RobotState, dt: number): ShapingCtx {
+    return {
+      viewAngle: viewAngleOf(r.alliance),
+      parkSpeedPct: this.settings.parkSpeedPct,
+      tankControlMode: this.settings.tankControlMode,
+      canPark: this.canPark(),
+      forkFeatures: this.forkFeatures(),
+      aimHeading: (alt) => this.mod.aimHeading?.(this.world, r, alt) ?? null,
+      dt,
+    };
+  }
+
+  /** may this fork's FTC25 extras act in this session — solo, or a LAN room, and never a room on
+   *  DSIM's own servers (`forkFeaturesAllowed`) */
+  private forkFeatures(): boolean {
+    return forkFeaturesAllowed(this.session);
+  }
+
   /** the drive style the local robot is driven in now: the driver's switch, else its spawn style */
   private liveFieldCentric(): boolean {
-    return this.fieldCentricLive ?? this.localRobot().fieldCentric;
+    return this.p1.liveFieldCentric(this.localRobot());
   }
 
   /** can park mode be turned ON right now? Any time the robot can actually move —
@@ -1657,61 +1679,13 @@ export class GameController {
   private frameLogic(dtMs: number): void {
     const cmd = this.input.poll();
     const lr = this.localRobot();
-    // A BUTTERFLY with its traction set down drives as a tank, and the sim's tank branch reads
-    // only leftDrive/rightDrive — no drive style reaches it.
-    const drivingTank =
-      lr.spec.drivetrain === 'tank' || (lr.spec.drivetrain === 'butterfly' && lr.butterflyTank);
-    // drive style switch: field-centric ⇄ robot-centric for the rest of this run. A pure tank
-    // has no strafe to re-aim, so the press does nothing there rather than light a HUD item
-    // that changes nothing.
-    if (this.input.driveFramePressed && lr.spec.drivetrain !== 'tank') {
-      const next = !this.liveFieldCentric();
-      this.fieldCentricLive = next === lr.fieldCentric ? null : next;
-    }
-    const fieldCentric = this.liveFieldCentric();
-    // "flip front": reverse robot-centric drive so the shooter side leads.
-    // Meaningless in field-centric (translation is driver-frame there).
-    if (!fieldCentric) {
-      if (this.input.flipPressed) this.frontFlipped = !this.frontFlipped;
-      if (this.frontFlipped) {
-        cmd.driveX = -cmd.driveX;
-        cmd.driveY = -cmd.driveY;
-      }
-    }
-    // the switched style, re-expressed in the frame the robot reads (`reframeStick`)
-    if (fieldCentric !== lr.fieldCentric && !drivingTank) {
-      const s = reframeStick({ x: cmd.driveX, y: cmd.driveY }, fieldCentric, lr.heading, viewAngleOf(lr.alliance));
-      cmd.driveX = s.x;
-      cmd.driveY = s.y;
-    }
-    // park mode: toggle on press. Turning it ON is gated to when the robot can
-    // drive (auto/teleop/free drive); turning it back OFF is always allowed. While
-    // on, cap the drive command's magnitude to the configured percentage for
-    // precision, low-speed control.
-    if (this.input.parkPressed) {
-      if (this.parked) this.parked = false;
-      else if (this.canPark()) this.parked = true;
-    }
-    if (this.parked) {
-      const k = Math.max(0, Math.min(100, this.settings.parkSpeedPct)) / 100;
-      cmd.driveX *= k;
-      cmd.driveY *= k;
-      cmd.rotate *= k;
-    }
-    // Tank control style is a PER-DRIVER input preference (not a shared world
-    // setting), so resolve it here: "Normal" tank derives side-drive from arcade
-    // driveY/rotate, "Traditional" keeps the raw separate-stick leftDrive/rightDrive.
-    // The sim's tank branch then always reads leftDrive/rightDrive, so the choice
-    // works identically in solo and multiplayer (the server never sees these
-    // settings). Runs after flip/park so both still apply in Normal tank.
-    // A BUTTERFLY that currently has its traction set down drives as a tank, so it takes
-    // the same control-style resolution — otherwise swapping wheel sets mid-match would
-    // silently stop responding (the sim's tank branch reads ONLY leftDrive/rightDrive,
-    // which nothing would have been filling). `drivingTank` is resolved at the top.
-    if (drivingTank && this.settings.tankControlMode === 'normal') {
-      cmd.leftDrive = clamp(cmd.driveY - cmd.rotate, -1, 1);
-      cmd.rightDrive = clamp(cmd.driveY + cmd.rotate, -1, 1);
-    }
+    const dtFrame = Math.min(dtMs / 1000, 0.25);
+    this.p1.apply(cmd, this.input, lr, this.shapingCtx(lr, dtFrame));
+    // LOCAL VERSUS: player 2's pad, through the same shaping, into the command map `stepSolo`
+    // hands the sim and the recorder (`player2Cmd`)
+    const p2 = this.player2;
+    const p2r = p2 ? this.world.robots.find((x) => x.id === p2.id) : undefined;
+    this.player2Cmd = p2 && p2r ? localizeCommand(p2.shaping.apply(p2.input.poll(), p2.input, p2r, this.shapingCtx(p2r, dtFrame))) : null;
     this.lastCmd = cmd;
 
     // ONLINE, the accumulator runs a few percent fast or slow while the lead controller slews
@@ -1962,6 +1936,8 @@ export class GameController {
     const local = localizeCommand(cmd);
     let steps = 0;
     const commands = new Map<number, RobotCommand>([[this.localRobotId, local]]);
+    // LOCAL VERSUS: player 2 is a second driver in the same map, recorded the same way
+    if (this.player2 && this.player2Cmd) commands.set(this.player2.id, this.player2Cmd);
     while (this.acc >= C.SIM_DT && steps < C.MAX_STEPS_PER_FRAME) {
       /**
        * THE BOTS DECIDE BEFORE THE STEP, once per tick, into the SAME map the recorder is
@@ -2039,9 +2015,8 @@ export class GameController {
     this.settle = newSettleClock();
     this.settleDone = false;
     this.hudCountdown = null;
-    this.frontFlipped = false;
-    this.fieldCentricLive = null;
-    this.parked = false;
+    this.p1.reset();
+    this.player2?.shaping.reset();
     this.seedActionAudio();
     this.toasts = [];
   }
@@ -3265,9 +3240,8 @@ export class GameController {
     this.settle = newSettleClock();
     this.settleDone = false;
     this.hudCountdown = null;
-    this.frontFlipped = false;
-    this.fieldCentricLive = null;
-    this.parked = false;
+    this.p1.reset();
+    this.player2?.shaping.reset();
     this.acc = 0;
     this.inputBuf = [];
     this.remoteCmds = new Map();
@@ -3405,9 +3379,8 @@ export class GameController {
     this.recorder = null;
     this.practice = null;
     this.drivenTicks = 0;
-    this.frontFlipped = false;
-    this.fieldCentricLive = null;
-    this.parked = false;
+    this.p1.reset();
+    this.player2?.shaping.reset();
     this.seedActionAudio();
     this.toasts = [];
   }
@@ -3498,7 +3471,6 @@ export class GameController {
     const r = this.localRobot();
     const a = this.viewAlliance();
     const opp: Alliance = a === 'blue' ? 'red' : 'blue';
-    const goal = w.goals[a];
     // Chain Reaction scoring readout (present only for CR worlds)
     const chain: HudSnapshot['chain'] = w.chain
       ? {
@@ -3521,7 +3493,7 @@ export class GameController {
       : undefined;
     const mod = gameOf(w);
     return {
-      game: w.game ?? 'decode',
+      game: mod.id,
       physics: this.interp3d() ? '3d' : '2d',
       prediction: this.getPredictionStats(),
       gameHud: mod.hud?.(w, this.localRobotId),
@@ -3530,38 +3502,39 @@ export class GameController {
       phase: w.match.phase,
       timeLeft: Math.max(0, w.match.phaseTimeLeft),
       alliance: a,
-      motif: w.motif,
       score: w.match.scores[a],
       oppTotal: w.match.scores[opp].total,
       oppScore: w.match.scores[opp],
-      provisionalPattern: w.match.provisionalPattern[a],
       fouls: { red: { ...w.match.fouls.red }, blue: { ...w.match.fouls.blue } },
       card: w.penalties.carded[r.id] ?? null,
       voided: w.match.scores[a].voided ?? false,
       fieldCentric: this.liveFieldCentric(),
       driveStyleSwitched: this.liveFieldCentric() !== r.fieldCentric,
+      ftc25:
+        this.settings.controlScheme === 'ftc25'
+          ? {
+              // only in a game whose controls use the presets (none yet — `RESERVED_ACTIONS`)
+              powerPct:
+                r.manualShot && this.forkFeatures() && actionUsedBy(FTC25_PRESET_ACTIONS[0], mod.id)
+                  ? Math.round((r.manualShot[this.p1.shotPowerIdx] ?? r.manualShot[0]) * 100)
+                  : null,
+              slow: this.input.slowHeld,
+            }
+          : null,
       aimAssist: r.aimAssist,
       autoIntake: r.autoIntake,
       autoFire: r.autoFire,
       catalystFling: w.game === 'chain' && chainCatalystGeom(r.spec).fling,
       hopper: [...r.hopper],
       powerDraw: r.powerDraw,
-      inLaunchZone: w.mode === 'free' || robotInLaunchZone(r),
       gamepadConnected: this.input.gamepadConnected,
       windowFocused: this.input.keyboard.hasFocus(),
       // only while it applies: a flip set in robot-centric does nothing after a switch to field
-      frontFlipped: this.frontFlipped && !this.liveFieldCentric(),
+      frontFlipped: this.p1.frontFlipped && !this.liveFieldCentric(),
       butterflyMode:
         r.spec.drivetrain === 'butterfly' ? (r.butterflyTank ? 'tank' : 'mecanum') : null,
-      parked: this.parked,
+      parked: this.p1.parked,
       canPark: this.canPark(),
-      gateOpen: goal.gateOpen,
-      gateForced: w.penalties.gateCulprit[a] !== null,
-      rampCount: w.balls.filter(
-        (b) => b.state.kind === 'rail' && b.state.goal === a && !b.state.overflow,
-      ).length,
-      classifiedCount: goal.classifiedCount,
-      overflowCount: goal.overflowCount,
       countdown: this.hudCountdown,
       resultFinal: w.match.phase === 'post' && this.settleDone,
       resultLost:
@@ -3609,7 +3582,9 @@ export class GameController {
     if (!decision.keep) return;
     const kept = { replay, result: worldResult(this.world) };
     if (completed) this.practice = kept;
-    this.onPracticeRun?.(kept.replay, kept.result);
+    // LOCAL-ONLY when this fork's features played it: FTC25 controls (the setups say so too) or a
+    // second person on this device (they do not) — kept here, never sent to DSIM's servers
+    this.onPracticeRun?.(kept.replay, kept.result, this.settings.controlScheme === 'ftc25' || this.player2 !== null);
   }
 
   dispose(): void {

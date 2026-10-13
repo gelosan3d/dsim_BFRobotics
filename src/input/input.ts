@@ -1,8 +1,8 @@
 import type { RobotCommand } from '../types';
 import { clamp } from '../math';
 import { Keyboard } from './keyboard';
-import { GamepadInput } from './gamepad';
-import { KEY_ACTIONS, type ControlBindings } from './bindings';
+import { GamepadInput, type GamepadSample } from './gamepad';
+import { FTC25_PRESET_ACTIONS, KEY_ACTIONS, type ControlBindings, type PadBindings } from './bindings';
 import { installViewKey } from '../games/biobuzz/graphics/viewKey';
 
 export interface VirtualInput {
@@ -23,12 +23,42 @@ export interface VirtualInput {
   driveMode: boolean;
 }
 
+/**
+ * WHICH DEVICES ONE DRIVER HAS. The defaults are the one local driver as always: the keyboard,
+ * the first pad, and gamepad 2 as their operator (`ControlBindings.pad2`). A LOCAL VERSUS has
+ * two drivers, each on one controller: player 1 keeps the keyboard and the first pad but no
+ * operator pad, and player 2 is `{ padSlot: 1, keyboard: false, operatorPad: false }` — the
+ * second pad and nothing else.
+ */
+export interface InputDevices {
+  /** which connected pad is this driver's own (0 the first, 1 the second) */
+  padSlot?: 0 | 1;
+  /** read the keyboard (only one driver may) */
+  keyboard?: boolean;
+  /** OR the second pad's `pad2` binds in as this driver's operator */
+  operatorPad?: boolean;
+}
+
 /** merges keyboard + gamepad into one driver command per frame, resolving
  * physical keys/buttons through the user's ControlBindings */
 export class InputManager {
   readonly keyboard = new Keyboard();
-  private gamepad = new GamepadInput();
+  private gamepad: GamepadInput;
+  /** GAMEPAD 2 (`ControlBindings.pad2`) — the second connected pad, ORed into the same robot */
+  private gamepad2 = new GamepadInput(1);
+  private readonly useKeyboard: boolean;
+  private readonly operatorPad: boolean;
+  /** gamepad 2's lists dressed as a `PadBindings` (the main pad's threshold and combo wait),
+   *  rebuilt only when the bindings change: `GamepadInput` caches by identity every frame */
+  private pad2Bindings: PadBindings | null = null;
   gamepadConnected = false;
+  /** FTC25 slow mode, HELD on some device this frame */
+  slowHeld = false;
+  /** edge-triggered FTC25 target snaps, from any device */
+  snapAimPressed = false;
+  snapAltPressed = false;
+  /** the FTC25 shooter preset picked this frame (index into the robot's `manualShot`), or -1 */
+  powerPicked = -1;
   /** edge-triggered "start match / confirm" from either device */
   startPressed = false;
   /** edge-triggered restart from either device */
@@ -58,8 +88,15 @@ export class InputManager {
     driveMode: false,
   };
 
-  constructor(private bindings: ControlBindings) {
+  constructor(
+    private bindings: ControlBindings,
+    devices: InputDevices = {},
+  ) {
+    this.gamepad = new GamepadInput(devices.padSlot ?? 0);
+    this.useKeyboard = devices.keyboard ?? true;
+    this.operatorPad = devices.operatorPad ?? true;
     this.applyPreventKeys();
+    this.pad2Bindings = this.operatorPad ? pad2PadBindings(bindings) : null;
   }
 
   /**
@@ -100,10 +137,11 @@ export class InputManager {
   setBindings(bindings: ControlBindings): void {
     this.bindings = bindings;
     this.applyPreventKeys();
+    this.pad2Bindings = this.operatorPad ? pad2PadBindings(bindings) : null;
   }
 
   private applyPreventKeys(): void {
-    this.keyboard.setPreventKeys(KEY_ACTIONS.flatMap((a) => this.bindings.keys[a]));
+    this.keyboard.setPreventKeys(this.useKeyboard ? KEY_ACTIONS.flatMap((a) => this.bindings.keys[a]) : []);
   }
 
   /**
@@ -129,6 +167,7 @@ export class InputManager {
   private releaseViewKey: (() => void) | null = null;
 
   attach(): void {
+    if (!this.useKeyboard) return;
     this.keyboard.attach();
     this.releaseViewKey ??= installViewKey();
   }
@@ -142,9 +181,12 @@ export class InputManager {
   /** call once per animation frame; returns the merged command */
   poll(): RobotCommand {
     const k = this.keyboard;
-    const keys = this.bindings.keys;
-    const g = this.gamepad.sample(this.bindings.pad);
-    this.gamepadConnected = g.connected;
+    // a driver with no keyboard (Local versus player 2) reads every key action as unbound
+    const keys = this.useKeyboard ? this.bindings.keys : NO_KEYS;
+    const g1 = this.gamepad.sample(this.bindings.pad);
+    this.gamepadConnected = g1.connected;
+    // gamepad 2's BUTTONS join the driver's; its sticks drive nothing (`ControlBindings.pad2`)
+    const g = this.pad2Bindings ? orPads(g1, this.gamepad2.sample(this.pad2Bindings)) : g1;
 
     const heldAny = (list: string[]): boolean => list.some((key) => k.held(key));
     const pressedAny = (list: string[]): boolean =>
@@ -171,6 +213,17 @@ export class InputManager {
     this.flipPressed = pressedAny(keys.flipFront) || g.flipFront || vFlip;
     this.driveFramePressed = pressedAny(keys.driveFrame) || g.driveFrame;
     this.parkPressed = pressedAny(keys.park) || g.park || vPark;
+    // FTC25 driving and the operator's power presets (no touch control for any of them)
+    this.slowHeld = heldAny(keys.slowHold) || g.slowHold;
+    this.snapAimPressed = pressedAny(keys.snapAim) || g.snapAim;
+    this.snapAltPressed = pressedAny(keys.snapAlt) || g.snapAlt;
+    const keyPower = FTC25_PRESET_ACTIONS.findIndex((a) => pressedAny(keys[a]));
+    this.powerPicked = g.power >= 0 ? g.power : keyPower;
+    // FTC25's element buttons each SHOOT, asking for one kind (`RobotCommand.fireSel`) —
+    // BIOBUZZ's pair; `effectiveBindings` empties them in any other game.
+    const firstKind = heldAny(keys.bbFirePollen) || g.bbFirePollen;
+    const secondKind = heldAny(keys.bbFireNectar) || g.bbFireNectar;
+    const fireSel = firstKind ? 1 : secondKind ? 2 : 0;
 
     const cmd: RobotCommand = {
       driveX: clamp(kx + g.driveX + this.virtualState.driveX, -1, 1),
@@ -179,7 +232,7 @@ export class InputManager {
       leftDrive: clamp(kLeft + g.leftY + this.virtualState.leftDrive, -1, 1),
       rightDrive: clamp(kRight + g.rightY + this.virtualState.rightDrive, -1, 1),
       intake: heldAny(keys.intake) || g.intake || this.virtualState.intake,
-      fire: heldAny(keys.fire) || g.fire || this.virtualState.fire,
+      fire: heldAny(keys.fire) || g.fire || this.virtualState.fire || fireSel !== 0,
       // Chain Reaction ring pick-up/place — held; the sim edge-triggers it
       catalyst: heldAny(keys.catalyst) || g.catalyst || this.virtualState.catalyst,
       // CATAPULT throw — held; the sim edge-triggers it (same contract as `catalyst`)
@@ -213,7 +266,32 @@ export class InputManager {
       // a replayed input can't double-toggle the way a client-side edge flag would.
       driveMode: heldAny(keys.driveMode) || g.driveMode || this.virtualState.driveMode,
     };
+    // written only when set, so a DSim-controls command is the object it always was
+    if (fireSel) cmd.fireSel = fireSel;
     k.endFrame();
     return cmd;
   }
+}
+
+/** every key action with nothing bound — the keyboard of a driver who has none */
+const NO_KEYS = Object.fromEntries(KEY_ACTIONS.map((a) => [a, [] as string[]])) as unknown as ControlBindings['keys'];
+
+/** gamepad 2's lists as a `PadBindings` the sampler can play, or null when there are none */
+function pad2PadBindings(b: ControlBindings): PadBindings | null {
+  if (!b.pad2) return null;
+  // its triggers never turn the robot, so nothing on them is ever paused (`livePad`)
+  return { ...b.pad, buttons: b.pad2.buttons, combos: b.pad2.combos, turnWith: 'stick' };
+}
+
+/** the driver's sample with gamepad 2's BUTTONS ORed in. Axes are the driver's alone. */
+function orPads(a: GamepadSample, b: GamepadSample): GamepadSample {
+  const out: GamepadSample = { ...a };
+  for (const key of Object.keys(a) as (keyof GamepadSample)[]) {
+    const va = a[key];
+    const vb = b[key];
+    if (typeof va === 'boolean' && typeof vb === 'boolean') (out[key] as boolean) = va || vb;
+  }
+  out.connected = a.connected;
+  out.power = a.power >= 0 ? a.power : b.power;
+  return out;
 }

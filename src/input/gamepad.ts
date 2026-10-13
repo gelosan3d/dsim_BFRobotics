@@ -1,4 +1,4 @@
-import { PAD_TRIGGERS, livePad, type PadBindings } from './bindings';
+import { FTC25_PRESET_ACTIONS, PAD_TRIGGERS, livePad, type PadBindings } from './bindings';
 import { PadChordResolver } from './padChords';
 import { applyPadMask, clearPadMask } from './padNav';
 
@@ -79,8 +79,18 @@ export interface GamepadSample {
   bbNectar: boolean;
   bbRamp: boolean;
   bbPass: boolean;
+  /** FTC25 held mechanism buttons (`FTC25_ONLY`) */
+  bbFirePollen: boolean;
+  bbFireNectar: boolean;
+  /** the FTC25 shooter power preset picked THIS frame (an edge), as an index into
+   *  `FTC25_SHOT_POWERS`, or -1 for none */
+  power: number;
   driveMode: boolean;
   driveFrame: boolean;
+  /** FTC25 driving: slow mode is HELD; the snaps and the heading reset are edges */
+  slowHold: boolean;
+  snapAim: boolean;
+  snapAlt: boolean;
   flipFront: boolean;
   park: boolean;
   start: boolean;
@@ -103,8 +113,14 @@ const EMPTY: GamepadSample = {
   bbNectar: false,
   bbRamp: false,
   bbPass: false,
+  bbFirePollen: false,
+  bbFireNectar: false,
+  power: -1,
   driveMode: false,
   driveFrame: false,
+  slowHold: false,
+  snapAim: false,
+  snapAlt: false,
   flipFront: false,
   park: false,
   start: false,
@@ -125,6 +141,18 @@ const EMPTY: GamepadSample = {
  */
 const PAD_DROPOUT_GRACE_MS = 100;
 
+/** the one-shot actions a held-over sample must NOT fire again (`PAD_DROPOUT_GRACE_MS`) */
+const NO_EDGES = {
+  driveFrame: false,
+  flipFront: false,
+  park: false,
+  start: false,
+  restart: false,
+  snapAim: false,
+  snapAlt: false,
+  power: -1,
+} as const;
+
 export class GamepadInput {
   private last: GamepadSample | null = null;
   private lostAt = 0;
@@ -133,21 +161,32 @@ export class GamepadInput {
   private prevFlip = false;
   private prevFrame = false;
   private prevPark = false;
+  private prevSnapAim = false;
+  private prevSnapAlt = false;
+  private prevPower: boolean[] = FTC25_PRESET_ACTIONS.map(() => false);
   private chords = new PadChordResolver();
   /** `livePad(bindings)`, kept until the bindings object changes: it copies the lists when the
    *  triggers turn, and this runs every frame */
   private liveFrom: PadBindings | null = null;
   private live: PadBindings | null = null;
 
+  /**
+   * `slot` 0 is the driver's pad — the FIRST connected one, as it always was. Slot 1 is GAMEPAD 2
+   * (`ControlBindings.pad2`), the second connected pad. Only slot 0 takes part in the in-match
+   * menu's button mask: the menu is watched on the first pad alone (`PadNavLayer`), so a mask
+   * recorded there says nothing about the second pad's buttons.
+   */
+  constructor(private readonly slot: 0 | 1 = 0) {}
+
   sample(bindings: PadBindings): GamepadSample {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
-    const pad = Array.from(pads).find((p) => p && p.connected) ?? null;
+    const pad = Array.from(pads).filter((p) => p && p.connected)[this.slot] ?? null;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (!pad) {
       if (this.last) {
         if (this.lostAt === 0) this.lostAt = now;
         if (now - this.lostAt < PAD_DROPOUT_GRACE_MS) {
-          return { ...this.last, driveFrame: false, flipFront: false, park: false, start: false, restart: false };
+          return { ...this.last, ...NO_EDGES };
         }
       }
       this.last = null;
@@ -157,8 +196,11 @@ export class GamepadInput {
       this.prevFlip = false;
       this.prevFrame = false;
       this.prevPark = false;
+      this.prevSnapAim = false;
+      this.prevSnapAlt = false;
+      this.prevPower = FTC25_PRESET_ACTIONS.map(() => false);
       this.chords.reset();
-      clearPadMask();
+      if (this.slot === 0) clearPadMask();
       return { ...EMPTY };
     }
     const raw: number[] = [];
@@ -168,7 +210,7 @@ export class GamepadInput {
     /* THE MASK, before the resolver sees anything. A button spent on opening or closing the
        in-match menu is dead until it is released, so the press that got the player out of the
        menu cannot also fire a shot on the way back in — `padNav.ts` says why. */
-    const held = applyPadMask(raw);
+    const held = this.slot === 0 ? applyPadMask(raw) : raw;
     this.lostAt = 0;
     // with the triggers turning, the resolver plays a map with every bind on LT / RT dropped
     if (this.liveFrom !== bindings) {
@@ -203,8 +245,15 @@ export class GamepadInput {
       bbNectar: on.bbNectar,
       bbRamp: on.bbRamp,
       bbPass: on.bbPass,
+      bbFirePollen: on.bbFirePollen,
+      bbFireNectar: on.bbFireNectar,
+      // the FIRST preset that went down this frame (two at once is a thumb on a d-pad diagonal)
+      power: FTC25_PRESET_ACTIONS.findIndex((a, i) => on[a] && !this.prevPower[i]),
       driveMode: on.driveMode,
       driveFrame: on.driveFrame && !this.prevFrame,
+      slowHold: on.slowHold,
+      snapAim: on.snapAim && !this.prevSnapAim,
+      snapAlt: on.snapAlt && !this.prevSnapAlt,
       flipFront: on.flipFront && !this.prevFlip,
       park: on.park && !this.prevPark,
       start: on.start && !this.prevStart,
@@ -215,6 +264,9 @@ export class GamepadInput {
     this.prevFlip = on.flipFront;
     this.prevFrame = on.driveFrame;
     this.prevPark = on.park;
+    this.prevSnapAim = on.snapAim;
+    this.prevSnapAlt = on.snapAlt;
+    this.prevPower = FTC25_PRESET_ACTIONS.map((a) => on[a]);
     this.last = sampleOut;
     return sampleOut;
   }

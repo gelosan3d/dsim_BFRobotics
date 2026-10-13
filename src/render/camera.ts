@@ -1,11 +1,7 @@
 import type { Alliance, Vec2 } from '../types';
-import { FIELD_HALF, VIEW_MARGIN } from '../config';
 import type { FieldBounds } from '../games/types';
 import { viewAngleOf } from '../sim/field';
 import { rot } from '../math';
-
-/** DECODE's square field is the default when no game bounds are supplied. */
-const DECODE_BOUNDS: FieldBounds = { halfX: FIELD_HALF, halfY: FIELD_HALF, viewMargin: VIEW_MARGIN };
 
 /** field-frame <-> screen transform, including the alliance 180° rotation so
  * each driver sees their own goal at the top */
@@ -23,7 +19,7 @@ export class Camera {
   cx = 0; // screen center the field is drawn about (CSS px)
   cy = 0;
 
-  configure(canvas: HTMLCanvasElement, alliance: Alliance, bounds: FieldBounds = DECODE_BOUNDS): void {
+  configure(canvas: HTMLCanvasElement, alliance: Alliance, bounds: FieldBounds): void {
     this.dpr = window.devicePixelRatio || 1;
     this.w = canvas.clientWidth;
     this.h = canvas.clientHeight;

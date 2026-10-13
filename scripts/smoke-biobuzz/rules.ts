@@ -53,7 +53,7 @@ import {
 } from '../../src/games/biobuzz/penalties';
 import { biobuzzFieldHud } from '../../src/games/biobuzz/hud';
 import { bbScene, bbSceneAt } from '../../src/games/biobuzz/scenes';
-import { footprintExtents, loadZone } from '../../src/sim/field';
+import { footprintExtents } from '../../src/sim/field';
 import { robotIntersectsRect } from '../../src/sim/physics';
 import { cmd, setup, type Check } from './harness';
 
@@ -2338,7 +2338,9 @@ function penaltyChecks(check: Check): void {
 
     // ...and NONE of it was inside DECODE's blue LOADING ZONE, which is what the shared test
     // read before `BB_CONTROL_GEOMETRY`. So the silence above is this field's rectangle.
-    const dz = loadZone('blue');
+    // DECODE's `loadZone('blue')`, as a literal since DECODE left this fork (2026-10-12): the
+    // 23 x 23 audience corner on blue's driver side
+    const dz = { x0: 49, x1: 72, y0: -72, y1: -49 };
     check('G407: ...and none of it is inside DECODE’s blue LOADING ZONE, so the pass is BB_LZ’s',
       zone.every((b) => !(b.pos.x >= dz.x0 && b.pos.x <= dz.x1 && b.pos.y >= dz.y0 && b.pos.y <= dz.y1)),
       zone.map((b) => `${b.pos.x.toFixed(1)},${b.pos.y.toFixed(1)}`).join(' '));

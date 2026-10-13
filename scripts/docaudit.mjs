@@ -35,7 +35,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * TOKEN BUDGET for CLAUDE.md, in bytes. ~4 bytes/token, so this is ~6.75k tokens against the
+ * TOKEN BUDGET for CLAUDE.md, in bytes. ~4 bytes/token, so this is ~6.7k tokens against the
  * ~43.7k the file was before the split. LOWER IT when the file shrinks; do not raise it — if a
  * rule genuinely has to live in the core, something else in the core is no longer core.
  *
@@ -45,7 +45,7 @@ import { join } from 'node:path';
  * 700 bytes is a couple of lines of genuine core rule; the SMALLEST section that was moved out
  * is 2.3 KB, so nothing section-sized can come back without tripping this.
  */
-const CLAUDE_BUDGET_BYTES = 27_000;
+const CLAUDE_BUDGET_BYTES = 26_850; // lowered from 27_000 when DECODE left this fork (2026-10-12)
 
 /** directories whose contents need no area guide, with the reason. */
 const UNGOVERNED = {

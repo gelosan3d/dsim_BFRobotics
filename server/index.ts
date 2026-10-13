@@ -60,7 +60,7 @@ import { Matchmaker } from './matchmaking';
 import { MATCHMAKER_REGION } from './regions';
 import { BALANCE_VERSION } from '../src/config';
 import { periodLabel, seasonFor } from '../src/seasons';
-import { coerceGameId, isGameId, serverPhysics } from '../src/games/types';
+import { coerceGameId, DEFAULT_GAME, isGameId, serverPhysics } from '../src/games/types';
 import { simModuleFor } from '../src/games/sim';
 import { runStarSweep, warnNoToken, STAR_SWEEP_MS } from './stargazers';
 import { runBoostSweep, BOOST_SWEEP_MS } from './boosts';
@@ -1971,8 +1971,8 @@ const httpServer = createServer((req, res) => {
           res.end(JSON.stringify({ ok: false, error: 'DB disabled' }));
           return;
         }
-        // which game's period to advance — DECODE and Chain Reaction run independent
-        // Act → Season progressions (default DECODE).
+        // which game's period to advance — every game runs an independent Act → Season
+        // progression (`DEFAULT_GAME` when none is named).
         const adminGame = coerceGameId(u.searchParams.get('game'));
         if (u.pathname === '/api/admin/season/start') {
           const name = u.searchParams.get('name') ?? undefined;
@@ -3267,7 +3267,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const code = msg.room.toLowerCase();
     let r = rooms.get(code);
     let created = false;
-    // sanitize the untrusted room game to a known id (unknown ⇒ 'decode'); the room
+    // sanitize the untrusted room game to a known id (unknown ⇒ `DEFAULT_GAME`); the room
     // resolves its sim module from this, and a mismatched joiner is refused below.
     const cfg: RoomConfig = {
       ...(msg.config ?? DEFAULT_ROOM_CONFIG),
@@ -3402,8 +3402,8 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     // IS the joiner's.)
     if (!created) {
       const want = cfg;
-      const theirGame = r.config.game ?? 'decode';
-      const ourGame = want.game ?? 'decode';
+      const theirGame = r.config.game ?? DEFAULT_GAME;
+      const ourGame = want.game ?? DEFAULT_GAME;
       /**
        * ⚠️ A SEASON MISMATCH IS NOT A "GAME MODE" MISMATCH, AND SAYING SO NAMED NOTHING.
        *

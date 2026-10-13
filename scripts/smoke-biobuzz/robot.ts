@@ -3544,7 +3544,7 @@ export function robotChecks(check: Check): void {
     const shared = robotSolids(r, [], BB_POLLEN_R);
     check('seam: the module slot returns BIOBUZZ geometry', JSON.stringify(mine) === JSON.stringify(bbRobotSolids(r, [], BB_POLLEN_R)));
     check("seam: a BACK sweeper's solids are NOT DECODE's front funnel", JSON.stringify(mine?.structure) !== JSON.stringify(shared.structure), `bb=${mine?.structure.length} shapes, shared=${shared.structure.length}`);
-    check('seam: DECODE and Chain Reaction leave the slot empty (the shared geometry is untouched)', simModuleFor('decode').artifactSolids === undefined && simModuleFor('chain').artifactSolids === undefined);
+    check('seam: Chain Reaction leaves the slot empty (the shared geometry is untouched)', simModuleFor('chain').artifactSolids === undefined);
   }
 
   // ── THE INTAKE COLLECTS WHAT IT DRIVES OVER ───────────────────────────────

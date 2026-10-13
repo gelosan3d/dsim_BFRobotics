@@ -18,7 +18,7 @@ export interface CareerNav {
    *  since there is no server id to fetch it by */
   onWatchLocal?: (replay: Replay) => void;
   onOpenProfile?: (username: string) => void;
-  /** which game's boards to show (DECODE default) — its own periods/records */
+  /** which game's boards to show — its own periods/records */
   game?: GameId;
 }
 

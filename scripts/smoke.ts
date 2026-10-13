@@ -10,10 +10,10 @@ import {
   PRACTICE_SAVE_MIN_S,
   PRACTICE_SAVE_MIN_TICKS,
 } from '../src/replaySavePolicy';
-import { createWorld, DEFAULT_ASSISTS, DEFAULT_SPEC, PLAYER_ASSISTS, coerceAssists, coerceAutoPath, coerceSpec, coerceSetup, coerceStartPose } from '../src/sim/spawn';
+import { DEFAULT_ASSISTS, DEFAULT_SPEC, coerceAssists, coerceSpec, coerceSetup } from '../src/sim/spawn';
 import { drawWheels } from '../src/games/chain/parts';
 import { sanitizePlayer, sanitizePlayerPatch } from '../src/net/sanitize';
-import { allianceDuo, derivedRole, savedStartCap } from '../src/ui/startPositions';
+import { allianceDuo, derivedRole } from '../src/ui/startPositions';
 import { queuedModes, queuedGames, queuesFor, anyoneQueued, widenHint } from '../src/ui/queueDepth';
 import { roomJoinRegion } from '../src/net/roomRegion';
 import { PRIMARY_HOSTS, primaryWsBase, PrimaryHealth } from '../src/net/primaryHost';
@@ -36,167 +36,43 @@ import {
   launchQuery,
   setLaunchSearchForTests,
 } from '../src/net/discordActivity';
-import { step } from '../src/sim/world';
-import { robotPenetration, robotSolids } from '../src/sim/artifactSolids';
 import { Keyboard } from '../src/input/keyboard';
 import { createTokenCache, readAccountSettings, sendWithTokenRetry } from '../src/net/authFetch';
 import { startPollLoop } from '../src/ui/pollLoop';
-import { updatePenalties } from '../src/sim/penalties';
-import { aimSolution, robotInLaunchZone } from '../src/sim/robot';
-import { updateHumanPlayers } from '../src/sim/humanPlayer';
+import * as C from '../src/config';
 import { startMatch } from '../src/sim/match';
 import { availableVideoFormats, videoFormat, videoBitrate } from '../src/ui/replayVideo';
 import { muxMp4 } from '../src/ui/mp4';
 import { hudLabels } from '../src/ui/replayOverlay';
 import { resolveReplayView } from '../src/ui/replayViewMode';
-import { gateColliderPos, gateRestOn, pushingGate } from '../src/sim/goal';
-import { chassisCorners } from '../src/sim/physics';
-import { pointDepthInChassis } from '../src/sim/physics';
-import {
-  inLaunchZone,
-  gateZone,
-  gateZoneTape,
-  gateArmRect,
-  startPose,
-  goalCenter,
-  goalTriangle,
-  goalFaceNormal,
-  goalFacePoints,
-  goalLineValue,
-  basinFunnelTarget,
-  railPos,
-  classifierRect,
-  baseZone,
-  gateTapeSegments,
-  depotSegment,
-  allianceArea,
-  tunnelStrip,
-  loadZone,
-  loadSlots,
-  loadBoxSlots,
-  loadPreStage,
-  inRect,
-  evalStartPose,
-  snapStartToLegal,
-  mirrorStartPose,
-  presetPose,
-  activeStartLegal,
-  footprintExtents,
-  footprintCorners,
-  viewAngleOf,
-} from '../src/sim/field';
+import { footprintExtents, viewAngleOf } from '../src/sim/field';
 import { reframeStick } from '../src/input/driveFrame';
-import { addClassified, addOverflow, assessMatchEnd, awardCard, awardFoul } from '../src/sim/scoring';
-import type { Alliance, ArtifactColor, AssistConfig, AutoPathData, DrivetrainType, GameId, GameMode, MatchPhase, RobotCommand, RobotSpec, RobotState, World } from '../src/types';
-import {
-  SIM_DT,
-  PRE_COUNTDOWN as C_PRE_COUNTDOWN,
-  GATE_APPROACH_S,
-  GATE_LINE_S,
-  GATE_OPEN_LATCH_S,
-  GATE_STOP_S,
-  GATE_OPEN_LATCH_S,
-  GATE_PASS_FRAC,
-  GATE_PADDLE_REACH,
-  GATE_GRAVITY,
-  GATE_SEAT_FRAC,
-  RAIL_OPEN_S,
-  RAIL_DROP_S,
-  RAMP_SLOTS,
-  GATE_PADDLE_SHOVE,
-  GATE_SHOVE_MIN,
-  RAIL_ACCEL,
-  RAIL_RATTLE_DRAG,
-  ROBOT_MIN_WIDTH,
-  INTAKE_ROLLER_MM,
-  intakeRollerDia,
-  intakeAxleX,
-  intakeNip,
-  INTAKE_TREAD_FRAC,
-  intakeMouth,
-  GATE_LINE_S,
-  GATE_RIDE_FRAC,
-  GATE_TAPE_Y,
-  RAIL_PITCH,
-  RAIL_TERMINAL,
-  HOPPER_CAPACITY,
-  RAIL_EXIT_S,
-  RAIL_ENTRY_V,
-  RAIL_S_MAX,
-  OVERFLOW_ROLL_LOSS,
-  OVERFLOW_SLOPE_MAX,
-  OVERFLOW_BUMP,
-  RAIL_ACCEL,
-  OVERFLOW_Z,
-  BASIN_FLOOR_Z,
-  RAMP_SURFACE_Z,
-  FIELD_HALF,
-  TUNNEL_STRIP_LEN,
-  LOAD_ZONE_SIZE,
-  BALL_RADIUS,
-  BALL_BALL_RESTITUTION,
-  BALL_WALL_RESTITUTION,
-  CLASSIFIER_W,
-  GATE_TAPE_W,
-  GATE_TAPE_LEN,
-  RAIL_WANDER_AMP,
-  ROBOT_HEIGHT,
-  HP_INITIAL_STOCK,
-  HP_PLACE_DELAY,
-  BALANCE_VERSION,
-  SIM_VERSION,
-  INTAKE_PRESETS,
-  INTAKE_LIP,
-  HELD_SLIDE_SPEED,
-  INTAKE_CAPTURE_BAND,
-  INTAKE_CATCH_LENIENCE,
-  ROBOT_PRESETS,
-  ROBOT_MAX_SIZE,
-  ROBOT_MIN_WIDTH,
-  SWERVE_MIN_WIDTH,
-  intakeMouth,
-  DRIVETRAIN_PRESETS,
-  DRIVETRAIN_LIMITS,
-  BUTTERFLY_MODES,
-  START_POSES,
-  SPEED_PER_RPM,
-  REF_DRIVE_RPM,
-  PUSH_RPM_MAX,
-  PHYS_MAX_ROBOT_SPEED,
-  DRIVE_EFFICIENCY,
-  WHEEL_DIAMETER_MM,
-  BASE_DRIVE_ACCEL,
-  POWER_DRAW_SWERVE,
-  POSSESSION_HERD_SPEED,
-  POSSESSION_PUSH_MIN,
-  POSSESSION_CONFIRM,
-  POSSESSION_GRACE,
-  POSSESSION_REBILL_S,
-  POSSESSION_CARRY_DIST,
-  PTS_FOUL_MAJOR,
-  MAX_SAVED_STARTS,
-  MAX_SAVED_STARTS_SUPPORTER,
-  CHASSIS_COLORS,
-  chassisFill,
-  PLACEMENT_GAMES,
-  ENDGAME_START,
-  PRE_COUNTDOWN,
-  COLORS,
-} from '../src/config';
+import { DriverShaping, ftc25SnapTurn, type ShapingInput } from '../src/input/driverShaping';
+import { InputManager } from '../src/input/input';
+import { forkFeaturesAllowed, markLanSession, replayIsFork } from '../src/net/forkScope';
+import { pendingPracticeUploads, savePracticeRun } from '../src/net/practiceRuns';
+import { BB_DEFAULT_SPEC } from '../src/games/biobuzz/coerce';
+import { hiveCellPos } from '../src/games/biobuzz/hive';
+import { awardFoul } from '../src/sim/scoring';
+import type { Alliance, DrivetrainType, GameId, GameMode, GameSettings, MatchPhase, RobotCommand, RobotSpec, RobotState, World } from '../src/types';
+import { SIM_DT, PRE_COUNTDOWN as C_PRE_COUNTDOWN, ROBOT_MIN_WIDTH, INTAKE_ROLLER_MM, intakeRollerDia, intakeMouth, FIELD_HALF, BALANCE_VERSION, SIM_VERSION, INTAKE_PRESETS, ROBOT_MAX_SIZE, SWERVE_MIN_WIDTH, DRIVETRAIN_PRESETS, DRIVETRAIN_LIMITS, BUTTERFLY_MODES, SPEED_PER_RPM, REF_DRIVE_RPM, PUSH_RPM_MAX, PHYS_MAX_ROBOT_SPEED, DRIVE_EFFICIENCY, WHEEL_DIAMETER_MM, BASE_DRIVE_ACCEL, POWER_DRAW_SWERVE, PTS_FOUL_MAJOR, CHASSIS_COLORS, chassisFill, ENDGAME_START, PRE_COUNTDOWN, COLORS } from '../src/config';
 import {
   CHASSIS_COLOR_KEYS, ACCENT_KEYS, DECAL_KEYS, PLATE_KEYS, COSMETIC_DEFAULTS,
   cosmeticTier, stripUnentitledCosmetics,
 } from '../src/cosmetics';
 import {
-  pointDepthInRobot,
   robotCorners,
   robotExtents,
   robotIntersectsRect,
+  squareUpRobotsWalls,
   wheelContacts,
 } from '../src/sim/physics';
+import { updateRobot, type DriveWrench } from '../src/sim/robot';
+import { chainColliders } from '../src/games/chain/colliders';
 import { beamBlock, beamDrag, beamDragFactor, beamStrafeBlock, beamForwardness, beamRide, canCrossBeams, cogFactor, wheelsOnBeam, CHAIN_BEAMS } from '../src/games/chain/beams';
 import { butterflyTankRpmLimits, driveParams, massLimits, rpmLimits, motorStep, driveSummary, widthLimits, pushForce, shoveMass } from '../src/sim/drivetrain';
-import { PERF_DISPLAY_LEVELS, coerceSettings, defaultSettings, hasStoredSettings, practiceSeatsFor, practiceSetups, saveSettings, switchGame, syncAudioMirrors } from '../src/settings';
+import { forAccount, keepLocalForkFields, seatAssists, singlePadBindings, versusSeats } from '../src/settings';
+import { PERF_DISPLAY_LEVELS, activeBindings, coerceSettings, defaultSettings, hasStoredSettings, practiceSeatsFor, practiceSetups, saveSettings, switchGame, syncAudioMirrors } from '../src/settings';
 import { legalRegion, routeTarget } from '../server/routing';
 import {
   authFlowsForTesting,
@@ -219,6 +95,7 @@ import {
 } from '../src/legalText';
 import {
   ANALYTICS_KEY,
+  PRACTICE_RUNS_KEY,
   STORAGE_CATEGORY_ORDER,
   STORAGE_KEYS,
   storageKeysIn,
@@ -227,8 +104,19 @@ import {
 import { analyticsAllowed, setAnalyticsAllowed } from '../src/analyticsPref';
 import { normalizePath, refHost, screenBucket, utmOf } from '../src/pageviews';
 import type { RobotSetup } from '../src/sim/spawn';
+import { CHAIN_SIM, chainSettled } from '../src/games/chain/sim';
 import {
   DEFAULT_BINDINGS,
+  FTC25_DEFAULT_BINDINGS,
+  FTC25_SINGLE_DEFAULT_BINDINGS,
+  FTC25_ONLY,
+  FTC25_PRESET_ACTIONS,
+  type ControlBindings,
+  pad2View,
+  fromPad2View,
+  schemeDefaults,
+  type KeyAction,
+  type PadAction,
   VIEW_ACTIONS,
   keyConflict,
   padConflict,
@@ -251,6 +139,7 @@ import {
   assignPadBind,
   removePadBind,
   ACTION_GAMES,
+  RESERVED_ACTIONS,
   BIND_SLOTS_MAX,
   actionUsedBy,
   actionsConflict,
@@ -354,7 +243,9 @@ import {
   REPLAY_FORMAT,
   replayPlayable,
   replayRefusal,
+  replayGameOf,
   ReplayRecorder,
+  worldResult,
   trackStride,
   type CommandSource,
   replayViewpoint,
@@ -364,7 +255,6 @@ import {
   type ReplayResult,
 } from '../src/sim/replay';
 import {
-  cardEventText,
   foulEventText,
   parsePenaltyEvent,
   warningEventText,
@@ -402,31 +292,28 @@ import {
   RED_CARD_MULT, chargedForParticipation, absenceOf, EARLY_ABSENT_TICKS,
   type StandingEventKind, type StandingState,
 } from '../src/standing';
-import type { ServerMsg, QueueMode } from '../src/net/protocol';
-import { dsin, dcos, dtan, datan2, hyp, rot, wrapAngle, clamp } from '../src/math';
-import { initPhysics } from '../src/sim/physicsEngine';
+import type { ServerMsg } from '../src/net/protocol';
+import { dsin, dcos, dtan, datan2, hyp, rot, wrapAngle } from '../src/math';
+import { initPhysics, solveRobots } from '../src/sim/physicsEngine';
 import { initPhysics3d } from '../src/games/biobuzz/sim3d/engine';
 import { simModuleFor } from '../src/games/sim';
 import { LeadController, LEAD_GAP_MS, LEAD_MAX_FAST, LEAD_MAX_SLOW, LEAD_TARGET_MAX } from '../src/net/leadControl';
 import { restoreWireClocks } from '../src/net/wireClocks';
 import { CONTACT_DRAW_FAR_IN, CONTACT_DRAW_FULL_IN, blendPose, followDrawn, nearDrawWeight } from '../src/net/contactDraw';
 import { AGREE_BALL_IN, AGREE_POS_IN, AGREE_STICK, cmdsAgree, digestsAgree, worldDigest } from '../src/net/worldDigest';
-import { serverPhysics, GAME_IDS } from '../src/games/types';
+import { serverPhysics, GAME_IDS, DEFAULT_GAME } from '../src/games/types';
 import { moduleFor, gameOf } from '../src/games';
 import { Renderer } from '../src/render/renderer';
 import type { GameScene } from '../src/games/module';
-import { decodeColliders } from '../src/games/decode/colliders';
 import { createChainWorld } from '../src/games/chain/spawn';
 import {
   MATCH_SETTLE_HOLD_S,
   MATCH_SETTLE_MAX_S,
-  decodeSettled,
   newSettleClock,
   settleStep,
 } from '../src/sim/settle';
 import { chainStep } from '../src/games/chain/step';
 import { chainGoalAimHeading, chainCatalystPrompt, updateChain } from '../src/games/chain/play';
-import { chainColliders } from '../src/games/chain/colliders';
 import {
   CHAIN_HALF_X,
   CHAIN_HALF_Y,
@@ -449,7 +336,7 @@ import {
   CHAIN_PRISM,
   chainArmReach,
 } from '../src/games/chain/config';
-import { CHAIN_HOOKS_PER_GOAL, accelMultiplier, catalystRailHalf, catalystRailTarget, catalystMouth, catalystTrackTarget, chainEvalStart, chainStartExtents, chainHeadingFits, chainNearestFittingHeading, chainSnapStartPose, chainIntakeMouths, chainMirrorStart, chainSnapStart, chainStartLegal, hookPos, labAreas, onRingStand, ringStandBoxes, ringStands } from '../src/games/chain/state';
+import { accelMultiplier, catalystRailHalf, catalystRailTarget, catalystMouth, catalystTrackTarget, chainEvalStart, chainStartExtents, chainHeadingFits, chainNearestFittingHeading, chainSnapStartPose, chainIntakeMouths, chainMirrorStart, chainSnapStart, chainStartLegal, hookPos, labAreas, onRingStand, ringStandBoxes, ringStands } from '../src/games/chain/state';
 import {
   CHAIN_CATALYSTS,
   CHAIN_CATALYST_TYPES,
@@ -484,6 +371,37 @@ import { CHAIN_CATALYST_MOUNTS, CHAIN_INTAKE_MOUNTS, CHAIN_TURRET_POSITIONS, MOU
 // step() runs. tsx runs this file as ESM, so top-level await is available.
 await initPhysics();
 
+// ── DECODE WAS REMOVED FROM THIS FORK (2026-10-12) ─────────────────────────────────────────────
+// Every check about DECODE's own rules — its artifacts, gate and ramp, intake, shooter, scoring,
+// fouls and human player — went with it. The SHARED checks that only used its world as their
+// VEHICLE (the drivetrain and robot contact, the snapshot codec, the reconcile, determinism) now
+// step CHAIN REACTION's: the other 2D game, on the same `updateRobot`, the same Rapier robot
+// solve and the same wire. `createWorld` / `step` keep their old names so those blocks read as
+// they did. Chain Reaction's field has beams and 300 particles where DECODE's had open floor, so a
+// block that measured a robot on bare tiles clears what it needs (`w.balls.length = 0`), or
+// steps `stepFlat` below.
+const createWorld = (mode: GameMode, seed: number, setups: RobotSetup[], settings?: GameSettings): World =>
+  CHAIN_SIM.createWorld(mode, seed, setups, settings);
+const step = (world: World, dt: number, commands: Map<number, RobotCommand>): void => CHAIN_SIM.step(world, dt, commands);
+/**
+ * THE SHARED ROBOT CORE ON A FLAT FIELD: `chainStep` without its beams and its game — the drive
+ * (`updateRobot`), the Rapier robot solve against the 144in walls, and the wall square-up. The
+ * robot-contact and drive-line checks ran on DECODE's open mid-field; Chain Reaction's beams lie
+ * along BOTH axes from the walls in to 16in of the centre, so on its real step those checks
+ * measure a wheel on a ridge (a pivot at (-34,5) sits on one) instead of the contact model.
+ * Free-drive worlds only: there is no match clock and no CoG scaling here.
+ */
+const FLAT_IDLE: RobotCommand = { driveX: 0, driveY: 0, rotate: 0, leftDrive: 0, rightDrive: 0, intake: false, fire: false };
+const stepFlat = (world: World, dt: number, commands: Map<number, RobotCommand>): void => {
+  world.time += dt;
+  world.tick++;
+  const drive = new Map<number, DriveWrench>();
+  for (const r of world.robots) drive.set(r.id, updateRobot(world, r, commands.get(r.id) ?? FLAT_IDLE, dt));
+  world.rrContacts.length = 0;
+  const preVels = solveRobots(world, dt, chainColliders, drive);
+  squareUpRobotsWalls(world, preVels, CHAIN_HALF_X, CHAIN_HALF_Y);
+};
+
 let failures = 0;
 function check(name: string, ok: boolean, detail = ''): void {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
@@ -494,6 +412,10 @@ const cmd = (patch: Partial<RobotCommand>): RobotCommand => ({
   driveX: 0,
   driveY: 0,
   rotate: 0,
+  // explicit, as every real command is (the wire fills them): Chain Reaction's step scales the
+  // tank sides by the CoG factor without a `?? 0`, so a missing side is NaN there
+  leftDrive: 0,
+  rightDrive: 0,
   intake: false,
   fire: false,
   ...patch,
@@ -522,218 +444,6 @@ const mkWorld = (
       startIndex: 0,
     },
   ]);
-
-const slotCount = (w: World, a: 'red' | 'blue') =>
-  w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === a && !b.state.overflow)
-    .length;
-
-// ---- spawn sanity ----------------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  // on-field = ground balls (preloads are now PHYSICAL 'held' balls inside robots)
-  const field = w.balls.filter((b) => b.state.kind === 'ground');
-  const purple = field.filter((b) => b.color === 'purple').length;
-  const green = field.filter((b) => b.color === 'green').length;
-  check('24 on-field balls at spawn (9 spike + 3 loading pre-stage per alliance)', field.length === 24, `${field.length}`);
-  check('on-field color split 16P/8G', purple === 16 && green === 8, `${purple}P ${green}G`);
-  check('hopper preloaded with 3', w.robots[0].hopper.length === 3);
-  check(
-    'default spawn is a legal G304 start (blue)',
-    evalStartPose(w.robots[0].spec, { x: w.robots[0].pos.x, y: w.robots[0].pos.y, headingDeg: (w.robots[0].heading * 180) / Math.PI }, 'blue').legal,
-  );
-  const pose = startPose('blue', 0);
-  check(
-    'start pose heading comes from START_POSES degrees',
-    Math.abs(w.robots[0].heading - pose.heading) < 1e-9,
-    `${(w.robots[0].heading * 180 / Math.PI).toFixed(1)}°`,
-  );
-  check('blue goal is far-left (cross-court)', goalCenter('blue').x < 0 && goalCenter('blue').y > 0);
-  check('red goal is far-right', goalCenter('red').x > 0 && goalCenter('red').y > 0);
-}
-
-// ---- configurable start positions (rule G304) ------------------------------
-{
-  // every named preset is a LEGAL setup for the default spec, both alliances
-  let presetsLegal = true;
-  for (const p of START_POSES) {
-    const canon = { x: p.x, y: p.y, headingDeg: p.headingDeg };
-    if (!evalStartPose(DEFAULT_SPEC, canon, 'red').legal) presetsLegal = false;
-    if (!evalStartPose(DEFAULT_SPEC, mirrorStartPose(canon, 'blue'), 'blue').legal) presetsLegal = false;
-  }
-  check('every START_POSES preset is a legal G304 setup (both alliances)', presetsLegal);
-
-  // DYNAMIC presets: presetPose resolves EVERY preset legal for ANY chassis size
-  let dynOk = true;
-  const chassis = [DEFAULT_SPEC, { ...DEFAULT_SPEC, length: 18, width: 18, intake: 'triangle' as const }, { ...DEFAULT_SPEC, length: 10, width: 10, intake: 'vector' as const }];
-  for (const s of chassis) for (const a of ['red', 'blue'] as const) for (let i = 0; i < START_POSES.length; i++) {
-    if (!evalStartPose(s, presetPose(i, a, s), a).legal) dynOk = false;
-  }
-  check('presetPose yields a legal pose for every preset/alliance/chassis size', dynOk);
-
-  // a mid-field pose (touching nothing) is NOT legal — the OLD presets were here
-  const midField = evalStartPose(DEFAULT_SPEC, { x: 20, y: 40, headingDeg: 315 }, 'red');
-  check('mid-launch-zone pose fails G304 (not touching goal/wall)', !midField.legal && !midField.touching);
-
-  // a pose off the field / into the opponent half fails the containment clauses
-  check('off-field pose fails containment', !evalStartPose(DEFAULT_SPEC, { x: 71, y: 71, headingDeg: 0 }, 'red').contained);
-  check('pose in the opponent half fails ownHalf', !evalStartPose(DEFAULT_SPEC, { x: -30, y: 50, headingDeg: 0 }, 'red').ownHalf);
-
-  // collision box: a pose buried in the goal corner is NOT clear (penetrates the structure)
-  const buried = evalStartPose(DEFAULT_SPEC, { x: 62, y: 62, headingDeg: 0 }, 'red');
-  check('footprint inside the goal structure fails the clear clause', !buried.clear && !buried.legal);
-
-  // snapping makes ANY spec legal from ANY seed, both alliances
-  let snapOk = true;
-  const specs = [DEFAULT_SPEC, { ...DEFAULT_SPEC, length: 18, width: 18, intake: 'triangle' as const }, { ...DEFAULT_SPEC, length: 10, width: 10, intake: 'vector' as const }];
-  const seeds = [{ x: 5, y: 5, headingDeg: 33 }, { x: 30, y: 0, headingDeg: 100 }, { x: 65, y: -10, headingDeg: 200 }, { x: 10, y: 65, headingDeg: 0 }];
-  for (const s of specs) for (const a of ['red', 'blue'] as const) for (const seed of seeds) {
-    if (!evalStartPose(s, snapStartToLegal(s, seed, a), a).legal) snapOk = false;
-  }
-  check('snapStartToLegal yields a legal pose for any spec/alliance/seed', snapOk);
-  check('snapStartToLegal leaves an already-legal pose unchanged', (() => {
-    const legal = mirrorStartPose({ x: START_POSES[0].x, y: START_POSES[0].y, headingDeg: START_POSES[0].headingDeg }, 'red');
-    const s = snapStartToLegal(DEFAULT_SPEC, legal, 'red');
-    return s.x === legal.x && s.y === legal.y && s.headingDeg === legal.headingDeg;
-  })());
-
-  // mirror is self-inverse
-  const mp = { x: 33.3, y: -12.1, headingDeg: 47 };
-  const rt = mirrorStartPose(mirrorStartPose(mp, 'blue'), 'blue');
-  check('mirrorStartPose is self-inverse', Math.abs(rt.x - mp.x) < 1e-9 && Math.abs(rt.headingDeg - mp.headingDeg) < 1e-9);
-
-  // coerceStartPose rejects junk, clamps to the field
-  check('coerceStartPose rejects non-finite', coerceStartPose({ x: NaN, y: 0, headingDeg: 0 }) === null);
-  check('coerceStartPose rejects non-object', coerceStartPose(null) === null && coerceStartPose('x') === null);
-  const clamped = coerceStartPose({ x: 999, y: -999, headingDeg: 725 });
-  check('coerceStartPose clamps x/y to field + normalizes heading', !!clamped && clamped.x === FIELD_HALF && clamped.y === -FIELD_HALF && clamped.headingDeg === 5);
-
-  // coerceSetup snaps a spoofed illegal custom pose to a legal spawn pose
-  const bad = coerceSetup({ id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0, startPose: { x: 0, y: 0, headingDeg: 0 } });
-  check('coerceSetup snaps an illegal custom startPose legal', !!bad.startPose && evalStartPose(DEFAULT_SPEC, mirrorStartPose(bad.startPose, 'blue'), 'blue').legal);
-
-  // ...but G304 IS DECODE'S RULE, so the snap is gated on the module's `startLegality`.
-  // `sanitizeReplay` → `coerceSetup(…, 'chain')` used to run DECODE's launch-line / touching-
-  // a-surface repair over a CR pose, moving it somewhere CR never asked for, before
-  // `chainSnapStartPose` ever saw it.
-  {
-    const mid = { x: 0, y: 0, headingDeg: 0 }; // illegal under G304, fine under CR's G04
-    const cr = coerceSetup({ id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0, startPose: mid }, 'chain');
-    check(
-      'coerceSetup does NOT snap a CR pose to G304 (startLegality: false)',
-      cr.startPose?.x === 0 && cr.startPose?.y === 0,
-      `${cr.startPose?.x},${cr.startPose?.y}`,
-    );
-    // and the SIZE ENVELOPE follows the game too: DECODE's intake-preset length limit cut a
-    // legal CR chassis, so the replay viewer re-simulated a robot nobody built.
-    const big = { ...DEFAULT_SPEC, length: 17, width: 17 };
-    const asCr = coerceSetup({ id: 0, alliance: 'blue', spec: big, assists: DEFAULT_ASSISTS, startIndex: 0 }, 'chain').spec;
-    const asDecode = coerceSetup({ id: 0, alliance: 'blue', spec: big, assists: DEFAULT_ASSISTS, startIndex: 0 }, 'decode').spec;
-    check(
-      'coerceSetup resolves the CR size envelope for a CR setup (DECODE would cut it)',
-      asCr.length === 17 && asDecode.length < 17,
-      `CR ${asCr.length}" vs DECODE ${asDecode.length}"`,
-    );
-    // ⚠️ THE NO-BUMP GUARD. Threading `game` any further arms `coerceSpec`'s mount-reset
-    // branch, which rewrites `intakeMount` to 'front'. That is PHYSICS — `footprintExtents`
-    // grows the collider on the mounted edge — so every stored replay carrying a non-front
-    // mount would re-simulate as a different robot, i.e. a silent SIM_VERSION retirement of
-    // the whole archive. This is what keeps the narrowed branch narrow.
-    const mounted = { ...DEFAULT_SPEC, intakeMount: 'side' as const };
-    check(
-      'coerceSetup leaves a DECODE spec`s intakeMount ALONE (narrowed on purpose — do not "complete" the threading)',
-      coerceSetup({ id: 0, alliance: 'blue', spec: mounted, assists: DEFAULT_ASSISTS, startIndex: 0 }, 'decode').spec.intakeMount === 'side',
-    );
-    const hashed = (sp: typeof mounted): string =>
-      worldHash(createWorld('match', 7, [{ id: 0, alliance: 'blue', spec: sp, assists: DEFAULT_ASSISTS, startIndex: 0 }]));
-    check(
-      'a DECODE world spawned from a side-mounted spec hashes the same as one built straight from it',
-      hashed(mounted) === hashed(coerceSetup({ id: 0, alliance: 'blue', spec: mounted, assists: DEFAULT_ASSISTS, startIndex: 0 }, 'decode').spec as typeof mounted),
-    );
-  }
-
-  // a custom pose actually drives the spawn position (canonical → mirrored)
-  const customCanon = { x: START_POSES[1].x, y: START_POSES[1].y, headingDeg: START_POSES[1].headingDeg };
-  const cw = createWorld('match', 1, [{ id: 0, alliance: 'red', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0, startPose: customCanon }]);
-  const want = startPose('red', 0, customCanon);
-  check('custom startPose overrides startIndex at spawn', Math.hypot(cw.robots[0].pos.x - want.pos.x, cw.robots[0].pos.y - want.pos.y) < 1e-6);
-
-  // the spawned robot (red = canonical frame) is a legal G304 setup
-  const spawnedPose = { x: cw.robots[0].pos.x, y: cw.robots[0].pos.y, headingDeg: (cw.robots[0].heading * 180) / Math.PI };
-  check('spawned custom-pose robot is a legal G304 setup', evalStartPose(cw.robots[0].spec, spawnedPose, 'red').legal);
-
-  // activeStartLegal (LOCAL start guard): null (preset) is always ok; a custom pose
-  // legal for a SMALL chassis but illegal for a BIGGER one is caught so the local
-  // game start can block-and-warn instead of silently snapping.
-  const smallSpec = coerceSpec({ ...DEFAULT_SPEC, length: 11, width: 10, intake: 'vector' });
-  const bigSpec = coerceSpec({ ...DEFAULT_SPEC, length: 18, width: 18, intake: 'vector' });
-  let crossChassisCaught = false;
-  outer: for (let x = -70; x <= 70 && !crossChassisCaught; x += 3)
-    for (let y = -70; y <= 70; y += 3)
-      for (let h = 0; h < 360; h += 30) {
-        const p = { x, y, headingDeg: h };
-        if (evalStartPose(smallSpec, p, 'red').legal && !evalStartPose(bigSpec, p, 'red').legal) {
-          crossChassisCaught = activeStartLegal(smallSpec, 'red', p) && !activeStartLegal(bigSpec, 'red', p);
-          if (crossChassisCaught) break outer;
-        }
-      }
-  check('activeStartLegal ok for a preset (null pose)', activeStartLegal(bigSpec, 'blue', null));
-  check('activeStartLegal flags a pose legal for a small chassis but illegal for a big one', crossChassisCaught);
-
-}
-
-// ---- duo start roles (close/far), preset categories, and saved-start settings -----------
-// (split from the G304 block above — no shared state with it)
-{
-  // 2v2 CLOSE/FAR role derivation always yields DISTINCT roles for the two allies —
-  // including after a swap + host-leave + rejoin (rejoiner returns with a NEW
-  // clientId and NO startRole; partner keeps its swapped role).
-  const lp = (clientId: string, startRole?: 'close' | 'far'): LobbyPlayer =>
-    ({ clientId, alliance: 'blue', hidden: false, startRole }) as unknown as LobbyPlayer;
-  const rolesDistinct = (a: LobbyPlayer, b: LobbyPlayer): boolean => {
-    const ra = derivedRole([a, b], a);
-    const rb = derivedRole([a, b], b);
-    return ra !== undefined && rb !== undefined && ra !== rb;
-  };
-  check('duo roles: a fresh pair splits close/far', rolesDistinct(lp('a'), lp('b')));
-  check(
-    'duo roles: after a swap, explicit distinct roles are honored',
-    derivedRole([lp('a', 'far'), lp('b', 'close')], lp('a', 'far')) === 'far',
-  );
-  // the reported bug: swap (partner keeps far), host leaves, rejoins with a NEW
-  // higher clientId + no startRole — old clientId-only sort put BOTH on far.
-  check(
-    'duo roles: rejoiner (new id, no role) takes the OPPOSITE of partner’s retained role',
-    (() => {
-      const partner = lp('a', 'far'); // stayed, kept swapped role
-      const rejoiner = lp('z'); // rejoined: new id sorts after 'a', no startRole
-      return derivedRole([partner, rejoiner], partner) === 'far' && derivedRole([partner, rejoiner], rejoiner) === 'close';
-    })(),
-  );
-  check('duo roles: identical explicit roles (collision) still resolve distinct', rolesDistinct(lp('a', 'far'), lp('b', 'far')));
-
-  // Close/Far categories: presets partition, and each is legal in its own category
-  const closeP = START_POSES.filter((p) => p.cat === 'close');
-  const farP = START_POSES.filter((p) => p.cat === 'far');
-  check('presets partition into close + far (both non-empty)', closeP.length > 0 && farP.length > 0 && closeP.length + farP.length === START_POSES.length);
-
-  // settings: new start fields default sanely + saved library caps per category
-  const def = coerceSettings({});
-  check('coerceSettings defaults startCat/library/memory', def.startCat === 'close' && Array.isArray(def.savedStartPoses.close) && def.startMemory.far.index === 1);
-  const capped = coerceSettings({ savedStartPoses: { close: [{ x: 5, y: 6, headingDeg: 0 }, { x: 7, y: 8, headingDeg: 10 }, { x: 9, y: 9, headingDeg: 20 }], far: [{ x: NaN, y: 0, headingDeg: 0 }, 'junk'] } });
-  // The PERSIST cap is the SUPPORTER ceiling, deliberately — not the free one.
-  // Sanitizing to 2 would silently delete a supporter's saved poses on any load
-  // before the entitlement resolved, and again the moment a membership lapsed.
-  // The free cap is enforced by the Save button (savedStartCap), not by storage.
-  check('coerceSettings keeps saved starts up to the SUPPORTER cap + drops junk', capped.savedStartPoses.close.length === 3 && capped.savedStartPoses.far.length === 0);
-  const overflow = coerceSettings({
-    savedStartPoses: {
-      close: Array.from({ length: MAX_SAVED_STARTS_SUPPORTER + 3 }, (_, i) => ({ x: i, y: 0, headingDeg: 0 })),
-      far: [],
-    },
-  });
-  check('coerceSettings still caps runaway saved starts at the supporter ceiling', overflow.savedStartPoses.close.length === MAX_SAVED_STARTS_SUPPORTER);
-  check('savedStartCap: free players get MAX_SAVED_STARTS, supporters get more', savedStartCap(false) === MAX_SAVED_STARTS && savedStartCap(true) === MAX_SAVED_STARTS_SUPPORTER);
-}
 
 // ---- cosmetics allowlist (docs/cosmetics-plan.md) ----------------------------------------
 // (split from the block above — no shared state with it)
@@ -781,7 +491,7 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
     'cosmetics: coerceSpec on a replay-style spec (no DB) keeps recorded cosmetics unchanged',
     (() => {
       const recorded: RobotSpec = { ...DEFAULT_SPEC, chassisColor: 'gold', accent: 'magenta', decal: 'checker', plate: 'bold' };
-      const replayed = coerceSpec(recorded, DEFAULT_SPEC, 'decode');
+      const replayed = coerceSpec(recorded, DEFAULT_SPEC, 'chain');
       return (
         replayed.chassisColor === 'gold' &&
         replayed.accent === 'magenta' &&
@@ -865,11 +575,11 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
         simModuleFor(game).step(w, SIM_DT, new Map());
         return worldHash(w);
       });
-    const decodeHashes = hashesFor('decode');
+    const chainHashes = hashesFor('chain');
     check(
-      'cosmetics never move worldHash: DECODE, every chassisColor/accent/decal/plate value',
-      decodeHashes.every((h) => h === decodeHashes[0]),
-      JSON.stringify(decodeHashes),
+      'cosmetics never move worldHash: Chain Reaction, every chassisColor/accent/decal/plate value',
+      chainHashes.every((h) => h === chainHashes[0]),
+      JSON.stringify(chainHashes),
     );
     const bbHashes = hashesFor('biobuzz');
     check(
@@ -888,34 +598,34 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
     const def = coerceSettings({});
     check(
       'practice seats: absent reads as three None, in every game',
-      (['decode', 'chain', 'biobuzz'] as const).every((g) => practiceSeatsFor(def, g).every((x) => x.kind === 'none')),
+      (['chain', 'biobuzz'] as const).every((g) => practiceSeatsFor(def, g).every((x) => x.kind === 'none')),
     );
     check(
       "practice seats: an absent entry's tier is the game's own default (the bot's, else 'medium')",
       practiceSeatsFor(def, 'biobuzz')[0].tier === simModuleFor('biobuzz').bot!.defaultTier &&
-        practiceSeatsFor(def, 'decode')[0].tier === 'medium',
+        practiceSeatsFor(def, 'chain')[0].tier === 'medium',
     );
     check('practice seats: a blob without the field stays without it', def.practiceSeats === undefined || Object.keys(def.practiceSeats).length === 0);
     const good = [seat('ai'), seat('dummy', 'easy'), seat('none', 'medium')];
-    const back = coerceSettings(JSON.parse(JSON.stringify({ practiceSeats: { biobuzz: good, decode: [seat('dummy'), seat('none'), seat('ai')] } })));
+    const back = coerceSettings(JSON.parse(JSON.stringify({ practiceSeats: { biobuzz: good, chain: [seat('dummy'), seat('none'), seat('ai')] } })));
     check(
       'practice seats: a valid per-game line-up survives the JSON round-trip, tiers verbatim',
-      JSON.stringify(back.practiceSeats?.biobuzz) === JSON.stringify(good) && back.practiceSeats?.decode?.[2].kind === 'ai',
+      JSON.stringify(back.practiceSeats?.biobuzz) === JSON.stringify(good) && back.practiceSeats?.chain?.[2].kind === 'ai',
       JSON.stringify(back.practiceSeats),
     );
     const bad = coerceSettings({
       practiceSeats: {
         biobuzz: [seat('ai'), seat('robot'), seat('none')], // unknown kind
         chain: [seat('dummy'), seat('dummy')], // two seats, not three
-        decode: [seat('ai'), seat('none'), { kind: 'none', tier: 'x'.repeat(40) }], // runaway tier
         pong: [seat('ai'), seat('ai'), seat('ai')], // not a game
       },
     });
+    const runaway = coerceSettings({ practiceSeats: { chain: [seat('ai'), seat('none'), { kind: 'none', tier: 'x'.repeat(40) }] } });
     check(
       'practice seats: a bad kind, a short line-up, a runaway tier and an unknown game are all dropped',
       bad.practiceSeats?.biobuzz === undefined &&
         bad.practiceSeats?.chain === undefined &&
-        bad.practiceSeats?.decode === undefined &&
+        runaway.practiceSeats?.chain === undefined &&
         !('pong' in (bad.practiceSeats ?? {})),
       JSON.stringify(bad.practiceSeats),
     );
@@ -944,14 +654,14 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
     );
     const again = practiceSetups({ ...base, practiceSeats: { biobuzz: [seat('dummy'), seat('ai', 'easy'), seat('ai', 'no-such-tier')] } }, 'biobuzz', 7);
     check('practice line-up: deterministic in the seed (a replay rebuilds the same specs)', JSON.stringify(again) === JSON.stringify(mixed));
-    const decode = practiceSetups({ ...base, practiceSeats: { decode: [seat('ai'), seat('dummy'), seat('ai')] } }, 'decode', 7);
+    const chain = practiceSetups({ ...base, practiceSeats: { chain: [seat('ai'), seat('dummy'), seat('ai')] } }, 'chain', 7);
     check(
       'practice line-up: an AI seat in a game with no driver is None — the Dummy still spawns',
-      decode.setups.length === 1 && decode.setups[0].id === 2 && decode.setups[0].passive === true && decode.botTiers.size === 0,
-      JSON.stringify(decode.setups.map((x) => x.id)),
+      chain.setups.length === 1 && chain.setups[0].id === 2 && chain.setups[0].passive === true && chain.botTiers.size === 0,
+      JSON.stringify(chain.setups.map((x) => x.id)),
     );
-    const other = practiceSetups({ ...base, practiceSeats: { decode: [seat('dummy'), seat('dummy'), seat('dummy')] } }, 'chain', 7);
-    check("practice line-up: per game — DECODE's line-up does not spawn in Chain Reaction", other.setups.length === 0);
+    const other = practiceSetups({ ...base, practiceSeats: { chain: [seat('dummy'), seat('dummy'), seat('dummy')] } }, 'biobuzz', 7);
+    check("practice line-up: per game — Chain Reaction's line-up does not spawn in BIOBUZZ", other.setups.length === 0);
   }
 }
 
@@ -959,31 +669,31 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
 // nothing bleeds (split from the block above; already self-contained) ---------------------
 {
   {
-    let s = coerceSettings({ game: 'decode' });
-    // build a DECODE loadout: name the robot + save one + pick a start
-    s = { ...s, spec: { ...s.spec, name: 'DecodeBot' }, savedRobots: [{ ...s.spec, name: 'DSaved' }], startIndex: 2 };
-    // switch to CR: the flat fields become CR's (fresh) — DECODE's are archived, not visible
+    let s = coerceSettings({ game: 'biobuzz' });
+    // build a BIOBUZZ loadout: name the robot + save one + pick a start
+    s = { ...s, spec: { ...s.spec, name: 'BeeBot' }, savedRobots: [{ ...s.spec, name: 'BSaved' }], startIndex: 2 };
+    // switch to CR: the flat fields become CR's (fresh) — BIOBUZZ's are archived, not visible
     s = switchGame(s, 'chain');
-    check('per-game: switching to CR hides DECODE saved robots', s.savedRobots.length === 0 && s.game === 'chain');
+    check('per-game: switching to CR hides BIOBUZZ saved robots', s.savedRobots.length === 0 && s.game === 'chain');
     // build a CR loadout: an 18"-long robot + a CR start anchor (index 3, valid only for CR)
     // 15" is the CR cap for a front-mounted sloped sweeper (18" cube − 3" reach); the
     // sweeper is structure and now counts toward the start cube, so 18" is no longer legal.
     const crCap = chainSizeLimits({ ...DEFAULT_SPEC, intake: 'sloped', intakeMount: 'front' }).maxLength;
     s = { ...s, spec: coerceSpec({ ...s.spec, name: 'ChainBot', length: crCap }, undefined, 'chain'), savedRobots: [{ ...s.spec, name: 'CSaved' }], startIndex: 3 };
     check('per-game: a CR chassis keeps its max legal length + anchor 3', s.spec.length === crCap && s.startIndex === 3);
-    // back to DECODE: our DECODE loadout returns intact (name/saved/start), CR's is archived
-    s = switchGame(s, 'decode');
-    check('per-game: DECODE loadout restored on switch back', s.spec.name === 'DecodeBot' && s.savedRobots[0]?.name === 'DSaved' && s.startIndex === 2);
-    // and CR's 18" build is preserved in the archive (would clamp to ~15 if it lived under DECODE)
+    // back to BIOBUZZ: our BIOBUZZ loadout returns intact (name/saved/start), CR's is archived
+    s = switchGame(s, 'biobuzz');
+    check('per-game: BIOBUZZ loadout restored on switch back', s.spec.name === 'BeeBot' && s.savedRobots[0]?.name === 'BSaved' && s.startIndex === 2);
+    // and CR's build is preserved in the archive
     s = switchGame(s, 'chain');
     check('per-game: CR loadout (max-length build) survives the round-trip', s.spec.name === 'ChainBot' && s.spec.length === crCap && s.startIndex === 3);
 
     /* THE ARCHIVED GAME'S REMEMBERED START SURVIVES A RELOAD.
        `coerceLoadout` validated the stored `startMemory` and then returned the DEFAULT one,
        so every JSON round-trip quietly reset the game the player was not currently on: pick
-       close=2 / far=3 under DECODE, play a CR match, reload, switch back — anchors 0 and 1. */
+       close=2 / far=3 under one game, play the other, reload, switch back — anchors 0 and 1. */
     s = { ...s, startMemory: { close: { index: 2, pose: null }, far: { index: 3, pose: null } } };
-    const stored = JSON.parse(JSON.stringify(switchGame(s, 'decode'))) as unknown;
+    const stored = JSON.parse(JSON.stringify(switchGame(s, 'biobuzz'))) as unknown;
     const back = switchGame(coerceSettings(stored), 'chain');
     check(
       'per-game: an archived startMemory survives the JSON round-trip',
@@ -991,97 +701,58 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
       `close=${back.startMemory.close.index} far=${back.startMemory.far.index}`,
     );
   }
-}
-
-// ---- field markings geometry (manual Section 9) ----------------------------
-{
-  // gate-zone marking: two parallel 10in tape LINES, 2.75in apart, running
-  // perpendicular to the wall (constant y), centered on the gate
-  let tapeOk = true;
-  for (const a of ['red', 'blue'] as const) {
-    const [s0, s1] = gateTapeSegments(a);
-    for (const [p0, p1] of [s0, s1]) {
-      if (Math.abs(Math.abs(p1.x - p0.x) - 10) > 1e-9) tapeOk = false; // 10in into the field
-      if (Math.abs(p1.y - p0.y) > 1e-9) tapeOk = false; // runs ⟂ to the wall (constant y)
-      if (Math.abs(Math.abs(p0.x) - (FIELD_HALF - 6)) > 1e-9) tapeOk = false; // starts at classifier edge (66)
-    }
-    if (Math.abs(Math.abs(s0[0].y - s1[0].y) - 2.75) > 1e-9) tapeOk = false; // 2.75in apart
-  }
-  check('gate tape: two 10in lines 2.75in apart, starting at the classifier edge', tapeOk);
-
-  // depot tape runs flush ALONG the goal face from the far-wall corner to the
-  // classifier edge (it must NOT run through the classifier to the side wall)
-  const [d0, d1] = depotSegment('blue');
-  const tri = goalTriangle('blue');
-  check(
-    'depot tape starts flush at the goal face far-wall corner',
-    Math.hypot(d0.x - tri[0].x, d0.y - tri[0].y) < 1e-9,
-  );
-  check(
-    'depot tape lies flush on the goal face (both ends, perp dist ~0)',
-    Math.abs(goalLineValue(d0, 'blue')) < 1e-9 && Math.abs(goalLineValue(d1, 'blue')) < 1e-9,
-  );
-  check(
-    'depot tape ends at the classifier edge, not the side wall',
-    Math.abs(Math.abs(d1.x) - (FIELD_HALF - 6)) < 1e-9,
-    `end x=${d1.x.toFixed(1)}`,
-  );
-
-  // alliance areas: fully outside the field, 96 along wall from the audience end
-  let areaOk = true;
-  for (const a of ['red', 'blue'] as const) {
-    const r = allianceArea(a);
-    const outside = Math.min(Math.abs(r.x0), Math.abs(r.x1)) >= FIELD_HALF - 1e-9;
-    const span = r.y1 - r.y0;
-    if (!outside || Math.abs(span - 96) > 1e-9 || r.y0 !== -FIELD_HALF) areaOk = false;
-  }
-  check('alliance areas: 96x54 outside the walls, flush with the audience end', areaOk);
-
-  // secret tunnel tape length + width (manual: ~46.5 x ~6.125)
-  const ts = tunnelStrip('blue');
-  check('secret tunnel strip is TUNNEL_STRIP_LEN long', Math.abs(ts.y1 - ts.y0 - 46.5) < 1e-9, `${(ts.y1 - ts.y0).toFixed(1)} in`);
-  check('secret tunnel strip is ~6.125in wide', Math.abs(ts.x1 - ts.x0 - 6.125) < 1e-9, `${(ts.x1 - ts.x0).toFixed(3)} in`);
-
-  // GOAL footprint: right triangle in the corner, 26.5in along the far wall,
-  // 18.3in down the side wall (manual "Top View Goal Opening Inside Dimensions")
-  for (const a of ['red', 'blue'] as const) {
-    const [far, side, corner] = goalTriangle(a);
-    // corner is the right angle, on both walls
-    const cornerOk = Math.abs(Math.abs(corner.x) - FIELD_HALF) < 1e-9 && Math.abs(corner.y - FIELD_HALF) < 1e-9;
-    const farLeg = Math.hypot(far.x - corner.x, far.y - corner.y); // along the far wall
-    const sideLeg = Math.hypot(side.x - corner.x, side.y - corner.y); // down the side wall
+  /* DECODE'S SETTINGS, AFTER DECODE (removed from this fork, 2026-10-12).
+     A blob saved ON DECODE opens on the default game with the player's OWN archived BIOBUZZ
+     robot — not their DECODE robot coerced into a BIOBUZZ one — and every piece of DECODE data
+     (its loadout, seats, binding overrides, auto paths) rides along opaque, so the copy synced to
+     a DSIM account is not stripped of it: an unmodified DSIM client on that account still has it. */
+  {
+    const decodeSpec = { ...DEFAULT_SPEC, name: 'DecodeBot', intake: 'vector' };
+    const raw = {
+      game: 'decode',
+      spec: decodeSpec,
+      savedRobots: [{ ...DEFAULT_SPEC, name: 'DSaved' }],
+      startIndex: 4,
+      loadouts: { biobuzz: { spec: { ...BB_DEFAULT_SPEC, name: 'BeeBot' }, savedRobots: [], startIndex: 1 } },
+      practiceSeats: { decode: [{ kind: 'ai', tier: 'hard' }, { kind: 'none', tier: 'hard' }, { kind: 'none', tier: 'hard' }] },
+      bindings: { perGame: { decode: { keys: { fire: ['f'] } } } },
+      savedAutos: [{ fileName: 'a.pp', startPoint: { x: 0, y: 0 }, lines: [] }],
+      autoPath: null,
+      autoPathEnabled: false,
+    };
+    const s = coerceSettings(JSON.parse(JSON.stringify(raw)));
     check(
-      `${a} goal: 26.5in far-wall leg / 18.3in side-wall leg, right-angle in the corner`,
-      cornerOk && Math.abs(farLeg - 26.5) < 1e-9 && Math.abs(sideLeg - 18.3) < 1e-9,
-      `far=${farLeg.toFixed(1)} side=${sideLeg.toFixed(1)}`,
+      "retired DECODE: a blob saved on DECODE opens on the default game, with the player's own archived robot",
+      s.game === 'biobuzz' && s.spec.name === 'BeeBot' && s.startIndex === 1 && s.savedRobots.length === 0,
+      JSON.stringify({ game: s.game, name: s.spec.name, startIndex: s.startIndex }),
+    );
+    const ret = s.retired as { loadout?: { spec?: { name?: string }; startIndex?: number } } | undefined;
+    check(
+      "retired DECODE: DECODE's own loadout is kept, opaque and untouched (not coerced)",
+      ret?.loadout?.spec?.name === 'DecodeBot' && ret?.loadout?.startIndex === 4 && !('decode' in (s.loadouts ?? {})),
+      JSON.stringify(ret?.loadout),
+    );
+    const sent = forAccount(s) as Record<string, Record<string, unknown> | unknown>;
+    const lo = sent.loadouts as Record<string, { spec?: { name?: string } }>;
+    const seats = sent.practiceSeats as Record<string, unknown>;
+    const perGame = (sent.bindings as { perGame?: Record<string, unknown> }).perGame ?? {};
+    check(
+      'retired DECODE: the account copy carries every piece of DECODE data back',
+      lo.decode?.spec?.name === 'DecodeBot' && Array.isArray(seats.decode) && 'decode' in perGame &&
+        Array.isArray(sent.savedAutos) && !('retired' in sent),
+      JSON.stringify(Object.keys(sent)),
+    );
+    const again = coerceSettings(JSON.parse(JSON.stringify(sent)));
+    check(
+      'retired DECODE: the account copy read back is the same settings (lossless both ways)',
+      again.game === 'biobuzz' && again.spec.name === 'BeeBot' &&
+        JSON.stringify(again.retired) === JSON.stringify(s.retired),
+    );
+    check(
+      'retired DECODE: a blob with no DECODE data carries no retired bag',
+      coerceSettings({ game: 'chain' }).retired === undefined,
     );
   }
-  // goal face normal is a unit vector pointing into the field (not 45°)
-  const n = goalFaceNormal('blue');
-  check(
-    'goal face normal is unit and points into the field',
-    Math.abs(Math.hypot(n.x, n.y) - 1) < 1e-9 && n.x > 0 && n.y < 0 && Math.abs(n.x - Math.SQRT1_2) > 1e-3,
-    `(${n.x.toFixed(3)},${n.y.toFixed(3)})`,
-  );
-  // BASE ZONE: 18x18, diagonally opposite corners (d*24,-48) and (d*42,-30)
-  let baseOk = true;
-  for (const a of ['red', 'blue'] as const) {
-    const bz = baseZone(a);
-    const d = a === 'blue' ? 1 : -1; // driver side (blue +x, red -x)
-    const xs = [bz.x0, bz.x1].map((x) => x).sort((p, q) => p - q);
-    const want = [d * 24, d * 42].sort((p, q) => p - q);
-    if (Math.abs(xs[0] - want[0]) > 1e-9 || Math.abs(xs[1] - want[1]) > 1e-9) baseOk = false;
-    if (Math.abs(bz.y0 - -48) > 1e-9 || Math.abs(bz.y1 - -30) > 1e-9) baseOk = false;
-  }
-  check('base zone: 18x18 corners at (d*24,-48) & (d*42,-30)', baseOk);
-
-  // goalLineValue: >0 behind the face (in the corner), <0 in front (field side)
-  const [, , blueCorner] = goalTriangle('blue');
-  check(
-    'goalLineValue: corner is behind the face, field center is in front',
-    goalLineValue(blueCorner, 'blue') > 0 && goalLineValue({ x: 0, y: 0 }, 'blue') < 0,
-    `corner=${goalLineValue(blueCorner, 'blue').toFixed(1)} center=${goalLineValue({ x: 0, y: 0 }, 'blue').toFixed(1)}`,
-  );
 }
 
 // ---- driving: forward vs strafe ratio -------------------------------------
@@ -1217,6 +888,420 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
   }
 }
 
+// ---- FTC25 CONTROLS + LOCAL VERSUS (this fork; `GameSettings.controlScheme`) -----------------
+// DSim controls must be EXACTLY what they were (every FTC25 action unbound, no gamepad 2, no
+// command field set). FTC25 binds every one of its actions on one controller and on two, with no
+// clash; the shooter presets are RESERVED (bound, but no game reads `shotPower` since DECODE
+// went, 2026-10-12) and `fireSel` acts only where the robot can physically choose; the snaps
+// turn to the season's target; and nothing this fork adds can reach DSIM's own servers (account
+// sync, run uploads, rooms on its servers).
+{
+  const J = (v: unknown): string => JSON.stringify(v);
+  const NO_SHAPING_INPUT: ShapingInput = {
+    driveFramePressed: false,
+    flipPressed: false,
+    parkPressed: false,
+    slowHeld: false,
+    snapAimPressed: false,
+    snapAltPressed: false,
+    powerPicked: -1,
+  };
+  const shapingCtxFor = (r: RobotState) => ({
+    viewAngle: viewAngleOf(r.alliance),
+    parkSpeedPct: 30,
+    tankControlMode: 'normal' as const,
+    canPark: true,
+    forkFeatures: true,
+    aimHeading: (): number | null => null,
+    dt: SIM_DT,
+  });
+  const D = DEFAULT_BINDINGS;
+  const F2 = FTC25_DEFAULT_BINDINGS;
+  const F1 = FTC25_SINGLE_DEFAULT_BINDINGS;
+
+  // ── the maps ──
+  check(
+    'FTC25: every FTC25 action is UNBOUND on the DSim map, on every device, and the DSim map has no gamepad 2',
+    FTC25_ONLY.every(
+      (a) => D.keys[a].length === 0 && D.pad.buttons[a as PadAction].length === 0 && D.pad.combos[a as PadAction].length === 0,
+    ) && D.pad2 === undefined,
+  );
+  const padOf = (b: ControlBindings, a: KeyAction): number[] => [
+    ...b.pad.buttons[a as PadAction],
+    ...(b.pad2?.buttons[a as PadAction] ?? []),
+  ];
+  check(
+    'FTC25: every FTC25 action has a pad bind on the two-controller map (gamepad 1 or 2)',
+    FTC25_ONLY.every((a) => padOf(F2, a).length > 0),
+    FTC25_ONLY.filter((a) => padOf(F2, a).length === 0).join(','),
+  );
+  check(
+    'FTC25: ...and on gamepad 1 of the ONE-controller map, which has no gamepad 2',
+    FTC25_ONLY.every((a) => F1.pad.buttons[a as PadAction].length > 0) && F1.pad2 === undefined,
+    FTC25_ONLY.filter((a) => F1.pad.buttons[a as PadAction].length === 0).join(','),
+  );
+  const clashes = (buttons: Record<PadAction, number[]>): string[] => {
+    const out: string[] = [];
+    for (let i = 0; i < PAD_ACTIONS.length; i++) {
+      for (let j = i + 1; j < PAD_ACTIONS.length; j++) {
+        const [a, b] = [PAD_ACTIONS[i], PAD_ACTIONS[j]];
+        if (!actionsConflict(a, b)) continue;
+        if (buttons[a].some((x) => buttons[b].includes(x))) out.push(`${a}+${b}`);
+      }
+    }
+    return out;
+  };
+  for (const [name, b] of [['two controllers', F2], ['one controller', F1]] as const) {
+    check(`FTC25 (${name}): no two conflicting actions share a button on gamepad 1`, clashes(b.pad.buttons).length === 0, clashes(b.pad.buttons).join(' '));
+    check(
+      `FTC25 (${name}): the menu button is on nothing else of gamepad 1`,
+      !PAD_ACTIONS.some((a) => b.pad.buttons[a].includes(b.pad.menuButton)),
+      `menu ${b.pad.menuButton}`,
+    );
+  }
+  check('FTC25 (two controllers): ...or on gamepad 2', !!F2.pad2 && clashes(F2.pad2.buttons).length === 0, F2.pad2 ? clashes(F2.pad2.buttons).join(' ') : 'no pad2');
+  // THE PRESETS ARE ON THE D-PAD in both layouts, in team 2627's order (R, U, L, D)
+  check(
+    'FTC25: the four presets sit on the d-pad — gamepad 2 of two controllers, gamepad 1 of one — as R, U, L, D',
+    J(FTC25_PRESET_ACTIONS.map((a) => F2.pad2?.buttons[a])) === J([[15], [12], [14], [13]]) &&
+      J(FTC25_PRESET_ACTIONS.map((a) => F1.pad.buttons[a])) === J([[15], [12], [14], [13]]),
+  );
+  check(
+    'FTC25 (two controllers): their driver — RT slow, LT intake, LB/RB snaps; their operator — RT shoot, LT intake, LB/RB element',
+    J(F2.pad.buttons.slowHold) === J([7]) && J(F2.pad.buttons.intake) === J([6]) && J(F2.pad.buttons.snapAim) === J([4]) &&
+      J(F2.pad.buttons.snapAlt) === J([5]) && J(F2.pad2?.buttons.fire) === J([7]) && J(F2.pad2?.buttons.intake) === J([6]) &&
+      J(F2.pad2?.buttons.bbFirePollen) === J([4]) && J(F2.pad2?.buttons.bbFireNectar) === J([5]),
+  );
+  check(
+    'FTC25 (one controller): RT shoot, LT intake, LB slow, RB / Y snaps, X / B element, menu on BACK',
+    J(F1.pad.buttons.fire) === J([7]) && J(F1.pad.buttons.intake) === J([6]) && J(F1.pad.buttons.slowHold) === J([4]) &&
+      J(F1.pad.buttons.snapAim) === J([5]) && J(F1.pad.buttons.snapAlt) === J([3]) && J(F1.pad.buttons.bbFirePollen) === J([2]) &&
+      J(F1.pad.buttons.bbFireNectar) === J([1]) && F1.pad.menuButton === 8,
+  );
+  for (const [name, base] of [['two', F2], ['one', F1]] as const) {
+    check(
+      `FTC25 (${name}): the map round-trips through mergeBindings over its own defaults`,
+      J(mergeBindings(JSON.parse(J(base)), base)) === J(base) && J(mergeBindings(undefined, base)) === J(base),
+    );
+  }
+  check('FTC25: ...and the DSim map still round-trips with no gamepad 2', J(mergeBindings(JSON.parse(J(D)))) === J(D));
+  check(
+    'FTC25: schemeDefaults names each map',
+    schemeDefaults('dsim') === D && schemeDefaults('ftc25', 2) === F2 && schemeDefaults('ftc25', 1) === F1,
+  );
+  const lost = JSON.parse(J(F2));
+  delete lost.pad2.buttons.shotPreset4;
+  check('FTC25: a gamepad 2 action missing from a stored map takes its FTC25 default', J(mergeBindings(lost, F2).pad2?.buttons.shotPreset4) === J([13]));
+  const bad = mergeBindings({ pad2: { buttons: { fire: ['x'], intake: [3, 3, 99] }, combos: { fire: [[7, 4]] } } });
+  check(
+    'FTC25: gamepad 2 lists are validated like the main pad’s',
+    J(bad.pad2?.buttons.fire) === J([]) && J(bad.pad2?.buttons.intake) === J([]) && J(bad.pad2?.combos.fire) === J([[4, 7]]),
+  );
+
+  // ── gamepad 2 through the editor's view ──
+  const view = pad2View(F2);
+  check('FTC25: the gamepad 2 view shows gamepad 2’s lists in the pad’s place', J(view.pad.buttons) === J(F2.pad2!.buttons));
+  check('FTC25: ...and an unedited view writes back to the identical map', J(fromPad2View(F2, view)) === J(F2));
+  const edited = fromPad2View(F2, assignPadBind(view, 'fire', 1, [0]));
+  check(
+    'FTC25: an edit through the view lands on gamepad 2 and leaves gamepad 1 alone',
+    J(edited.pad2?.buttons.fire) === J([7, 0]) && J(edited.pad.buttons) === J(F2.pad.buttons),
+  );
+  check(
+    'FTC25: a bind on gamepad 2 is refused only by gamepad 2’s own binds',
+    padConflict(view, null, 'intake', [0]) === null && padConflict(view, null, 'intake', [7]) !== null,
+  );
+  const effC = effectiveBindings(F2, 'chain');
+  const effB = effectiveBindings(F2, 'biobuzz');
+  check(
+    'FTC25: a game plays only its own gamepad 2 actions (BIOBUZZ’s elements; Chain Reaction none of them)',
+    J(effB.pad2?.buttons.bbFirePollen) === J([4]) && J(effC.pad2?.buttons.bbFirePollen) === J([]),
+  );
+  // THE PRESETS ARE RESERVED (owner, 2026-10-12: kept for BIOBUZZ's launcher, which does not read
+  // `shotPower` yet): bound in both FTC25 maps, listed for no game, so they fire nowhere and
+  // conflict with nothing — the one-controller map shares D-UP / D-LEFT with BIOBUZZ's buttons
+  check(
+    'FTC25: the shooter presets are RESERVED — bound in both maps, used by no game, emptied everywhere',
+    RESERVED_ACTIONS.every((a) => ACTION_GAMES[a].length === 0) &&
+      FTC25_PRESET_ACTIONS.every((a) => RESERVED_ACTIONS.includes(a)) &&
+      FTC25_PRESET_ACTIONS.every((a) => padOf(F2, a).length > 0 && F1.pad.buttons[a].length > 0) &&
+      GAME_IDS.every((g) => FTC25_PRESET_ACTIONS.every((a) => {
+        const e = effectiveBindings(F1, g);
+        const e2 = effectiveBindings(F2, g);
+        return e.pad.buttons[a].length === 0 && (e2.pad2?.buttons[a].length ?? 0) === 0;
+      })),
+  );
+  check(
+    'FTC25: no season is marked unbound under any scheme’s defaults',
+    GAME_IDS.every(
+      (g) => seasonUnbound(D, g, 'dsim').length === 0 && seasonUnbound(F2, g, 'ftc25').length === 0 && seasonUnbound(F1, g, 'ftc25').length === 0,
+    ),
+    J(GAME_IDS.map((g) => [g, seasonUnbound(F1, g, 'ftc25')])),
+  );
+
+  // ── settings: the scheme, the layout, the presets ──
+  const def = defaultSettings();
+  const ftcOne = coerceSettings({ controlScheme: 'ftc25', ftc25Pads: 1 });
+  const ftcTwo = coerceSettings({ controlScheme: 'ftc25', ftc25Pads: 7 });
+  check(
+    'FTC25: settings default to DSim controls on two controllers; activeBindings follows the scheme and the layout',
+    def.controlScheme === 'dsim' && def.ftc25Pads === 2 && activeBindings(def) === def.bindings &&
+      activeBindings(ftcOne) === ftcOne.ftc25SingleBindings && ftcTwo.ftc25Pads === 2 && activeBindings(ftcTwo) === ftcTwo.ftc25Bindings &&
+      coerceSettings({ controlScheme: 'nonsense' }).controlScheme === 'dsim',
+  );
+  check(
+    'FTC25: the presets default to 100/90/80/40, are kept whole only when four numbers, and clamp to 5..100',
+    J(def.ftc25Powers) === J([100, 90, 80, 40]) &&
+      J(coerceSettings({ ftc25Powers: [120, 1, 55.4, 70] }).ftc25Powers) === J([100, 5, 55, 70]) &&
+      J(coerceSettings({ ftc25Powers: [50, 50] }).ftc25Powers) === J([100, 90, 80, 40]),
+  );
+  check(
+    'FTC25: singlePadBindings is the one-controller map under FTC25 and the DSim map otherwise',
+    singlePadBindings(def) === def.bindings && singlePadBindings({ ...def, controlScheme: 'ftc25' }) === def.ftc25SingleBindings,
+  );
+  const ftcAssists = seatAssists({ ...def, controlScheme: 'ftc25', ftc25Powers: [100, 60, 50, 30] });
+  check(
+    'FTC25: a seat on FTC25 controls carries its preset table; a DSim seat carries nothing new',
+    J(ftcAssists.manualShot) === J([1, 0.6, 0.5, 0.3]) && seatAssists(def).manualShot === undefined,
+  );
+  check(
+    'FTC25: coerceAssists keeps a four-entry table (clamped) and drops anything else',
+    J(coerceAssists({ ...DEFAULT_ASSISTS, manualShot: [2, 0.5, 0.01, 0.9] }).manualShot) === J([1, 0.5, C.FTC25_MIN_POWER, 0.9]) &&
+      coerceAssists({ ...DEFAULT_ASSISTS, manualShot: true }).manualShot === undefined &&
+      coerceAssists({ ...DEFAULT_ASSISTS, manualShot: [1, 1] }).manualShot === undefined,
+  );
+
+  // ── NOTHING OF THIS FORK REACHES DSIM'S SERVERS: the account copy ──
+  const mine: GameSettings = {
+    ...def,
+    controlScheme: 'ftc25',
+    ftc25Pads: 1,
+    ftc25Powers: [100, 60, 50, 30],
+    bindings: { ...cloneBindings(def.bindings), pad2: cloneBindings(F2).pad2 },
+    practiceSeats: { biobuzz: [{ kind: 'player2', tier: 'medium' }, { kind: 'ai', tier: 'hard' }, { kind: 'none', tier: 'medium' }] },
+  };
+  const sent = forAccount(mine) as Record<string, unknown>;
+  const sentText = J(sent);
+  check(
+    'FTC25: the account copy has none of this fork’s settings — no scheme, no FTC25 maps, no presets, no gamepad 2, no Player 2',
+    !('controlScheme' in sent) && !('ftc25Bindings' in sent) && !('ftc25SingleBindings' in sent) && !('ftc25Pads' in sent) &&
+      !('ftc25Powers' in sent) && !sentText.includes('pad2') && !sentText.includes('player2'),
+    Object.keys(sent).filter((k) => k.startsWith('ftc25') || k === 'controlScheme').join(','),
+  );
+  check(
+    'FTC25: ...and the seats it does send are the rest of the line-up as it was (Player 2 written as None)',
+    J((sent.practiceSeats as Record<string, unknown>).biobuzz) ===
+      J([{ kind: 'none', tier: 'medium' }, { kind: 'ai', tier: 'hard' }, { kind: 'none', tier: 'medium' }]),
+  );
+  const back = keepLocalForkFields(coerceSettings(JSON.parse(sentText)), mine);
+  check(
+    'FTC25: settings loaded from the account keep this device’s own fork settings',
+    back.controlScheme === 'ftc25' && back.ftc25Pads === 1 && J(back.ftc25Powers) === J([100, 60, 50, 30]) &&
+      J(back.bindings.pad2) === J(mine.bindings.pad2) && back.practiceSeats?.biobuzz?.[0].kind === 'player2' &&
+      back.practiceSeats?.biobuzz?.[1].kind === 'ai',
+  );
+
+  // ── …nor runs or rooms ──
+  const plainReplay = { setups: [{ assists: { ...DEFAULT_ASSISTS } }] } as unknown as Replay;
+  const forkReplay = { setups: [{ assists: { ...DEFAULT_ASSISTS } }, { assists: { ...DEFAULT_ASSISTS, manualShot: [1, 1, 1, 1] } }] } as unknown as Replay;
+  check('FTC25: a run with a seat on FTC25 controls is a fork run; a plain one is not', replayIsFork(forkReplay) && !replayIsFork(plainReplay));
+  const cloudSession = {};
+  const lanSession = {};
+  markLanSession(lanSession);
+  check('FTC25: solo play may use the fork’s features; a room not on a LAN may not', forkFeaturesAllowed(null) && !forkFeaturesAllowed(cloudSession));
+  check('FTC25: ...and a LAN room’s session may — the mark is on that session alone, never the next one', forkFeaturesAllowed(lanSession) && !forkFeaturesAllowed({}));
+  {
+    const store = new Map<string, string>();
+    const stub = {
+      getItem: (k: string): string | null => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string): void => void store.set(k, v),
+      removeItem: (k: string): void => void store.delete(k),
+    };
+    const g = globalThis as { localStorage?: unknown };
+    const had = 'localStorage' in g;
+    const prev = g.localStorage;
+    g.localStorage = stub;
+    try {
+      const w = mkWorld('match', 'blue', 3);
+      const rec = new ReplayRecorder(3, [{ id: 0, alliance: 'blue', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 }], 'match', 'chain', '2d');
+      rec.record(1, new Map([[0, cmd({})]]));
+      const replay = rec.finish();
+      const res = worldResult(w);
+      const a = savePracticeRun(replay, res);
+      const b = savePracticeRun(replay, res, true);
+      const c = savePracticeRun({ ...replay, setups: [{ ...replay.setups[0], assists: { ...DEFAULT_ASSISTS, manualShot: [1, 0.9, 0.8, 0.4] } }] }, res);
+      const pending = pendingPracticeUploads().map((m) => m.id);
+      check(
+        'FTC25: a local-only practice run, and one with an FTC25 seat, are kept but never offered for upload',
+        !!a && !!b && !!c && pending.includes(a.id) && !pending.includes(b.id) && !pending.includes(c.id) && !!b.localOnly && !!c.localOnly,
+        J(pending),
+      );
+      // a run kept before the flag existed is caught off its body
+      const idx = JSON.parse(store.get(PRACTICE_RUNS_KEY) ?? '[]') as { id: string; localOnly?: boolean }[];
+      for (const m of idx) delete m.localOnly;
+      store.set(PRACTICE_RUNS_KEY, J(idx));
+      const pending2 = pendingPracticeUploads().map((m) => m.id);
+      check('FTC25: ...even with the flag lost, the FTC25 run is held back by its body', !pending2.includes(c!.id) && pending2.includes(a!.id));
+    } finally {
+      if (had) g.localStorage = prev;
+      else delete g.localStorage;
+    }
+  }
+  check(
+    'FTC25: a room not on a LAN sees an ordinary command — the element button still shoots, nothing else of FTC25 rides along',
+    (() => {
+      const shaping = new DriverShaping();
+      const w = mkWorld('free', 'blue', 4);
+      const out = shaping.apply(cmd({ fire: true, fireSel: 1, driveX: 1 }), { ...NO_SHAPING_INPUT, slowHeld: true, powerPicked: 2 }, w.robots[0], {
+        ...shapingCtxFor(w.robots[0]),
+        forkFeatures: false,
+      });
+      return out.fire && out.fireSel === undefined && out.shotPower === undefined && out.driveX === 1;
+    })(),
+  );
+
+  // ── the presets are INERT: no game reads `shotPower` (DECODE's shooter did) ──
+  {
+    const playOut = (power: number): number => {
+      const w = simModuleFor('biobuzz').createWorld('match', 17, [
+        { id: 0, alliance: 'blue', spec: { ...BB_DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS, manualShot: [1, 0.9, 0.8, 0.4] }, startIndex: 0 },
+      ], undefined, '2d');
+      startMatch(w);
+      for (let t = 0; t < 600; t++) {
+        simModuleFor('biobuzz').step(w, SIM_DT, new Map([[0, localizeCommand(cmd({ fire: true, intake: true, driveY: t < 300 ? 0.6 : -0.6, shotPower: power }))]]));
+      }
+      return worldHash(w);
+    };
+    check('FTC25: a BIOBUZZ match plays the same whichever preset is picked (the presets are reserved)', playOut(0) === playOut(3) && playOut(1) === playOut(2));
+  }
+
+  // ── the wire ──
+  let wireOk = true;
+  for (const shotPower of [0, 1, 2, 3]) {
+    for (const fireSel of [0, 1, 2]) {
+      const b2 = localizeCommand(cmd({ fire: true, shotPower, fireSel }));
+      if ((b2.shotPower ?? 0) !== shotPower || (b2.fireSel ?? 0) !== fireSel) wireOk = false;
+    }
+  }
+  const plain = localizeCommand(cmd({ fire: true }));
+  check('FTC25: shotPower and fireSel survive the wire round trip at every value', wireOk);
+  check(
+    'FTC25: a DSim-controls command comes back without either field, and with the old button bits',
+    !('shotPower' in plain) && !('fireSel' in plain) && quantizeCommand(cmd({ fire: true })).buttons === 2,
+  );
+
+  // ── the target snap: Chain Reaction's goal opening, end to end on the sim ──
+  const snapEnd = (world: World, heading: number, alt = false): { err: number; ticks: number } => {
+    const r = world.robots[0];
+    r.heading = heading;
+    const shaping = new DriverShaping();
+    const ctx = { ...shapingCtxFor(r), aimHeading: (a: boolean) => simModuleFor(world.game).aimHeading?.(world, r, a) ?? null };
+    let ticks = 0;
+    let first = true;
+    while (ticks < 400) {
+      const c = shaping.apply(cmd({}), { ...NO_SHAPING_INPUT, snapAimPressed: first && !alt, snapAltPressed: first && alt }, r, ctx);
+      first = false;
+      step(world, SIM_DT, new Map([[0, c]]));
+      ticks++;
+      if (!shaping.snap) break;
+    }
+    run(world, cmd({}), 0.5); // let it settle
+    const target = ctx.aimHeading(alt)!;
+    return { err: Math.abs(wrapAngle(target - r.heading)), ticks };
+  };
+  const landed: string[] = [];
+  let worstSnap = 0;
+  for (const h of [0, 2.4, -1.9]) {
+    const w = mkWorld('free', 'red', 13);
+    w.balls.length = 0;
+    w.robots[0].pos = { x: -30, y: -30 }; // clear of the beams on the axes
+    w.robots[0].vel = { x: 0, y: 0 };
+    const e = snapEnd(w, h);
+    worstSnap = Math.max(worstSnap, e.err);
+    landed.push(`${((e.err * 180) / Math.PI).toFixed(2)}° in ${e.ticks}t`);
+  }
+  check('FTC25: the target snap leaves a Chain Reaction robot facing its goal (within 3°, from any start)', worstSnap < (3 * Math.PI) / 180, landed.join(', '));
+  check(
+    'FTC25: a stick past 0.3 cancels a snap; a still stick keeps it turning',
+    ftc25SnapTurn(1, 0.31, 0) === null && ftc25SnapTurn(1, 0.29, 0) !== null && ftc25SnapTurn(0.001, 0, 0) === null,
+  );
+
+  // ── BIOBUZZ: the snap faces the robot's SHOOTER at its own HIVE's cells ──
+  const bbWorld = simModuleFor('biobuzz').createWorld('free', 5, [
+    { id: 0, alliance: 'blue', spec: { ...BB_DEFAULT_SPEC, shooterMount: 'back' }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
+  ], undefined, '2d');
+  const bbr = bbWorld.robots[0];
+  bbr.pos = { x: 40, y: -30 };
+  const bbHive = (bbWorld.biobuzz as { hives: Record<string, { up: 'north' | 'south' }> }).hives.blue;
+  const cellOf = (side: 'north' | 'south') => hiveCellPos('blue', side);
+  const facing = (h: number, side: 'north' | 'south'): number => {
+    // a BACK-mounted shooter points along heading + π
+    const c = cellOf(side);
+    return Math.abs(wrapAngle(Math.atan2(c.y - bbr.pos.y, c.x - bbr.pos.x) - (h + Math.PI)));
+  };
+  const hA = simModuleFor('biobuzz').aimHeading!(bbWorld, bbr, false)!;
+  const hB = simModuleFor('biobuzz').aimHeading!(bbWorld, bbr, true)!;
+  const other = bbHive.up === 'north' ? 'south' : 'north';
+  check(
+    'FTC25 (BIOBUZZ): snap points a BACK shooter at the cell taking elements, and the other button at the other cell',
+    facing(hA, bbHive.up) < 1e-9 && facing(hB, other) < 1e-9,
+    `${facing(hA, bbHive.up)} ${facing(hB, other)}`,
+  );
+
+  // ── LOCAL VERSUS: the seat, and one-match seating ──
+  const vs = versusSeats({ ...def, game: 'biobuzz' });
+  check(
+    'LOCAL VERSUS: the tile seats Player 2 as opponent 1 and nobody else, without touching the saved seats',
+    J(vs.practiceSeats?.biobuzz?.map((x) => x.kind)) === J(['none', 'player2', 'none']) && def.practiceSeats?.biobuzz === undefined,
+  );
+  const lineup = practiceSetups({ ...vs, controlScheme: 'ftc25' }, 'biobuzz', 9);
+  const p2 = lineup.setups.find((x) => x.id === lineup.player2);
+  check(
+    'LOCAL VERSUS: Player 2 drives the player’s own robot on the other alliance, with this device’s FTC25 presets',
+    lineup.player2 === 2 && !!p2 && p2.alliance !== vs.alliance && p2.spec.name === 'Player 2' &&
+      J(p2.assists.manualShot) === J([1, 0.9, 0.8, 0.4]) && lineup.botTiers.size === 0,
+  );
+  const twoP2 = practiceSetups(
+    { ...def, practiceSeats: { chain: [{ kind: 'player2', tier: 'medium' }, { kind: 'player2', tier: 'medium' }, { kind: 'none', tier: 'medium' }] } },
+    'chain',
+    9,
+  );
+  check('LOCAL VERSUS: only one Player 2 — a second such seat reads as None', twoP2.player2 === 1 && twoP2.setups.length === 1);
+
+  // ── LOCAL VERSUS: player 2 reads the SECOND pad and nothing else; player 1 then has no operator pad ──
+  const nav = globalThis.navigator as unknown as { getGamepads?: () => unknown[] };
+  const had = Object.getOwnPropertyDescriptor(nav, 'getGamepads');
+  const mkPad = () => ({ connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) });
+  const pad1 = mkPad();
+  const pad2 = mkPad();
+  Object.defineProperty(nav, 'getGamepads', { value: () => [pad1, null, pad2], configurable: true, writable: true });
+  try {
+    const one = effectiveBindings(F1, 'biobuzz');
+    const p1in = new InputManager(one, { operatorPad: false });
+    const p2in = new InputManager(one, { padSlot: 1, keyboard: false, operatorPad: false });
+    pad2.buttons[7] = { pressed: true, value: 1 }; // player 2 holds RT (shoot)
+    pad1.axes[1] = -1; // player 1 pushes forward
+    const c1 = p1in.poll();
+    const c2 = p2in.poll();
+    check(
+      'LOCAL VERSUS: each driver’s own pad drives only their robot',
+      !c1.fire && c1.driveY > 0.9 && c2.fire && c2.driveY === 0,
+      J({ c1: [c1.fire, c1.driveY], c2: [c2.fire, c2.driveY] }),
+    );
+    // two controllers, one driver: gamepad 2's preset is the operator's, picked as one edge
+    const g2 = new GamepadInput(1);
+    const pad2b = { ...F2.pad, buttons: F2.pad2!.buttons, combos: F2.pad2!.combos, turnWith: 'stick' as const };
+    pad2.buttons[7] = { pressed: false, value: 0 };
+    pad2.buttons[13] = { pressed: true, value: 1 };
+    const first = g2.sample(pad2b).power;
+    const held = g2.sample(pad2b).power;
+    check('FTC25: an operator’s d-pad preset is one edge, read off the second pad', first === 3 && held === -1, J({ first, held }));
+  } finally {
+    if (had) Object.defineProperty(nav, 'getGamepads', had);
+    else delete nav.getGamepads;
+  }
+}
+
 // ---- wall contact squares the robot up --------------------------------------
 {
   const w = mkWorld('free', 'blue', 3);
@@ -1282,963 +1367,6 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
   );
 }
 
-// ---- a wheel wedged in the classifier is evicted (no wall fight) ----------------
-{
-  const w = mkWorld('free', 'blue', 8);
-  const r = w.robots[0];
-  // left-front corner lands at (-71, 1): 1" off the wall, inside the blue
-  // channel — the nearest eviction is THROUGH the wall, which must be refused
-  r.pos = { x: -62, y: -11 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({}), 1);
-  const rect = classifierRect('blue');
-  const stuck = robotCorners(r).some(
-    (c) => c.x > rect.x0 && c.x < rect.x1 && c.y > rect.y0 && c.y < rect.y1,
-  );
-  check('wheel wedged in the classifier gets evicted', !stuck, `pos=(${r.pos.x.toFixed(1)},${r.pos.y.toFixed(1)})`);
-  run(w, cmd({ driveY: -1 }), 1);
-  check('robot drives free after the eviction', r.pos.y < -25, `y=${r.pos.y.toFixed(1)}`);
-}
-
-// ---- a ground ball meshed in the classifier channel is evicted (not stuck) --
-{
-  const w = mkWorld('free', 'blue', 11);
-  const cr = classifierRect('red'); // right-wall channel, x ∈ [66, 72]
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: (cr.x0 + cr.x1) / 2, y: 20 }; // dead-center inside the channel
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({}), 0.3);
-  const inside = ball.pos.x > cr.x0 && ball.pos.x < cr.x1 && ball.pos.y > cr.y0 && ball.pos.y < cr.y1;
-  check(
-    'a ground ball meshed in the classifier is evicted out the field side (grabbable)',
-    !inside && ball.pos.x <= cr.x0 - BALL_RADIUS + 0.01,
-    `pos=(${ball.pos.x.toFixed(1)},${ball.pos.y.toFixed(1)})`,
-  );
-}
-
-// ---- pinned ball resists the robot ------------------------------------------
-{
-  const w = mkWorld('free', 'blue', 21);
-  const r = w.robots[0];
-  r.pos = { x: 0, y: 45 };
-  r.heading = Math.PI / 2; // facing the far wall
-  r.fieldCentric = false;
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: 0, y: FIELD_HALF - BALL_RADIUS }; // resting against the far wall
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({ driveY: 1 }), 2.5); // grind straight into the pinned ball
-  const ballSpeed = Math.hypot(ball.vel.x, ball.vel.y);
-  const robotSpeed = Math.hypot(r.vel.x, r.vel.y);
-  // the funnel mouth is OPEN, so a centered ball nestles against the throat
-  // (chassis front) with the intake around it — the CHASSIS must stall behind
-  // the ball (the intake tip legitimately overlaps it in the open mouth)
-  check(
-    'wall-pinned ball stalls the robot (no grind-through)',
-    r.pos.y + r.spec.length / 2 < FIELD_HALF - BALL_RADIUS,
-    `chassis front y=${(r.pos.y + r.spec.length / 2).toFixed(1)}`,
-  );
-  check('robot stalled against the pinned ball', robotSpeed < 5, `v=${robotSpeed.toFixed(1)}`);
-  check(
-    'pinned ball stays put, in-field, no energy blow-up',
-    Math.abs(ball.pos.x) < 6 && ball.pos.y <= FIELD_HALF - BALL_RADIUS + 0.01 && ballSpeed < 20,
-    `pos=(${ball.pos.x.toFixed(1)},${ball.pos.y.toFixed(1)}) v=${ballSpeed.toFixed(1)}`,
-  );
-  /**
-   * ...AND THE STALL DOES NOT WRENCH THE CHASSIS ROUND, which is the half of this that a
-   * hand-written stall could not promise.
-   *
-   * The old `ballRobotFeedback` answered a pinned artifact by writing `r.vel` and pivoting the
-   * heading directly (`pushRobotAt`, point contact, "pivot the chassis freely"). That was
-   * survivable while the drive model OVERWROTE `r.vel` every tick. Once the drive became a
-   * FORCE the write persisted and compounded: the chassis wedged 8.21 degrees off its
-   * commanded heading and slid diagonally at 24.0 in/s, driving the artifact 26.5in sideways
-   * along the wall it was supposed to be stuck against. The solve answers it now, so the robot
-   * ends where it is pointed: 0.00 degrees, 2.2 in/s, artifact at x=0.00.
-   */
-  const wrench = Math.abs(((r.heading - Math.PI / 2 + Math.PI) % (2 * Math.PI)) - Math.PI);
-  check(
-    '...and it stalls the robot STRAIGHT — no wedge, no diagonal slide',
-    (wrench * 180) / Math.PI < 1,
-    `${((wrench * 180) / Math.PI).toFixed(2)}deg off the commanded heading (8.21 with the hand-written stall)`,
-  );
-}
-
-// ---- an artifact cannot shove a robot, because it does not weigh enough --------
-/**
- * PRODUCT DECISION #7 — "gate outflow can't shove a parked robot" — used to hold BY
- * CONSTRUCTION: the chassis body in the artifact solve was KINEMATIC, so nothing could move
- * it. It is DYNAMIC now, and the rule holds for a physical reason instead: `BALL_MASS` is
- * 0.2lb against a `shoveMass` of 15-25, so an artifact arriving at full drain speed moves a
- * parked robot by a rounding error. Worth pinning, because the day it stops being true is the
- * day somebody has changed one of those two numbers by two orders of magnitude.
- */
-{
-  const w = mkWorld('free', 'blue', 23);
-  const r = w.robots[0];
-  r.pos = { x: 0, y: 0 };
-  r.heading = Math.PI / 2; // artifact arrives on the flank, the worst case for yaw
-  r.fieldCentric = false;
-  const before = { x: r.pos.x, y: r.pos.y, h: r.heading };
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: -14, y: 0 };
-  ball.vel = { x: 120, y: 0 }; // faster than any robot on this field
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({}), 1);
-  const moved = Math.hypot(r.pos.x - before.x, r.pos.y - before.y);
-  const turned = (Math.abs(r.heading - before.h) * 180) / Math.PI;
-  check(
-    'an artifact at full speed cannot shove a parked robot (outflow-no-shove is now the mass ratio)',
-    moved < 0.5 && turned < 1,
-    `moved ${moved.toFixed(3)}in, turned ${turned.toFixed(2)}deg on a 120 in/s hit`,
-  );
-}
-
-// ---- a BIGGER clump is genuinely heavier to push ------------------------------
-/**
- * The old hand-written drag SATURATED at three artifacts, because it bled a fixed fraction of
- * the approach speed per CONTACT and a chassis is three artifacts wide — 1 / 3 / 6 / 9
- * artifacts cost 9.9 / 18.5 / 18.6 / 18.7% of settled speed, i.e. flat past the front row.
- * For a while the answer seemed to keep growing past the front row (10.1 / 19.2 / 20.0 /
- * 20.2%) and that was read as the solve carrying the mass behind it; it was a pin-test bug —
- * see the check. Small, and it should be — a 0.2lb wiffle ball against a 23lb robot — which
- * is why `clumpDrag` survives on top of it as a stated FEEL constant. What is checked here is
- * the ORDERING of the front row, which is the part that is physics.
- */
-{
-  const settled = (count: number): number => {
-    const w = mkWorld('free', 'blue', 24);
-    const r = w.robots[0];
-    r.pos = { x: 0, y: -62 };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    r.hopper = ['green', 'green', 'green']; // full: collision only, no capture
-    const loose = w.balls.filter((b) => b.state.kind !== 'held');
-    loose.forEach((b, i) => {
-      b.state = { kind: 'ground' };
-      b.z = 0;
-      b.vz = 0;
-      b.vel = { x: 0, y: 0 };
-      b.pos =
-        i < count
-          ? { x: -5 + (i % 3) * 5, y: -62 + r.spec.length / 2 + 3 + Math.floor(i / 3) * 5.2 }
-          : { x: -FIELD_HALF + 8, y: -FIELD_HALF + 8 };
-    });
-    const ticks = Math.round(1.1 / SIM_DT);
-    let tail = 0;
-    let tailN = 0;
-    for (let i = 0; i < ticks; i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1 })]]));
-      for (let k = count; k < loose.length; k++) {
-        if (loose[k].state.kind === 'ground') {
-          loose[k].pos = { x: -FIELD_HALF + 8, y: -FIELD_HALF + 8 };
-          loose[k].vel = { x: 0, y: 0 };
-        }
-      }
-      if (i >= Math.round((ticks * 2) / 3)) {
-        tail += hyp(w.robots[0].vel.x, w.robots[0].vel.y);
-        tailN++;
-      }
-    }
-    return tail / tailN;
-  };
-  const [v0, v1, v3, v9] = [settled(0), settled(1), settled(3), settled(9)];
-  const pct = (v: number) => 100 * (1 - v / v0);
-  /**
-   * ...AND THE ROWS BEHIND COST WHAT A KINEMATIC PUSH CAN FEEL, WHICH IS NOTHING. The growth
-   * this used to assert past the front row (19.2 -> 20.0 -> 20.2%) was not the solve carrying
-   * the mass behind: it was the pin test calling a deeply-overlapped FREE artifact pinned, with
-   * nothing behind it, and stalling the robot for a tick. A free clump is not support (see
-   * `pinnedArtifacts`), so a nine-clump and a three-clump now cost the same front row. Real
-   * physics agrees to within what a driver could feel: nine 0.2 lb balls are 1.8 lb of momentum
-   * once and 1.6 in/s^2 of rolling drag after, against a chassis that accelerates at 350. What
-   * is asserted is the front row: every artifact the bumper meets costs its stated drag, and
-   * three of them cost more than one (measured 9.6 / 28.0 / 28.0 with the bumper skin catching
-   * all three where the bare-surface test used to miss one).
-   */
-  check(
-    'a bigger clump is heavier to push, by the row the bumper meets',
-    pct(v1) > 5 && pct(v3) > pct(v1) && pct(v9) >= pct(v3) - 0.5,
-    `0/1/3/9 artifacts cost ${[v1, v3, v9].map((v) => pct(v).toFixed(1)).join('/')}% of ` +
-      `${v0.toFixed(1)} in/s`,
-  );
-}
-
-// ---- off-center wall ball scatters out of the way -----------------------------
-{
-  const w = mkWorld('free', 'blue', 22);
-  const r = w.robots[0];
-  r.pos = { x: 0, y: 45 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  const half = r.spec.width / 2;
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: half + 1.5, y: FIELD_HALF - BALL_RADIUS }; // at the corner's path
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  const startX = ball.pos.x;
-  run(w, cmd({ driveY: 1 }), 2.5);
-  // a ball beside the chassis (past the intake) gets brushed aside, not funneled,
-  // and the robot drives on past it
-  check(
-    'corner-hit wall ball is nudged aside (not funneled in)',
-    ball.pos.x > startX + 0.5 && Math.abs(ball.pos.x) <= FIELD_HALF - BALL_RADIUS + 0.01,
-    `x ${startX.toFixed(1)} -> ${ball.pos.x.toFixed(1)}`,
-  );
-  check('robot drove on once the ball escaped', r.pos.y > 52, `y=${r.pos.y.toFixed(1)}`);
-}
-
-// ---- artifacts collide like balls --------------------------------------------------
-/**
- * "The artifacts do not behave like a 2d collision." "Artifacts feel like they are stuck to
- * each other or stuck to the wall. They don't leave their semi-linear formation they form
- * when they come out of the gate. They don't disperse." Two defects, both in the artifact
- * world's CONTACT MODEL rather than in any pass:
- *
- *  · 0.7 of in-plane friction on rotation-locked circles. A tangential impulse that spins a
- *    real rolling ball had nowhere to go but the ball's translation, so a glancing hit sent
- *    the struck ball off at 3 degrees where the contact normal was at 30, and a 45-degree
- *    wall bounce kept a quarter of its along-wall speed. `PHYS_BALL_FRICTION` is 0.05 now.
- *  · a 3.5in speculative look-ahead. Rapier closes a speculative gap as a velocity clip with
- *    NO restitution and bounces whatever approach is left, so every ball-ball and ball-wall
- *    hit landed at about a fifth of its set coefficient (0.14 for 0.68), at every speed, and
- *    a ball rear-ending the one ahead merged with it instead of shoving it on. The look-ahead
- *    is Rapier's default now and the chassis carries a contact SKIN instead.
- *
- * These pin the physical outcomes directly so neither can quietly come back. Every scene
- * silences the human player (it collects from the audience corner) and parks the robot away.
- */
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  const spd = (b: Artifact) => hyp(b.vel.x, b.vel.y);
-
-  // restitution, head-on: the relative speed the tick before anything changed, against the
-  // separation three ticks after
-  const headOn = (v: number): { ball: number; wall: number } => {
-    const w = quiet(7);
-    w.balls.length = 2;
-    const [a, b] = w.balls;
-    place(a, 0, -30, v, 0);
-    place(b, 7, -30, 0, 0);
-    let hit = -1;
-    let approach = NaN;
-    let ball = NaN;
-    for (let i = 0; i < 120 && Number.isNaN(ball); i++) {
-      const rel = a.vel.x - b.vel.x;
-      step(w, SIM_DT, new Map());
-      if (hit < 0 && b.vel.x > 0.01) {
-        hit = i;
-        approach = rel;
-      }
-      if (hit >= 0 && i === hit + 3) ball = (b.vel.x - a.vel.x) / approach;
-    }
-    const w2 = quiet(7);
-    w2.balls.length = 1;
-    const c = w2.balls[0];
-    place(c, -FIELD_HALF + BALL_RADIUS + 4, -30, -v, 0); // the bare wall below the gate
-    let hitW = -1;
-    let appW = NaN;
-    let wall = NaN;
-    for (let i = 0; i < 120 && Number.isNaN(wall); i++) {
-      const vin = -c.vel.x;
-      step(w2, SIM_DT, new Map());
-      if (hitW < 0 && -c.vel.x < vin - 1) {
-        hitW = i;
-        appW = vin;
-      }
-      if (hitW >= 0 && i === hitW + 3) wall = c.vel.x / appW;
-    }
-    return { ball, wall };
-  };
-  const e40 = headOn(40);
-  check(
-    'artifacts bounce off each other and off the wall at their SET restitution',
-    e40.ball > 0.58 && e40.ball < 0.78 && e40.wall > 0.4 && e40.wall < 0.56,
-    `at 40 in/s: ball-ball e ${e40.ball.toFixed(2)} (set ${BALL_BALL_RESTITUTION}), ball-wall e ${e40.wall.toFixed(2)} (set ${BALL_WALL_RESTITUTION}); the speculative look-ahead gave 0.14 and 0.20`,
-  );
-
-  // a glancing hit: the struck ball leaves along the contact normal, with next to no tangential
-  // speed — a 2D collision between round bodies
-  const glance = (by: number): { off: number; tangential: number } => {
-    const w = quiet(7);
-    w.balls.length = 2;
-    const [a, b] = w.balls;
-    place(a, 0, 0, 40, 0);
-    place(b, 8, by, 0, 0);
-    let hit = -1;
-    let nx = 1;
-    let ny = 0;
-    for (let i = 0; i < 40; i++) {
-      const pax = a.pos.x, pay = a.pos.y, pbx = b.pos.x, pby = b.pos.y;
-      step(w, SIM_DT, new Map());
-      if (hit < 0 && spd(b) > 0.5) {
-        hit = i;
-        const d = hyp(pbx - pax, pby - pay);
-        nx = (pbx - pax) / d;
-        ny = (pby - pay) / d;
-      }
-      if (hit >= 0 && i === hit + 1) break;
-    }
-    const off = Math.abs(wrapAngle(Math.atan2(b.vel.y, b.vel.x) - Math.atan2(ny, nx))) * (180 / Math.PI);
-    const tangential = Math.abs(-b.vel.x * ny + b.vel.y * nx);
-    return { off, tangential };
-  };
-  const g1 = glance(2.5);
-  const g2 = glance(4);
-  check(
-    'a glancing hit sends the struck artifact off along the contact normal',
-    g1.off < 6 && g2.off < 6 && g1.tangential < 2 && g2.tangential < 2,
-    `impact parameter R: ${g1.off.toFixed(1)}deg off the normal, ${g1.tangential.toFixed(1)} in/s tangential; 1.6R: ${g2.off.toFixed(1)}deg, ${g2.tangential.toFixed(1)} in/s (was 26deg / 9 in/s)`,
-  );
-}
-
-// ---- a 45-degree wall bounce keeps its along-wall speed (split from the block above;
-// its own copy of the quiet()/place() scene helpers) --------------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  // a 45-degree wall bounce keeps its along-wall speed and loses only the set share of the normal
-  {
-    const w = quiet(7);
-    w.balls.length = 1;
-    const a = w.balls[0];
-    place(a, -60, -40, -30, 30);
-    /**
-     * Measured against the velocity the artifact had THE TICK BEFORE it touched the wall, not
-     * against the one it was launched with. It rolls 9.5in to reach the wall and
-     * `BALL_ROLL_FRICTION` bleeds it on the way, which is a floor effect and has nothing to do
-     * with what the CONTACT does — comparing to the launch velocity made this check fail
-     * whenever that constant moved, for a bounce that was still perfect.
-     */
-    let vx = NaN;
-    let vy = NaN;
-    let beforeX = NaN;
-    let beforeY = NaN;
-    for (let i = 0; i < 60 && Number.isNaN(vx); i++) {
-      const px = a.vel.x;
-      const py = a.vel.y;
-      step(w, SIM_DT, new Map());
-      if (a.vel.x > 0) {
-        vx = a.vel.x;
-        vy = a.vel.y;
-        beforeX = px;
-        beforeY = py;
-      }
-    }
-    const kept = vy / beforeY;
-    const bounced = vx / -beforeX;
-    check(
-      'a 45-degree wall bounce keeps its along-wall speed',
-      kept > 0.93 && bounced > 0.4 && bounced < 0.6,
-      `kept ${(kept * 100).toFixed(0)}% of its along-wall speed and returned ${bounced.toFixed(2)} of the normal (set ${BALL_WALL_RESTITUTION}); in/s (${vx.toFixed(1)}, ${vy.toFixed(1)}) from (${(-beforeX).toFixed(1)}, ${beforeY.toFixed(1)}) — in-plane friction used to leave (4, 9)`,
-    );
-  }
-}
-
-// ---- the nine-ball gate drain disperses: not a line along the wall (split from the block
-// above; its own copy of the quiet() scene helper) -----------------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  {
-    const w = quiet(7);
-    w.balls.length = 9;
-    for (let i = 0; i < 9; i++) {
-      const b = w.balls[i];
-      const s = GATE_STOP_S + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-      w.goals.blue.gatePos = 1;
-      w.goals.blue.gateOpen = true;
-      w.goals.blue.gateLatch = 1;
-      step(w, SIM_DT, new Map());
-    }
-    const g = w.balls.filter((b) => b.state.kind === 'ground');
-    const n = g.length;
-    const mx = g.reduce((s, b) => s + b.pos.x, 0) / n;
-    const my = g.reduce((s, b) => s + b.pos.y, 0) / n;
-    let sxx = 0, syy = 0, sxy = 0;
-    for (const b of g) {
-      sxx += (b.pos.x - mx) ** 2;
-      syy += (b.pos.y - my) ** 2;
-      sxy += (b.pos.x - mx) * (b.pos.y - my);
-    }
-    const tr = (sxx + syy) / n;
-    const det = (sxx * syy - sxy * sxy) / (n * n);
-    const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
-    const ratio = Math.sqrt(Math.max(0, tr / 2 - disc) / (tr / 2 + disc)); // minor/major axis
-    const onWall = g.filter((b) => b.pos.x < -FIELD_HALF + BALL_RADIUS + 0.15).length;
-    let touching = 0;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (hyp(g[i].pos.x - g[j].pos.x, g[i].pos.y - g[j].pos.y) < 2 * BALL_RADIUS + 0.15) touching++;
-    check(
-      'the gate drain DISPERSES instead of settling in a line along the wall',
-      n === 9 && ratio > 0.35 && onWall <= 6 && touching <= 5,
-      `nine out: spread minor/major ${ratio.toFixed(2)} (was 0.01), ${onWall} on the wall (was 9), ${touching} touching pairs (was 8)`,
-    );
-  }
-}
-
-// ---- a full-throttle ram into a free clump never stalls the robot (split from the block
-// above; its own copy of the quiet()/place() scene helpers) -------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  // a free artifact, however deep it sits for a tick, is not a pin
-  {
-    const w = quiet(7);
-    const r = w.robots[0];
-    const tip = r.spec.length / 2 + INTAKE_PRESETS[r.spec.intake].reach;
-    r.heading = Math.PI / 2;
-    r.pos = { x: 20, y: -40 };
-    r.hopper = ['green', 'green', 'green'];
-    w.balls.length = 3;
-    for (let i = 0; i < 3; i++) place(w.balls[i], 20 + (i % 2 ? 4 : 0), -40 + tip + 22 + i * 2 * BALL_RADIUS, 0, 0);
-    let hitTick = -1;
-    let minAfter = Infinity;
-    for (let i = 0; i < 150; i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1 })]]));
-      const sol = robotSolids(r, []);
-      const near = w.balls.some((b) => (robotPenetration(r, sol, b.pos, BALL_RADIUS, false, false, -0.5)?.pen ?? -1) > -0.5);
-      if (near && hitTick < 0) hitTick = i;
-      if (hitTick >= 0 && i < hitTick + 30) minAfter = Math.min(minAfter, hyp(r.vel.x, r.vel.y));
-    }
-    check(
-      'a full-throttle ram into a free three-clump never stalls the robot',
-      hitTick >= 0 && minAfter > 50,
-      `slowest in the half second after contact: ${minAfter.toFixed(1)} in/s (a pin on a free artifact stopped it dead)`,
-    );
-  }
-}
-
-// ---- a PILE in open field is swallowed and shoved, not a barrier (split from the block
-// above; its own copy of the quiet()/place() scene helpers) -------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  // an empty robot at full throttle takes three and keeps its speed through the other five
-  {
-    const w = quiet(11);
-    const r = w.robots[0];
-    r.hopper = [];
-    r.heading = Math.PI / 2;
-    r.pos = { x: 0, y: -30 };
-    const tip = r.spec.length / 2 + INTAKE_PRESETS[r.spec.intake].reach;
-    const pitch = 2 * BALL_RADIUS + 0.05;
-    const rows = [[0], [-0.5, 0.5], [-1, 0, 1], [-1.5, -0.5]];
-    w.balls.length = 8;
-    let k = 0;
-    for (let ri = 0; ri < rows.length; ri++) for (const c of rows[ri]) place(w.balls[k++], c * pitch, -30 + tip + 30 + ri * pitch * 0.866, 0, 0);
-    let contact = -1;
-    let slowest = Infinity;
-    let worstPen = 0;
-    for (let i = 0; i < 90; i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, intake: true })]]));
-      const held = w.balls.filter((b) => b.state.kind === 'held');
-      const sol = robotSolids(r, held);
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground') continue;
-        const q = robotPenetration(r, sol, b.pos, BALL_RADIUS, false, false, -0.5);
-        if (!q) continue;
-        if (contact < 0) contact = i;
-        // the CHASSIS box only: a held artifact's collider appears at its slot on the tick of
-        // capture and can overlap the next one in the mouth for a few ticks; that is the capture
-        // animation, not the pile going through the bumper
-        if (q.part === 'chassis' && q.pen > worstPen) worstPen = q.pen;
-      }
-      // the half second after contact: the pile is 62in from the far wall, which the robot reaches
-      // in about 0.8s and legitimately stops at
-      if (contact >= 0 && i < contact + 30) slowest = Math.min(slowest, hyp(r.vel.x, r.vel.y));
-    }
-    const held = w.balls.filter((b) => b.state.kind === 'held').length;
-    check(
-      'an empty robot driving into a pile of eight takes three and shoves the rest without slowing',
-      held === 3 && contact >= 0 && slowest > 60 && worstPen < 0.75,
-      `held ${held}, slowest ${slowest.toFixed(1)} in/s in the 0.5s after contact, deepest chassis burial ${worstPen.toFixed(2)}in (the pile used to be a barrier: 6 in/s, and a claimed artifact went 2.6in through the face)`,
-    );
-  }
-}
-
-// ---- a wall ball caught by the flat BACK of a chassis a few degrees off square is squeezed
-// out along the wall (split from the block above; its own copy of the quiet()/place() scene
-// helpers) -----------------------------------------------------------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  // the robot drives on to the wall; it does not park on the ball
-  {
-    const squeezed = (deg: number): { reached: boolean; ballMoved: number } => {
-      const w = quiet(11);
-      const r = w.robots[0];
-      r.hopper = ['green', 'green', 'green'];
-      r.heading = -Math.PI / 2 + (deg * Math.PI) / 180;
-      r.pos = { x: 0, y: FIELD_HALF - BALL_RADIUS - r.spec.length / 2 - 20 };
-      w.balls.length = 1;
-      place(w.balls[0], 0, FIELD_HALF - BALL_RADIUS, 0, 0);
-      run(w, cmd({ driveY: -1 }), 2);
-      return { reached: r.pos.y + r.spec.length / 2 > FIELD_HALF - 0.5, ballMoved: Math.abs(w.balls[0].pos.x) };
-    };
-    const s8 = squeezed(8);
-    const s15 = squeezed(15);
-    check(
-      'a wall ball caught a few degrees off square squirts out and the robot drives on',
-      s8.reached && s15.reached && s8.ballMoved > 5 && s15.ballMoved > 5,
-      `8deg: at the wall ${s8.reached}, ball ${s8.ballMoved.toFixed(0)}in along it; 15deg: ${s15.reached}, ${s15.ballMoved.toFixed(0)}in (a fixed pin circle parked the robot on a ball creeping at 5 in/s)`,
-    );
-  }
-}
-
-// ---- a fast artifact into a PARKED robot does not move the robot (split from the block
-// above; its own copy of the quiet()/place() scene helpers) -------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  // 0.2 lb cannot shove 30 lb
-  {
-    const moved = (how: 'flank' | 'front'): number => {
-      const w = quiet(7);
-      const r = w.robots[0];
-      w.balls.length = 1;
-      const b = w.balls[0];
-      r.heading = Math.PI / 2;
-      if (how === 'flank') {
-        r.pos = { x: -FIELD_HALF + r.spec.width / 2 + 2 * BALL_RADIUS - 1, y: -40 };
-        place(b, -FIELD_HALF + BALL_RADIUS, -10, 0, -60);
-      } else {
-        r.pos = { x: 0, y: -40 };
-        place(b, 0, -5, 0, -60);
-      }
-      const x0 = r.pos.x;
-      const y0 = r.pos.y;
-      run(w, cmd({}), 1.5);
-      return hyp(r.pos.x - x0, r.pos.y - y0);
-    };
-    const flank = moved('flank');
-    const front = moved('front');
-    check(
-      'a fast artifact does not shove a parked robot',
-      flank < 0.5 && front < 0.5,
-      `60 in/s into the flank (squeezed against the wall) moved it ${flank.toFixed(2)}in, into the nose ${front.toFixed(2)}in`,
-    );
-  }
-}
-
-// ---- nothing the robot pushes outruns the robot, plus the vector-intake stranding check
-// it shares fixtures with (split from the block above; its own copy of the quiet()/place()
-// scene helpers) -------------------------------------------------------------------------
-{
-  const quiet = (seed: number): World => {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    const r = w.robots[0];
-    r.pos = { x: 50, y: 50 };
-    r.heading = 0;
-    r.vel = { x: 0, y: 0 };
-    r.fieldCentric = false;
-    return w;
-  };
-  const place = (b: Artifact, x: number, y: number, vx: number, vy: number) => {
-    b.state = { kind: 'ground' };
-    b.pos = { x, y };
-    b.vel = { x: vx, y: vy };
-    b.z = 0;
-    b.vz = 0;
-  };
-  /**
-   * ...AND NOTHING THE ROBOT PUSHES OUTRUNS THE ROBOT.
-   *
-   * Equal masses with restitution e <= 1 hand the struck body ((1+e)/2)*v, never more than the
-   * striker's own v. The artifact solve broke that whenever the striker was itself pressed
-   * against a kinematic chassis: unable to recoil, it read as infinite mass and delivered
-   * (1+e)*v. A robot ramming a pile at 85 in/s put the ball beyond it at exactly BALL_MAX_SPEED
-   * — the clamp catching a collision that wanted even more — and a ball faster than the robot
-   * is a ball the robot can never catch: "if I drive in full speed, third ball bumps with the
-   * second ball and doesn't get intaked". A PINNED artifact is exempt and is checked separately
-   * (the wall-squeeze squirt above), because a closing wedge really does throw it out faster.
-   */
-  {
-    const ram = (build: (w: World, r: RobotState) => void, hopper: ArtifactColor[], intake: boolean, seconds: number) => {
-      const w = quiet(11);
-      const r = w.robots[0];
-      r.hopper = [...hopper];
-      build(w, r);
-      const commands = new Map([[0, cmd({ driveY: 1, intake })]]);
-      let peakBall = 0;
-      let peakRobot = 0;
-      for (let i = 0; i < Math.round(seconds / SIM_DT); i++) {
-        step(w, SIM_DT, commands);
-        peakRobot = Math.max(peakRobot, hyp(r.vel.x, r.vel.y));
-        for (const b of w.balls) {
-          if (b.state.kind !== 'ground') continue;
-          peakBall = Math.max(peakBall, hyp(b.vel.x, b.vel.y));
-        }
-      }
-      return { peakBall, peakRobot, ratio: peakRobot > 1 ? peakBall / peakRobot : 0 };
-    };
-    const pitch = 2 * BALL_RADIUS + 0.02;
-    // an OFFSET pile is the case that reported it: square on, the chain stays in the mouth
-    const pile = ram(
-      (w, r) => {
-        r.heading = Math.PI / 2;
-        r.pos = { x: 0, y: -30 };
-        const tip = r.spec.length / 2 + INTAKE_PRESETS[r.spec.intake].reach;
-        const y0 = -30 + tip + 40;
-        w.balls.length = 4;
-        place(w.balls[0], 3 - pitch / 2, y0, 0, 0);
-        place(w.balls[1], 3 + pitch / 2, y0, 0, 0);
-        place(w.balls[2], 3 - pitch, y0 + pitch * 0.866, 0, 0);
-        place(w.balls[3], 3, y0 + pitch * 0.866, 0, 0);
-      },
-      [],
-      true,
-      3.5,
-    );
-    const line = ram(
-      (w, r) => {
-        r.heading = Math.PI / 2;
-        r.pos = { x: 0, y: -40 };
-        const tip = r.spec.length / 2 + INTAKE_PRESETS[r.spec.intake].reach;
-        w.balls.length = 6;
-        for (let i = 0; i < 6; i++) place(w.balls[i], 0, -40 + tip + 30 + i * pitch, 0, 0);
-      },
-      ['green', 'green', 'green'],
-      false,
-      3,
-    );
-  /**
-   * A VECTOR INTAKE TAKES WHAT IS UNDER ITS ROLLER ROW, NOT ONLY WHAT IS ALREADY CENTRED.
-   *
-   * The flat preset has no slopes to walk an artifact to the throat, `cornered` is wedge-only,
-   * and the flank grab written for it could never fire: it wanted the mouth WIDER than the
-   * chassis, and `intakeMouth` sets the vector mouth to exactly the chassis half-width. So its
-   * only way in was the throat, about 7in of a 15in opening. Measured over this grid, artifacts
-   * sat INSIDE the vector intake with room in the hopper and were never eligible: 8 before,
-   * 3 after. The preset already charges the vectoring as TIME (`capMin` to `capMax` by offset);
-   * requiring the artifact to be centred as well charged it twice. Gated on `!m.wedge`, so the
-   * two funnel presets are untouched.
-   */
-  {
-    const strandedInMouth = (geo: 'row' | 'hex' | 'file', n: number, off: number, thr: number, deg: number): number => {
-      const w = quiet(11);
-      const r = w.robots[0];
-      r.spec = { ...r.spec, intake: 'vector' };
-      r.hopper = [];
-      r.heading = Math.PI / 2 - (deg * Math.PI) / 180;
-      r.pos = { x: 0, y: -30 };
-      const m = intakeMouth(r.spec);
-      const hl = r.spec.length / 2;
-      const tip = hl + INTAKE_PRESETS[r.spec.intake].reach;
-      const pitch = 2 * BALL_RADIUS + 0.02;
-      const y0 = -30 + tip + 30;
-      w.balls.length = n;
-      for (let i = 0; i < n; i++) {
-        const b = w.balls[i];
-        if (geo === 'row') place(b, off + (i - (n - 1) / 2) * pitch, y0, 0, 0);
-        else if (geo === 'file') place(b, off, y0 + i * pitch, 0, 0);
-        else if (i < 2) place(b, off + (i - 0.5) * pitch, y0, 0, 0);
-        else place(b, off + (i - 2 - (n - 3) / 2) * pitch, y0 + pitch * 0.866, 0, 0);
-      }
-      const commands = new Map([[0, cmd({ driveY: thr, intake: true })]]);
-      for (let i = 0; i < Math.round(3 / SIM_DT); i++) step(w, SIM_DT, commands);
-      if (HOPPER_CAPACITY - r.hopper.length <= 0) return 0;
-      /**
-       * STRANDED = the intake still HAS HOLD of it when the scene ends, with room to take it.
-       *
-       * This used to be "was ever inside `(hl − R, tip + R) × mouthHalf` at any tick", which
-       * was the capture window written out by hand — so the moment the grab became the roller
-       * nip the probe was measuring the diff rather than the defect, and counted every
-       * artifact that merely PASSED THROUGH the mouth on its way somewhere else. A check that
-       * re-derives geometry fails whenever the geometry changes, which is exactly when you
-       * need it to still mean something.
-       *
-       * The suction region is the honest statement of "the intake has hold of it": inside it
-       * the rollers are pulling, so an artifact still sitting there at the end with hopper
-       * room is one the preset can neither swallow nor let go of. `onRoller` is wedge-only,
-       * so for a flat front the region is just the box below.
-       */
-      return w.balls.filter((b) => {
-        if (b.state.kind !== 'ground' || b.z > 6) return false;
-        const l = rot({ x: b.pos.x - r.pos.x, y: b.pos.y - r.pos.y }, -r.heading);
-        return l.x > hl - BALL_RADIUS && l.x < tip + BALL_RADIUS && Math.abs(l.y) < m.mouthHalf;
-      }).length;
-    };
-    let stranded = 0;
-    for (const geo of ['row', 'hex', 'file'] as const)
-      for (const n of [3, 5])
-        for (const off of [0, 2, 4, 6])
-          for (const thr of [0.25, 1.0]) for (const deg of [0, 12]) stranded += strandedInMouth(geo, n, off, thr, deg);
-    check(
-      'a vector intake does not strand artifacts sitting inside its own mouth',
-      stranded <= 4,
-      `${stranded} artifacts ended still held by the suction with room in the hopper, over 96 ram scenes (8 before the roller row became the capture surface, 3 after, 0 once the grab became the roller nip and drawIn rose to 32)`,
-    );
-  }
-
-    check(
-      'nothing a robot pushes ends up faster than the robot',
-      pile.ratio <= 1.02 && line.ratio <= 1.02,
-      `offset pile of four: fastest artifact ${pile.peakBall.toFixed(1)} in/s against a robot doing ${pile.peakRobot.toFixed(1)} (${pile.ratio.toFixed(2)}x); line of six: ${line.peakBall.toFixed(1)} against ${line.peakRobot.toFixed(1)} (${line.ratio.toFixed(2)}x) — both used to hit the 90 in/s clamp and outrun the robot`,
-    );
-  }
-}
-
-// ---- open-field push still moves balls easily ---------------------------------
-{
-  const w = mkWorld('free', 'blue', 23);
-  const r = w.robots[0];
-  r.pos = { x: 0, y: -20 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: 0, y: 0 };
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({ driveY: 1 }), 1);
-  const dist = Math.hypot(ball.pos.x, ball.pos.y);
-  check('open-field push sends the ball rolling', dist > 20, `moved ${dist.toFixed(1)} in`);
-}
-
-// ---- launch zone: robot straddling the wedge APEX is IN (OBB overlap, not just
-//      corners — the wedge narrows to a point at field center, so all four corners
-//      can sit outside both diagonals while the body covers the zone) -------------
-{
-  const w = mkWorld('free', 'blue', 30);
-  const r = w.robots[0];
-  r.heading = -Math.PI / 2; // intake points -y, AWAY from the wedge (can't help)
-  r.pos = { x: 0, y: -5 }; // body straddles the apex (0,0); no corner is inside
-  const cornersIn = robotCorners(r).some((c) => inLaunchZone(c, 'blue'));
-  check(
-    'robot straddling the launch-wedge apex counts as in-zone (no corner inside)',
-    robotInLaunchZone(r) && !cornersIn,
-    `result=${robotInLaunchZone(r)} anyCornerIn=${cornersIn}`,
-  );
-  // sanity: a robot parked in a far corner (well outside both zones) is OUT
-  r.pos = { x: 60, y: -60 };
-  r.heading = 0;
-  check('robot in a far corner is NOT in a launch zone', !robotInLaunchZone(r));
-}
-
-// ---- Rapier ground balls: ball-ball separation (no robot involved) -------------
-{
-  const w = mkWorld('free', 'blue', 24);
-  w.robots[0].pos = { x: 60, y: -60 }; // park the robot far from the balls
-  const a = w.balls[0];
-  const b = w.balls[1];
-  for (const bb of [a, b]) {
-    bb.state = { kind: 'ground' };
-    bb.z = 0;
-    bb.vz = 0;
-    bb.vel = { x: 0, y: 0 };
-  }
-  a.pos = { x: -2, y: 0 };
-  b.pos = { x: 2, y: 0 }; // overlapping (centers 4in < 5in diameter)
-  run(w, cmd({}), 0.5);
-  const sep = Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y);
-  // started 4in apart (overlapping); Rapier pushes them out to ~contact distance
-  // (a small residual < BALL_RADIUS is the soft-contact steady penetration, the
-  // same slack robots rest at — the point is they separated, no explosion)
-  check(
-    'Rapier separates two overlapping ground balls (ball-ball contact)',
-    sep >= 2 * BALL_RADIUS - 0.5 && sep < 2 * BALL_RADIUS + 1 && Number.isFinite(sep),
-    `sep=${sep.toFixed(2)} in`,
-  );
-}
-
-// ---- Rapier ground ball never tunnels a wall (hard clamp holds) ----------------
-{
-  const w = mkWorld('free', 'blue', 25);
-  w.robots[0].pos = { x: -60, y: -60 };
-  const ball = w.balls[0];
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: 0, y: FIELD_HALF - 8 };
-  ball.vel = { x: 0, y: 400 }; // fired hard at the far wall
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({}), 0.5);
-  check(
-    'fast ground ball stays inside the wall (no tunnel past the clamp)',
-    ball.pos.y <= FIELD_HALF - BALL_RADIUS + 0.02 && Number.isFinite(ball.pos.y),
-    `y=${ball.pos.y.toFixed(3)}`,
-  );
-}
-
-// ---- Rapier ground-ball physics is deterministic across replays ----------------
-{
-  const mk = (): World => {
-    const w = mkWorld('free', 'blue', 26);
-    w.robots[0].pos = { x: 55, y: 55 };
-    const a = w.balls[0];
-    const b = w.balls[1];
-    a.state = { kind: 'ground' }; a.pos = { x: -20, y: 0 }; a.vel = { x: 120, y: 0 }; a.z = 0; a.vz = 0;
-    b.state = { kind: 'ground' }; b.pos = { x: 20, y: 0 }; b.vel = { x: -120, y: 0 }; b.z = 0; b.vz = 0;
-    return w;
-  };
-  const w1 = mk();
-  const w2 = mk();
-  for (let i = 0; i < 300; i++) { step(w1, SIM_DT, new Map()); step(w2, SIM_DT, new Map()); }
-  check(
-    'ground-ball collisions are bit-for-bit deterministic across two replays',
-    worldHash(w1) === worldHash(w2),
-    `${worldHash(w1)} vs ${worldHash(w2)}`,
-  );
-}
-
 // ---- driver-side view frames ------------------------------------------------
 {
   // blue driver stands at the RIGHT wall: stick-up must drive toward -x
@@ -2273,63 +1401,6 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
   );
 }
 
-// ---- shooting & visible classification -------------------------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: 10, y: 40 }; // launch zone, mid-range to the blue goal (-60,60)
-  run(w, cmd({ fire: true }), 0.5); // instant burst: 3 preloads in ~0.3s
-  const inTransit = w.balls.filter((b) => b.state.kind === 'flight' || b.state.kind === 'basin').length;
-  check('burst fire emptied hopper in ~0.3s', r.hopper.length === 0, `hopper=${r.hopper.length}`);
-  check('balls travel visibly (flight/basin, no teleport)', inTransit > 0, `${inTransit} in transit`);
-  run(w, cmd({}), 6); // land, jumble in the basin, funnel onto the rail
-  const g = w.goals.blue;
-  const s = w.match.scores.blue;
-  check('shots settled into ramp slots', slotCount(w, 'blue') >= 2, `slots=${slotCount(w, 'blue')} classified=${g.classifiedCount} overflow=${g.overflowCount}`);
-  check('classified points = 3 each', s.autoClassified === g.classifiedCount * 3, `${s.autoClassified} pts`);
-}
-
-// ---- shooting on the move ----------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 99);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: 20, y: 50 };
-  run(w, cmd({ fire: true, driveX: 0.6 }), 1); // strafing while firing
-  run(w, cmd({}), 6);
-  const g = w.goals.blue;
-  check('shooting on the move still scores (lead compensation)', g.classifiedCount + g.overflowCount >= 2, `entered=${g.classifiedCount + g.overflowCount}`);
-}
-
-// ---- manual aim: the turret is bolted to the chassis ------------------------
-// AIM ASSIST IS ALWAYS ON in the product (the toggle is gone; `coerceAssists` forces
-// the flag true), so this path is not reachable through settings. The BRANCH stays, and
-// stays tested, because the bug it fixes is what made removing the toggle safe to undo:
-// `fire()` launches along `r.turretHeading`, and the aim-assist-off branch used to leave
-// it at whatever `spawn` wrote — so the robot shot along one FROZEN world-frame direction
-// all match. Reported by @shlok-k720 (PR #37). Set on the robot directly, since the
-// coercer will not build a manual-aim config any more.
-{
-  const w = mkWorld('match', 'blue', 104);
-  startMatch(w);
-  const r = w.robots[0];
-  r.aimAssist = false;
-  r.pos = { x: 10, y: 40 };
-  r.heading = 0;
-  run(w, cmd({}), 0.1);
-  const tracks = Math.abs(wrapAngle(r.turretHeading - r.heading)) < 1e-9;
-  r.heading = aimSolution(r).yaw; // driver lines it up by hand
-  const held = r.hopper.length;
-  run(w, cmd({ fire: true }), 6);
-  const g = w.goals.blue;
-  check(
-    'manual aim: the turret tracks the chassis, so a hand-aimed shot scores',
-    tracks && g.classifiedCount + g.overflowCount === held,
-    `tracks=${tracks} in=${g.classifiedCount + g.overflowCount}/${held}`,
-  );
-}
-
 // AIM ASSIST IS NOT CONFIGURABLE: every coercion path forces it on, so neither a stale
 // localStorage value, a synced account blob, a saved robot slot, nor a spoofed wire
 // payload can leave a player on manual aim with no control to switch back.
@@ -2344,21 +1415,6 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
   check('aim assist is forced ON through every coercion path (settings, spec, wire)', !!forced);
 }
 
-// ---- intake -----------------------------------------------------------------
-{
-  const w = mkWorld('free', 'blue', 42);
-  const r = w.robots[0];
-  r.hopper = [];
-  w.balls = w.balls.filter((b) => b.state.kind !== 'held'); // clear physical preloads too
-  // blue spike column is on the blue (right) side at x=+46
-  r.pos = { x: 46, y: -55 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  run(w, cmd({ driveY: 0.6, intake: true }), 3);
-  check('intake collected balls from the spike column', r.hopper.length > 0, `hopper=${r.hopper.length}`);
-  check('hopper capped at 3', r.hopper.length <= 3);
-}
-
 // ---- vector intake spans EXACTLY the chassis width (no overhang) -------------
 {
   // the vector wheel row is as wide as the frame — mouthHalf tracks width/2
@@ -2371,1864 +1427,6 @@ const slotCount = (w: World, a: 'red' | 'blue') =>
     'sloped/triangle keep their fixed funnel mouth',
     intakeMouth({ intake: 'sloped', width: 14 }).mouthHalf === INTAKE_PRESETS.sloped.mouth.mouthHalf &&
       intakeMouth({ intake: 'triangle', width: 18 }).mouthHalf === INTAKE_PRESETS.triangle.mouth.mouthHalf,
-  );
-}
-
-// ---- sloped intake: the same maneuver only shoves the ball ---------------------
-{
-  const w = mkWorld('free', 'blue', 6);
-  const r = w.robots[0];
-  r.hopper = [];
-  r.pos = { x: 0, y: 0 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  const ball = w.balls[0];
-  w.balls.splice(1); // only this ball on the field
-  ball.state = { kind: 'ground' };
-  ball.pos = { x: -12, y: 8 };
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({ driveX: -1, intake: true }), 1);
-  check('sloped intake has no side capture', r.hopper.length === 0, `hopper=${r.hopper.length}`);
-}
-
-// ---- vector intake grabs at the FRONT only — never from the chassis flank ------
-{
-  // the vector mouth spans the full chassis width now (no overhang), but it's still
-  // a FRONT-face intake: a ball sitting beside the chassis BODY is never captured.
-  const spec = { length: 11.5, width: 18, intake: 'vector' as const, driveRpm: 435, massLb: 26 };
-  const w = mkWorld('free', 'blue', 6, spec);
-  const r = w.robots[0];
-  r.hopper = [];
-  r.pos = { x: 0, y: 0 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  const ball = w.balls[0];
-  w.balls.splice(1);
-  ball.state = { kind: 'ground' };
-  // beside the chassis body (local x≈0), just past the side edge — at heading π/2,
-  // world (−(half+2), 0) maps to robot-local (0, half+2): flank, NOT in front
-  const half = spec.width / 2;
-  ball.pos = { x: -(half + 2), y: 0 };
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 0;
-  ball.vz = 0;
-  run(w, cmd({ intake: true }), 0.5); // intake running, not driven into the front
-  check(
-    'vector intake never captures from the chassis flank',
-    r.hopper.length === 0,
-    `hopper=${r.hopper.length}`,
-  );
-}
-
-// ---- sloped drives into a clump; the slopes funnel it to the throat wheels -------
-{
-  const w = mkWorld('free', 'blue', 6);
-  const r = w.robots[0];
-  r.hopper = [];
-  r.pos = { x: 0, y: -12 };
-  r.heading = Math.PI / 2; // forward = +y
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  // three balls a bit ahead; the robot drives in and the physical slopes deflect
-  // the off-center ones to the center compliant wheels (no wide vacuum)
-  w.balls.splice(3);
-  const ahead = -12 + r.spec.length / 2 + 4;
-  [-4, 0, 4].forEach((off, i) => {
-    const b = w.balls[i];
-    b.state = { kind: 'ground' };
-    b.pos = { x: off, y: ahead };
-    b.vel = { x: 0, y: 0 };
-    b.z = 0;
-    b.vz = 0;
-  });
-  run(w, cmd({ driveY: 0.3, intake: true }), 1.6);
-  check(
-    'sloped drives a clump in via the slopes (all 3)',
-    r.hopper.length === 3,
-    `hopper=${r.hopper.length}`,
-  );
-}
-
-// ---- triangle transfer is CAPPED, not generally slower --------------------------
-{
-  // CLOSE range (recovery ~0): the triangle's max-rate cap (fireCap 0.12) is its only
-  // limit, so it fires a touch slower than a fast sloped intake (interval 0.08). Keep the
-  // hopper topped up every tick so CADENCE — not the 3-ball hopper — bounds the count;
-  // measure over a full second so the 0.08-vs-0.12 gap resolves cleanly.
-  const firedPerSec = (intake: 'sloped' | 'triangle') => {
-    const w = mkWorld('free', 'blue', 6, { length: 12, width: 14, intake });
-    const r = w.robots[0];
-    const g = goalCenter('blue');
-    r.pos = { x: g.x + 8, y: g.y - 8 }; // point-blank → recovery ~0, so the cap shows
-    let shots = 0;
-    for (let i = 0; i < Math.round(1.0 / SIM_DT); i++) {
-      while (r.hopper.length < 3) r.hopper.push('green'); // unlimited ammo ⇒ cadence limits
-      const before = r.hopper.length;
-      step(w, SIM_DT, new Map([[0, cmd({ fire: true })]]));
-      shots += before - r.hopper.length;
-    }
-    return shots;
-  };
-  const sloped = firedPerSec('sloped');
-  const triangle = firedPerSec('triangle');
-  check(
-    'triangle fires FEWER than sloped up close (max-rate cap bites)',
-    triangle < sloped,
-    `triangle ${triangle} vs sloped ${sloped}`,
-  );
-  // buffed cap 0.12 → ~1/0.12 ≈ 8-9 shots/s, comfortably faster than the old 0.18 cap (~6)
-  check('triangle close-range cadence honors the buffed fireCap', triangle >= 8, `${triangle} shots/s`);
-}
-
-// ---- CLOSE-range rapid fire: near-zero inertia carries a small floor -------------
-{
-  // point-blank, so the DISTANCE recovery is ~0 and only the close floor differs:
-  // a ~0-inertia wheel fires FEWER shots in a tight window than a ~0.2-inertia one.
-  const closeShots = (inertia: number) => {
-    const w = mkWorld('free', 'blue', 7, { intake: 'sloped', flywheelInertia: inertia });
-    const r = w.robots[0];
-    const g = goalCenter('blue');
-    r.pos = { x: g.x + 8, y: g.y - 8 };
-    const start = r.hopper.length;
-    run(w, cmd({ fire: true }), 0.25);
-    return start - r.hopper.length;
-  };
-  const lo = closeShots(0);
-  const hi = closeShots(0.2);
-  check('close rapid fire: ~0 inertia is nerfed vs 0.2 inertia', lo < hi, `inertia0 ${lo} vs inertia0.2 ${hi}`);
-}
-
-// ---- gate release --------------------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: 10, y: 40 };
-  run(w, cmd({ fire: true }), 0.5);
-  run(w, cmd({}), 6);
-  const ramped = slotCount(w, 'blue');
-  const zone = gateZone('blue');
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 4); // drive INTO the gate arm to open it (push-to-open)
-  check('gate opened and released ramp balls', slotCount(w, 'blue') < ramped, `slots ${ramped} -> ${slotCount(w, 'blue')}`);
-  const groundBalls = w.balls.filter((b) => b.state.kind === 'ground').length;
-  check('released balls rolled out onto the field', groundBalls >= 21 + ramped - 1, `${groundBalls} ground`);
-}
-
-// ---- gate tap: flow holds the gate open ----------------------------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: 10, y: 40 };
-  run(w, cmd({ fire: true }), 0.5);
-  run(w, cmd({}), 6);
-  const ramped = slotCount(w, 'blue');
-  const zone = gateZone('blue');
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 0.3); // tap: a brief push opens the arm...
-  r.pos = { x: 0, y: -30 }; // ...and drive away immediately
-  run(w, cmd({}), 4);
-  // A tap drains SOME of the column and then gives out — it must not empty the ramp (see
-  // the tap-depth sweep). What is left stays retained.
-  check('a tapped gate drains part of the column', ramped >= 2 && slotCount(w, 'blue') < ramped, `slots ${ramped} -> ${slotCount(w, 'blue')}`);
-  check('gate re-closed once the drain gave out', !w.goals.blue.gateOpen);
-  // NOT "gatePos === 0". The arm comes to rest on WHAT IS UNDER IT, so with artifacts still
-  // on the ramp it correctly seats on one (at GATE_SEAT_FRAC or below) rather than falling
-  // flat. Flat is only right when the gateway is genuinely empty. What matters either way is
-  // that it is no longer passable.
-  check(
-    'the arm ends NOT passable — flat if the gateway is empty, seated on an artifact if not',
-    w.goals.blue.gatePos < GATE_PASS_FRAC && w.goals.blue.gatePos <= GATE_SEAT_FRAC + 1e-9,
-    `gatePos ${w.goals.blue.gatePos.toFixed(3)} (pass ${GATE_PASS_FRAC}, seat ${GATE_SEAT_FRAC})`,
-  );
-}
-
-// ---- HELD open streams; TAPPED open meters, and can give out ---------------------
-// The paddle is not weightless and it cannot hover. A robot holding the arm up keeps it
-// CLEAR of the artifacts, so the column just flows; let go and the arm settles ONTO the
-// flow at GATE_RIDE_FRAC, where its weight drags every artifact passing under it and it
-// sags in the gaps between them. That is the whole difference, and before it existed the
-// two drained at literally the same rate — 0.596s vs 0.598s between releases, a metronome
-// either way, because a ball in the gateway simply FROZE gatePos wherever it happened to
-// be (pinned at 1.0, touching nothing).
-//
-// Split off the tap-yield distribution sweep, the "gate never rests on an artifact" sweep
-// and the up-ramp scenario below (each builds its own fresh worlds and shares no state with
-// this one) so the sharder can run them in parallel — this comparison plus the trailing
-// "second tap resumes" check (which continues `tapped.w` and must stay here) used to anchor
-// a single ~24s block on its own.
-{
-  /** drain a full 9-artifact column and report the release cadence */
-  const drain = (hold: boolean) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    fillBlueRail(w);
-    const r = w.robots[0];
-    const zone = gateZone('blue');
-    r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-    r.heading = Math.PI; // face the -x (blue) wall
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    const left = () => w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-    const gaps: number[] = [];
-    const times: number[] = []; // when each artifact was released
-    let prev = left();
-    let last = -1;
-    let drove = false;
-    // how far the arm SAGS onto the flow — measured only once it has reached full open,
-    // so the opening ramp (0 -> 1, which passes through every fraction) isn't mistaken
-    // for the paddle resting on an artifact
-    let sag = 1;
-    let rode = 0; // the fraction it was last seen riding at, above the pass line
-    let peakPos = 0;
-    let fullyOpen = false;
-    for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-      const t = i * SIM_DT;
-      let c = cmd({});
-      if (hold || t < 0.3) c = cmd({ driveY: 1 });
-      else if (!drove) {
-        r.pos = { x: 0, y: -30 }; // tap: drive away and let the arm find the flow
-        drove = true;
-      }
-      step(w, SIM_DT, new Map([[0, c]]));
-      const g = w.goals.blue;
-      const n = left();
-      if (n > 0) {
-        if (g.gatePos > peakPos) peakPos = g.gatePos;
-        if (g.gatePos >= 1) fullyOpen = true;
-        if (fullyOpen) {
-          if (g.gatePos < sag) sag = g.gatePos;
-          if (g.gatePos > GATE_PASS_FRAC && g.gatePos < 1) rode = g.gatePos;
-        }
-      }
-      if (n < prev) {
-        for (let k = 0; k < prev - n; k++) {
-          if (last >= 0) gaps.push(t - last);
-          last = t;
-          times.push(t);
-        }
-        prev = n;
-      }
-    }
-    const mean = gaps.length ? gaps.reduce((p, q) => p + q, 0) / gaps.length : 0;
-    return { w, left: left(), gaps, mean, max: gaps.length ? Math.max(...gaps) : 0, rode, sag, peakPos, times };
-  };
-
-  const held = drain(true);
-  const tapped = drain(false);
-
-  check(
-    'a HELD gate drains the whole column',
-    held.left === 0,
-    `${9 - held.left}/9 out`,
-  );
-  // the old bug: every artifact was slammed to v=0 at the exit, released at ZERO speed,
-  // and only shoved clear by the EXIT_NUDGE creep — so the column restarted from rest
-  // every cycle and the gaps sat at 0.60s. A packed column following the artifact ahead
-  // out at ramp speed is roughly RAIL_PITCH / flow speed.
-  check(
-    'a HELD gate STREAMS — no metering cadence between releases',
-    held.mean < 0.4 && held.max < 0.5,
-    `mean ${held.mean.toFixed(3)}s max ${held.max.toFixed(3)}s`,
-  );
-  check(
-    'a held arm stays fully lifted, clear of the flow (no paddle drag)',
-    held.peakPos === 1 && held.sag === 1,
-    `peak ${held.peakPos.toFixed(2)} sag ${held.sag.toFixed(2)}`,
-  );
-  check(
-    'an UNHELD arm settles ONTO the flow rather than hovering',
-    // `rode` is the last fraction seen between the pass line and fully open, which includes
-    // the arm on its way DOWN, so it is not bounded by the ride height. What matters is that
-    // an unheld arm comes off full open at all, unlike a held one.
-    tapped.sag < 1 && tapped.rode > 0,
-    `sagged to ${tapped.sag.toFixed(3)}, rode at ${tapped.rode.toFixed(3)} (pass ${GATE_PASS_FRAC})`,
-  );
-  // THE HEADLINE REQUIREMENT: "the gate always empties all... it shouldn't." A tap buys you
-  // a few artifacts and then the arm settles onto the column and the drain gives out; only
-  // a robot actually holding the lever empties the ramp.
-  //
-  // (Do NOT restate this as a comparison of mean release gaps. It was written that way
-  // first and it lies: the tapped run gives out early, so its mean covers only the opening
-  // fast releases while the held mean is dragged up by the later ones, where a pile has
-  // built outside the gate — it reads as the tapped gate being FASTER.)
-  void held;
-  // What a tap is worth is asserted as a DISTRIBUTION in the blocks below (27+ combinations
-  // of packing, tap length and run-up), never from this one scenario.
-
-  // ...and where a tap DOES give out it must be a stall, never a deadlock: tap again and the
-  // rest comes out. Skipped when this particular tap emptied the ramp, which is now a
-  // legitimate outcome; the give-out case is covered by the distribution block below.
-  if (tapped.left > 0) {
-    const w = tapped.w;
-    const r = w.robots[0];
-    const zone = gateZone('blue');
-    r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-    r.vel = { x: 0, y: 0 };
-    const before = tapped.left;
-    run(w, cmd({ driveY: 1 }), 0.3);
-    r.pos = { x: 0, y: -30 };
-    run(w, cmd({}), 6);
-    const after = w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-    check(
-      'a second tap resumes a gate that gave out (a stall, never a deadlock)',
-      after < before,
-      `${before} left -> ${after}`,
-    );
-  }
-}
-
-// ---- tap yield: the SPREAD across packing / tap-length / standoff (split from the block
-// above — independent fresh-world sims, shares no state with the held/tapped comparison) ---
-// "it would randomly stop if the momentum is not enough to keep the gate open" — the ride
-// height an artifact can hold is proportional to its speed, so a column that has spread out
-// lets the arm fall past GATE_PASS_FRAC and the drain simply gives out.
-{
-  /** drain `n` artifacts staged at `spread` extra pitch, tapped for `tapS` from `standoff` */
-  const tapDrain = (n: number, spread: number, tapS = 0.3, standoff = 7) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (let i = 0; i < n; i++) {
-      const b = w.balls[i];
-      const s = GATE_STOP_S + i * (RAIL_PITCH + spread);
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const r = w.robots[0];
-    const z = gateZone('blue');
-    r.pos = { x: z.x1 + standoff, y: (z.y0 + z.y1) / 2 };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: 1 }), tapS);
-    r.pos = { x: 0, y: -30 };
-    run(w, cmd({}), 12);
-    return n - w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-  };
-  // WHAT A TAP IS WORTH IS A RANGE, NOT A DOSE: "it should empty up to maximum 9, but as
-  // low as like 4 or 5". So this asserts the SPREAD across the conditions a driver
-  // actually varies — how packed the column is, how long the tap was, how much run-up
-  // there was — rather than a number at one setting. Sweeping only packing at a fixed tap
-  // reads as a flat 6 and hides the whole distribution; that is how an earlier version of
-  // this check convinced me the yield was a constant when it was not.
-  const yields: number[] = [];
-  for (const spread of [0, 2, 5]) {
-    // Sampled ACROSS the tap-length gradient, not either side of it. How long the arm is
-    // held is what decides the yield — 0.15s gives 1, 0.18s gives 2, 0.22s gives 3, 0.28s
-    // gives 5, 0.30s empties it — and [0.15, 0.3, 0.5] straddled that jump, seeing only the
-    // two ends and reading as a fixed dose.
-    for (const tapS of [0.15, 0.2, 0.25, 0.28, 0.35]) {
-      for (const standoff of [4, 11]) yields.push(tapDrain(9, spread, tapS, standoff));
-    }
-  }
-  const lo = Math.min(...yields);
-  const hi = Math.max(...yields);
-  /**
-   * WHAT A TAP IS WORTH CHANGED WHEN THE CHUTE GOT STEEPER, and it is worth saying why
-   * rather than restating the bound.
-   *
-   * This used to assert a SPREAD — "it should empty up to maximum 9, but as low as like 4
-   * or 5" — and it held while the ramp delivered slowly: the flow petered out, the arm
-   * settled onto the column, and the drain gave out part way. Then "balls come down at a
-   * slightly too slow frequency" steepened the chute (RAIL_ACCEL 50 -> 65 at the same
-   * delivery speed), and a denser stream keeps knocking the arm up (GATE_SHOULDER_LIFT)
-   * faster than it can fall. So on a PACKED column any real tap now carries the whole ramp.
-   *
-   * That is the honest consequence of the two things asked for in a row — more artifacts
-   * per tap, then a quicker cadence — and both are the same knob. Restoring the spread
-   * means raising the speed an artifact needs to keep the arm passable, which trades the
-   * cadence back; the dial is GATE_SHOULDER_LIFT and this note is where to start.
-   *
-   * What still varies is whether the tap REACHES the lever at all: from a standoff the
-   * robot has to cross the gate zone first, and under about 0.15s it never gets there.
-   */
-  check(
-    'a tap that reaches the lever carries the whole ramp',
-    hi >= RAMP_SLOTS,
-    `best tap: ${hi} of 9 (worst ${lo}, which is a tap too short to cross the standoff)`,
-  );
-}
-
-// ---- tap yield: a quick bump is worth more than one artifact, and the arm-fall/ramp-pace
-// arithmetic behind it (split from the tap-yield block above; independent fresh-world sims) -
-{
-  /** drain `n` artifacts staged at `spread` extra pitch, tapped for `tapS` from `standoff` */
-  const tapDrain = (n: number, spread: number, tapS = 0.3, standoff = 7) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (let i = 0; i < n; i++) {
-      const b = w.balls[i];
-      const s = GATE_STOP_S + i * (RAIL_PITCH + spread);
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const r = w.robots[0];
-    const z = gateZone('blue');
-    r.pos = { x: z.x1 + standoff, y: (z.y0 + z.y1) / 2 };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: 1 }), tapS);
-    r.pos = { x: 0, y: -30 };
-    run(w, cmd({}), 12);
-    return n - w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-  };
-  /**
-   * A QUICK BUMP IS WORTH MORE THAN ONE ARTIFACT. Reported from play: "a tap lets out 1 or
-   * 2." The tap-length gradient in the block above is sampled from 0.15s, which is already a
-   * deliberate press; a driver bumping the lever and coming off it is at 0.10s.
-   */
-  const quick = [0, 1, 2].map((sp) => tapDrain(9, sp, 0.12));
-  check(
-    'a quick bump off the lever is worth more than one artifact',
-    Math.max(...quick) >= 3 && quick.every((y) => y >= 2),
-    `0.12s tap at +0/1/2in packing -> ${quick.join(' ')}`,
-  );
-  /**
-   * ...AND WHY, stated as the arithmetic, because this is the relation that broke it.
-   *
-   * A tap on a RESTING column is a race between two times, and neither is a feel constant:
-   *
-   *   the arm's fall from fully open to the pass line   sqrt(2 * (1 - PASS) / GATE_GRAVITY)
-   *   the column's delivery of its next artifact        sqrt(2 * RAIL_PITCH / RAIL_ACCEL)
-   *
-   * The second one DOUBLED when the ramp stopped running at a capped flow speed (RAIL_ACCEL
-   * 80 -> 25 moved it 0.36s -> 0.64s) and the arm's fall was left at 0.45s. The arm was then
-   * always shut before the second artifact could arrive, and no amount of knock could fix
-   * the first gap — a tap was worth exactly what was already sitting at the gate.
-   *
-   * The ratio is the whole story and it has a floor AND a ceiling. Push the fall past the
-   * delivery and every tap empties the ramp (measured: at GATE_GRAVITY 2.9, fall 0.64s, the
-   * yield is 9 in every one of 50 conditions — the drain can no longer give out at all).
-   * Well under it and nothing ever follows the first artifact out. Marginal is the point.
-   */
-  const armFall = Math.sqrt((2 * (1 - GATE_PASS_FRAC)) / GATE_GRAVITY);
-  const railPitchTime = Math.sqrt((2 * RAIL_PITCH) / RAIL_ACCEL);
-  /**
-   * ...AND THAT RATIO IS NOW DELIBERATELY OVER ONE.
-   *
-   * The band above was 0.75-1.00 — marginal, so the yield varied with how the column
-   * happened to be packed. Two asks moved it, in the same direction, on purpose: "gate
-   * should stay open for longer" slowed the arm, and "balls come down at a too slow
-   * cadence and lose too much velocity" steepened the chute twice (RAIL_ACCEL 50 -> 65 ->
-   * 100). Both shorten the delivery against the fall, and past 1.0 the arm cannot shut
-   * between artifacts, so a tap carries the whole ramp. That is the behaviour asked for and
-   * it is recorded here rather than defended.
-   *
-   * The ceiling is what still matters: far enough past 1 and the arm is effectively never
-   * shut, which is a different mechanism (and a gate that no longer means anything). 1.6
-   * leaves the fall visibly shorter than two artifacts' worth of delivery.
-   */
-  check(
-    "the arm's fall outlasts the ramp's pace, so a tap carries the ramp",
-    armFall > railPitchTime && armFall < railPitchTime * 1.6,
-    `fall ${armFall.toFixed(2)}s vs one pitch from rest ${railPitchTime.toFixed(2)}s (ratio ${(armFall / railPitchTime).toFixed(2)}; it was 0.75-1.00 when a tap was meant to be marginal)`,
-  );
-}
-
-// ---- THE BENCHMARK: a tap releases 5 to 9 artifacts (split from the tap-yield block above;
-// independent fresh-world sims) -------------------------------------------------------------
-{
-  /** drain `n` artifacts staged at `spread` extra pitch, tapped for `tapS` from `standoff` */
-  const tapDrain = (n: number, spread: number, tapS = 0.3, standoff = 7) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (let i = 0; i < n; i++) {
-      const b = w.balls[i];
-      const s = GATE_STOP_S + i * (RAIL_PITCH + spread);
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const r = w.robots[0];
-    const z = gateZone('blue');
-    r.pos = { x: z.x1 + standoff, y: (z.y0 + z.y1) / 2 };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: 1 }), tapS);
-    r.pos = { x: 0, y: -30 };
-    run(w, cmd({}), 12);
-    return n - w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-  };
-  /**
-   * THE BENCHMARK, in the user's words: "on a gate tap, 5-9 balls must release."
-   *
-   * This replaces a check that asked for the yield to vary with how PACKED the column is.
-   * It did, on a 5-degree ramp where the flow was marginal enough that spacing decided
-   * whether it sustained. The ramp is 10.5 degrees now (RAIL_ACCEL 50 — the flow was too
-   * slow, "the initial balls are too slow"), and at that pace a firm tap carries any
-   * column: loosening the pitch by 8in no longer changes the answer. What still varies is
-   * the tap itself, which is what the gradient above measures.
-   *
-   * A tap that never reaches the lever is a MISS, not a tap, and is excluded — a robot 11in
-   * back with a 0.10s press has not touched the arm when the press ends.
-   */
-  const benchmark: number[] = [];
-  for (const sp of [0, 1, 2]) {
-    for (const tapS of [0.15, 0.2, 0.25, 0.3, 0.5]) {
-      for (const standoff of [4, 7]) benchmark.push(tapDrain(9, sp, tapS, standoff));
-    }
-  }
-  const low = Math.min(...benchmark);
-  check(
-    'THE BENCHMARK: a tap releases 5 to 9 artifacts',
-    low >= 5 && Math.max(...benchmark) <= RAMP_SLOTS,
-    `${benchmark.length} taps: worst ${low}, best ${Math.max(...benchmark)}, mean ${(benchmark.reduce((a, b) => a + b, 0) / benchmark.length).toFixed(1)}`,
-  );
-}
-
-// ---- THE GATE NEVER COMES TO REST ON AN ARTIFACT (split from the block above; its own
-// fresh-world sweep, shares no state with the held/tapped comparison or the tap-yield sweeps)
-// It LANDS on one often — the paddle's reach is 2R wide against a 5.1in pitch, so it nearly
-// always meets something — but landing is not resting: its weight has a sideways component,
-// so it pushes the artifact off, either OUT past the gate or back UP into the classifier, and
-// then closes.
-//
-// Getting to "never" took three goes and the reason is worth keeping. gateStopS (where the
-// arm blocks) and gateRestOn (how high an artifact holds it) are exact INVERSES, so the
-// pair is neutrally stable at EVERY offset: wherever the artifact stops, the arm settles to
-// precisely the height that blocks it right there, and it sits forever (measured d = 1.30,
-// v = 0.0, rest = 0.315 = gatePos, tick after tick). A proportional push cannot break that
-// near its own neutral point, so the shove carries a minimum magnitude (GATE_SHOVE_MIN) and
-// takes only its DIRECTION from which side it landed. And the paddle is no floor for an
-// artifact it is EXPELLING — though it very much is one for an artifact it is shoving back
-// up, which is just the gate doing its job.
-{
-  let onBall = 0;
-  let total = 0;
-  for (const n of [4, 6, 8]) {
-    for (const spread of [0, 0.4, 0.8, 1.2, 1.6, 2.4]) {
-      const w = mkWorld('match', 'blue', 42);
-      startMatch(w);
-      for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-      for (let i = 0; i < n; i++) {
-        const b = w.balls[i];
-        const s = GATE_STOP_S + i * (RAIL_PITCH + spread);
-        b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-        b.pos = railPos('blue', s);
-        b.vel = { x: 0, y: 0 };
-        b.z = RAMP_SURFACE_Z;
-        b.vz = 0;
-      }
-      const r = w.robots[0];
-      const z = gateZone('blue');
-      r.pos = { x: z.x1 + 7, y: (z.y0 + z.y1) / 2 };
-      r.heading = Math.PI;
-      r.fieldCentric = false;
-      r.vel = { x: 0, y: 0 };
-      run(w, cmd({ driveY: 1 }), 0.3);
-      r.pos = { x: 0, y: -30 };
-      run(w, cmd({}), 10);
-      total++;
-      if (w.goals.blue.gatePos > 0.001 && w.goals.blue.gatePos < GATE_PASS_FRAC) onBall++;
-    }
-  }
-  check(
-    'the gate NEVER comes to rest on an artifact — it always resolves',
-    onBall === 0,
-    `${onBall}/${total} stalls left the arm seated on one`,
-  );
-}
-
-// ---- ...AND NOTHING UP-RAMP OF THE PADDLE PROPS IT OPEN (split from the block above; a
-// single self-contained scenario) -----------------------------------------------------------
-// The gateway was asked with GATE_CLOSE_CLEAR (8.5in, d from -3.5 to +5.0) rather than the
-// paddle's actual reach, so an artifact a FULL DIAMETER clear of the gate — one that has not
-// reached it and cannot be touching it — held the arm up and kept the flow going.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-  // ONE artifact, parked well up-ramp of the gate line and held there, nothing below it
-  const b = w.balls[0];
-  const s = GATE_LINE_S + BALL_RADIUS + 1.5; // clear of the paddle's reach
-  b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-  b.pos = railPos('blue', s);
-  b.vel = { x: 0, y: 0 };
-  b.z = RAMP_SURFACE_Z;
-  b.vz = 0;
-  const g = w.goals.blue;
-  g.gatePos = 1;
-  g.gateVel = 0;
-  g.gateLatch = 0;
-  g.gateOpen = true;
-  run(w, cmd({}), 3);
-  check(
-    'an artifact up-ramp of the paddle does not prop the gate open',
-    !g.gateOpen,
-    `gatePos ${g.gatePos.toFixed(3)}`,
-  );
-}
-
-// ---- a STALLED column does not wind up ------------------------------------------
-// Reported: "after ball flow resumes after being stalled, it shoots down extremely quickly".
-// A blocked artifact is not being accelerated — whatever holds it up pushes back exactly as
-// hard as gravity pulls — but the solver went on adding RAIL_ACCEL to `v` every tick it stood
-// still, because the only cap on a blocked artifact's speed was the floor's, and an OPEN gate
-// declares "no cap". Measured: a column pinned by a robot on the outflow marched to the
-// RAIL_TERMINAL safety cap of 120 in/s in 4.8s and then left at up to 86 in/s the moment the
-// robot moved, emptying the whole ramp in one burst. RAIL_TERMINAL is a safety cap, not a
-// flow speed.
-{
-  const w = mkWorld('match', 'blue', 5);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  fillBlueRail(w);
-  // parked ON the outflow, and HELD there every tick: the gate is wide open and the drain is
-  // blocked anyway. Pinned rather than driven, because what is under test is the column's
-  // speed while it waits, not how well a robot can hold a spot against the wall.
-  const r = w.robots[0];
-  const block = railPos('blue', RAIL_EXIT_S);
-  const park = { x: block.x - 3, y: block.y - 4 };
-  r.heading = Math.PI;
-  r.fieldCentric = false;
-  const railV = () =>
-    w.balls
-      .filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue')
-      .map((b) => Math.abs((b.state as { v: number }).v));
-  const perTick: number[] = [];
-  let stalledLeft = 0;
-  for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    r.pos = { ...park };
-    r.heading = Math.PI; // ...and its heading: the gate arm PIVOTS a robot leaning on it now,
-    r.vel = { x: 0, y: 0 }; // so an unpinned one turns off the outflow and stops blocking
-    step(w, SIM_DT, new Map());
-    perTick.push(Math.max(0, ...railV()));
-    stalledLeft = railV().length;
-  }
-  // the front of the column arrives with real speed and KEEPS it, so this is not a check that
-  // the ramp is at rest — it is that standing still buys nothing. Compare a window two seconds
-  // into the stall against the last second of it: the wind-up added a flat RAIL_ACCEL every
-  // second, so it moved this by +25 in/s and had reached the safety cap by 4.8s.
-  const windowMax = (t0: number, t1: number) =>
-    Math.max(...perTick.slice(Math.round(t0 / SIM_DT), Math.round(t1 / SIM_DT)));
-  const midMax = windowMax(2, 3);
-  const lateMax = windowMax(5, 6);
-  // a stalled column carries the momentum it ARRIVED with and not a bit more. Nothing on this
-  // ramp starts above rest, so five seconds of standing still must not manufacture any speed.
-  check(
-    'a column held against a block does not accumulate speed while it waits',
-    stalledLeft >= 5 && lateMax <= midMax + 1e-6,
-    `${stalledLeft} still on the ramp, max |v| ${midMax.toFixed(1)} in/s at 2s -> ${lateMax.toFixed(1)} at 6s (the wind-up reached ${RAIL_TERMINAL}, the safety cap)`,
-  );
-  // ...and when the block clears they leave at a speed the ramp could actually have given
-  // them: RAIL_ACCEL over the length of the ramp, sqrt(2*a*s), and no artifact here has more
-  // than a few pitches of runway left.
-  const ceiling = Math.sqrt(2 * RAIL_ACCEL * (RAIL_S_MAX - RAIL_EXIT_S));
-  r.pos = { x: 0, y: -40 };
-  r.vel = { x: 0, y: 0 };
-  const exits: number[] = [];
-  const onRail = new Set(
-    w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').map((b) => b.id),
-  );
-  for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map());
-    for (const b of w.balls) {
-      if (!onRail.has(b.id) || b.state.kind === 'rail') continue;
-      onRail.delete(b.id);
-      exits.push(hyp(b.vel.x, b.vel.y));
-    }
-  }
-  const fastest = exits.length ? Math.max(...exits) : 0;
-  check(
-    'and it resumes at ramp speed rather than shooting out of the gate',
-    exits.length >= 3 && fastest < ceiling,
-    `${exits.length} out, fastest ${fastest.toFixed(1)} in/s (ramp ceiling ${ceiling.toFixed(1)})`,
-  );
-}
-
-// ---- the arm's WEIGHT is a coherent set, and two of it are load-bearing ------------
-// There is no single mass constant: the paddle's weight shows up in the drag it puts on
-// what passes under it, the momentum needed to shoulder it, how readily a push eases it
-// open, and how fast it settles. Making it "lighter" means moving all of those together.
-// Two of them cannot be lightened freely, and this states why so a future tweak trips here
-// rather than in a play session.
-{
-  check(
-    'the paddle shove still beats gravity, or the gate can rest on an artifact again',
-    GATE_PADDLE_SHOVE * GATE_SHOVE_MIN > RAIL_ACCEL,
-    `${GATE_PADDLE_SHOVE} x ${GATE_SHOVE_MIN} = ${(GATE_PADDLE_SHOVE * GATE_SHOVE_MIN).toFixed(0)} vs RAIL_ACCEL ${RAIL_ACCEL}`,
-  );
-  // gateStopS and gateRestOn are exact inverses, so the pair is neutrally stable at EVERY
-  // offset — only a shove that outruns gravity breaks it. Lightening GATE_PADDLE_SHOVE
-  // without raising GATE_SHOVE_MIN to compensate puts the gate back on top of artifacts.
-  /**
-   * THE SEAT AND THE PASS HEIGHT ARE ONE NUMBER, and that is the geometry speaking rather
-   * than a margin being kept.
-   *
-   * They used to be 0.34 and 0.40, the gap doing a job: "seated under the arm is not past
-   * it", so that a resting column could not hold its own gate open and drain itself. That
-   * gap was needed because the old gateway window was 8.5in against a 5.1in artifact pitch,
-   * so a packed column ALWAYS had something under the arm. A stick tangent to a sphere has
-   * its own, much tighter reach — and the check below is the one that now does the work.
-   */
-  check(
-    'the seat IS the pass height: the stick rides highest at the apex, and clearing it is passing',
-    GATE_SEAT_FRAC === GATE_PASS_FRAC && Math.abs(gateRestOn(0) - GATE_PASS_FRAC) < 1e-9,
-    `seat ${GATE_SEAT_FRAC.toFixed(3)} = pass ${GATE_PASS_FRAC.toFixed(3)} = rest(0) ${gateRestOn(0).toFixed(3)}`,
-  );
-  check(
-    '...and a packed column cannot hold its own gate passable, because the paddle reaches less than one pitch',
-    2 * GATE_PADDLE_REACH < RAIL_PITCH,
-    `paddle window ${(2 * GATE_PADDLE_REACH).toFixed(2)}in vs artifact pitch ${RAIL_PITCH}in`,
-  );
-}
-
-// ---- how fast the arm closes: initial position, and the flow's momentum -----------
-// "gate also closes up too quickly. how fast it closes up is determined by the momentum of
-// the balls coming down and the initial position of the gate."
-{
-  const closeFrom = (p0: number) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    const g = w.goals.blue;
-    g.gatePos = p0;
-    g.gateVel = 0;
-    g.gateLatch = 0;
-    g.gateOpen = p0 >= GATE_PASS_FRAC;
-    for (let i = 0; i < Math.round(4 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({})]]));
-      if (g.gatePos === 0) return (i + 1) * SIM_DT;
-    }
-    return Infinity;
-  };
-  const full = closeFrom(1);
-  const half = closeFrom(0.5);
-  // The bar moved once the knock-up existed: "the gate should close faster with no momentum
-  // going in". An EMPTY gateway is now the fast case on purpose — this only asserts it is
-  // still a swing and not a snap. What keeps it from slamming when it matters is the cushion,
-  // checked below, and the flowing case is still ~4x slower than this one.
-  check(
-    'the arm still swings shut rather than snapping',
-    full > 0.25,
-    `${full.toFixed(3)}s from fully open with an empty gateway`,
-  );
-  // ...and it takes longer the further open it started, which is the point. The arm is in FREE
-  // FALL for the whole swing now — GATE_GRAVITY is low enough (it is set by how long the arm
-  // has to stay passable for a tapped column to reach it) that GATE_CLOSE_MAX is never
-  // reached — so the time goes as the SQUARE ROOT of the height, which is what falling does.
-  // It used to be terminal-limited and therefore near-proportional; that was a consequence of
-  // a fall speed calibrated against a ramp that no longer exists.
-  check(
-    '...and how long it takes grows with how far open it was',
-    half < full && Math.abs(half / full - Math.SQRT1_2) < 0.12,
-    `half/full = ${(half / full).toFixed(2)} (0.71 = free fall, 0.50 = terminal-limited)`,
-  );
-  // ...and the flow cushions it: artifacts streaming under the paddle knock it back up as
-  // fast as gravity brings it down.
-  const withFlow = (() => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    for (let i = 0; i < 6; i++) {
-      const b = w.balls[i];
-      const cs = GATE_LINE_S + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s: cs, v: -40, overflow: false, pending: false };
-      b.pos = railPos('blue', cs);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const g = w.goals.blue;
-    g.gatePos = 1;
-    g.gateVel = 0;
-    g.gateLatch = 0;
-    g.gateOpen = true;
-    let lowest = 1;
-    for (let i = 0; i < Math.round(0.35 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({})]]));
-      lowest = Math.min(lowest, g.gatePos);
-    }
-    return lowest;
-  })();
-  const noFlowAt035 = (() => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    const g = w.goals.blue;
-    g.gatePos = 1;
-    g.gateVel = 0;
-    g.gateLatch = 0;
-    g.gateOpen = true;
-    run(w, cmd({}), 0.35);
-    return g.gatePos;
-  })();
-  check(
-    'a stream of artifacts under the paddle slows its fall',
-    withFlow > noFlowAt035 + 0.05,
-    `after 0.35s: with flow ${withFlow.toFixed(3)} vs empty gateway ${noFlowAt035.toFixed(3)}`,
-  );
-}
-
-// ---- the arm comes to rest ON an artifact, never between two -----------------------
-// Reported as "when the classifier flow is stopped by the robot, the gate is always in
-// between two artifacts. This does not have to be that way." It was not a preference the
-// arm had — it had no idea what was under it, and fell straight to 0 THROUGH whatever was
-// sitting in the gateway at every offset from +4 to −2.4in.
-//
-// The paddle's edge descends the vertical at GATE_LINE_S and lands where that meets the
-// artifact's surface. WHICH SIDE it landed on is then the whole story once the robot is
-// gone: on the downhill face it wedges the artifact, on the uphill face its own weight
-// squeezes it out.
-{
-  /** one artifact parked `d` from the gate line (+ = not through yet), a second a pitch
-   * behind, arm descending onto it, no robot anywhere near the lever */
-  const settle = (d: number) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    for (let i = 0; i < 2; i++) {
-      const b = w.balls[i];
-      const s = GATE_LINE_S + d + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const g = w.goals.blue;
-    g.gatePos = Math.min(1, gateRestOn(d) + 0.08); // coming down onto it
-    g.gateVel = 0;
-    g.gateLatch = 0;
-    g.gateOpen = g.gatePos >= GATE_PASS_FRAC;
-    run(w, cmd({}), 5);
-    return { gatePos: g.gatePos, out: w.balls[0].state.kind === 'ground' };
-  };
-
-  // "gateRestOn(0) === GATE_SEAT_FRAC" removed: subsumed by "the seat IS the pass height"
-  // above (GATE_SEAT_FRAC === GATE_PASS_FRAC && |gateRestOn(0) - GATE_PASS_FRAC| < 1e-9).
-  // THE ONE THAT MATTERS. Seated on an artifact is the MARGINAL contact — clearance is
-  // exactly the ball and no more — so it is not passable, and getting past takes momentum.
-  // This was originally set EQUAL to GATE_PASS_FRAC ("a full diameter of clearance is the
-  // pass height"), and because the 8.5in gateway window is wider than the 5.1in artifact
-  // pitch a packed column always has something under the arm — so merely being under it
-  // held the gate permanently passable and a tap drained the entire ramp.
-  /**
-   * THE PROFILE IS A TANGENCY, and it has a shape the old plunger model did not.
-   *
-   * A stick hinged off to one side rides highest when the artifact is dead beneath it and
-   * falls away toward the edge of its reach — and that reach is decided by the tangency, not
-   * by the artifact's radius. At GATE_PIVOT_Z 3.5in it works out SHORTER than a radius, which
-   * is what stops a packed column keeping the arm up.
-   */
-  const profile = [0, 0.5, 1, 1.5, 2].map((d) => gateRestOn(d));
-  check(
-    'gateRestOn falls monotonically from the apex to nothing at the paddle reach',
-    profile.every((v, i) => i === 0 || v < profile[i - 1]) &&
-      gateRestOn(GATE_PADDLE_REACH * 0.999) > 0 &&
-      gateRestOn(GATE_PADDLE_REACH + 0.01) === 0 &&
-      gateRestOn(-GATE_PADDLE_REACH - 1) === 0,
-    `d=0..2: ${profile.map((v) => v.toFixed(3)).join(' ')}, reach ${GATE_PADDLE_REACH.toFixed(2)}in`,
-  );
-  check(
-    '...and the reach is the tangency answer, not the artifact radius',
-    Math.abs(GATE_PADDLE_REACH - BALL_RADIUS) > 0.1,
-    `reach ${GATE_PADDLE_REACH.toFixed(2)}in vs radius ${BALL_RADIUS}in`,
-  );
-
-  const wedged = settle(1.2);
-  const past = settle(-1.2);
-  // It used to WEDGE this one — frozen with the arm perched on it, which is precisely "the
-  // gate closed on top of a ball". A hinged arm with its weight on an artifact does not do
-  // that; it shoves it back into the classifier and then shuts.
-  check(
-    'landing on the DOWNHILL face leaves the arm perched on NOTHING',
-    wedged.gatePos === 0 || wedged.gatePos >= GATE_PASS_FRAC,
-    `gatePos ${wedged.gatePos.toFixed(3)} (perched would be ~${gateRestOn(1.2).toFixed(3)})`,
-  );
-  check(
-    '...and the artifact is shoved back INTO the classifier, not let out',
-    !wedged.out,
-    `left=${wedged.out}`,
-  );
-  // ...and the arm shuts behind it. Not necessarily to ZERO: the trailing artifact follows
-  // down and the arm comes to rest on THAT, which is the whole point — it lands on what is
-  // under it. What must be true is that it is no longer passable.
-  check(
-    'landing on the UPHILL face squeezes it out and the arm shuts behind it',
-    past.out && past.gatePos < GATE_PASS_FRAC,
-    `out=${past.out} gatePos ${past.gatePos.toFixed(3)} (pass ${GATE_PASS_FRAC})`,
-  );
-  // ...and beyond the artifact's edge the paddle genuinely misses: a column packed against
-  // a shut gate rests at GATE_STOP_S, one radius clear, and must not hold the arm up at all
-  check(
-    'a column parked at GATE_STOP_S is clear of the paddle (gate reads fully shut)',
-    // ...to within the bisection that solved the reach — 1e-16 is zero for every purpose here
-    gateRestOn(GATE_STOP_S - GATE_LINE_S) < 1e-9,
-    `d=${(GATE_STOP_S - GATE_LINE_S).toFixed(2)} -> ${gateRestOn(GATE_STOP_S - GATE_LINE_S)}`,
-  );
-}
-
-// ---- gate is a physical arm: only opens on a real push, then lifts/falls smoothly
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const g = w.goals.blue;
-  const zone = gateZone('blue');
-  const r = w.robots[0];
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  // merely LOITERING in the gate zone (no drive input) must NOT open the arm
-  run(w, cmd({}), 0.5);
-  check('loitering in the gate zone does not open the gate', g.gatePos === 0 && !g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-  // a real push eases the arm open — it travels continuously (not a teleport to full).
-  // One tick of a gentle lean lifts it partway, not all the way.
-  r.pos = { x: (gateArmRect('blue').x0 + gateArmRect('blue').x1) / 2, y: GATE_TAPE_Y };
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 1 / 60);
-  check('a real push eases the arm open (not instant)', g.gatePos > 0 && g.gatePos < 1, `gatePos ${g.gatePos.toFixed(3)}`);
-  // keep leaning on it: it lifts fully open
-  run(w, cmd({ driveY: 1 }), 0.5);
-  check('sustained push lifts the arm fully open', g.gatePos >= 0.99 && g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-  // release with no ball flowing: the arm stays LATCHED open a beat (no need to hold),
-  // then gravity swings it shut
-  r.pos = { x: 0, y: -30 };
-  run(w, cmd({}), 1 / 60);
-  check('gate stays open right after release (latched — no need to keep pressing)', g.gatePos >= 0.99 && g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-  run(w, cmd({}), GATE_OPEN_LATCH_S + 1); // latch lapses, then gravity finishes closing it
-  check('gate arm eventually falls fully closed once the latch lapses', g.gatePos === 0 && !g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-}
-
-// ---- gate TAP latches open (no continuous pressing needed) ----------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const g = w.goals.blue;
-  const zone = gateZone('blue');
-  const r = w.robots[0];
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 0.15); // a brief TAP against the arm
-  const atRelease = g.gatePos;
-  r.pos = { x: 0, y: -30 }; // then drive away immediately (stop pressing)
-  run(w, cmd({}), 0.1); // ...and it is still passable a beat later with nothing holding it
-  const shortly = g.gatePos;
-  run(w, cmd({}), 1); // left alone, gravity finishes bringing it down
-  // A tap COMMITS the arm fully open and the driver does not have to keep pressing — but
-  // "stays up a beat" is the FALL, not a pin. It used to be latched at maximum lift for
-  // GATE_OPEN_LATCH_S (0.5s) with nothing touching it, which a hinged arm cannot do and
-  // which is why a tap emptied the whole ramp; the beat is now the ~0.23s gravity needs to
-  // bring it from full lift back to the pass line.
-  check(
-    'a brief tap commits the arm fully open without holding',
-    atRelease >= 0.99,
-    `gatePos at release ${atRelease.toFixed(3)}`,
-  );
-  check(
-    '...and it is still passable a beat later with nothing holding it up',
-    shortly >= GATE_PASS_FRAC && shortly < 1,
-    `gatePos ${shortly.toFixed(3)} (pass ${GATE_PASS_FRAC})`,
-  );
-  check(
-    '...but it is NOT pinned there — with no flow under it, it falls shut',
-    g.gatePos === 0 && !g.gateOpen,
-    `gatePos ${g.gatePos.toFixed(3)}`,
-  );
-}
-
-// ---- gate opens on a straight push only — NOT driving sideways along the lever ---
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const r = w.robots[0];
-  const ar = gateArmRect('blue');
-  r.pos = { x: (ar.x0 + ar.x1) / 2, y: GATE_TAPE_Y }; // squarely against the arm
-  // sideways: fast motion ALONG the wall (Y), none into the handle (X) — must NOT open
-  r.vel = { x: 0, y: 12 };
-  check('driving sideways along the lever does not open the gate', !pushingGate(r, cmd({}), 'blue'));
-  // straight in: motion toward the wall (−x for blue) DOES open it
-  r.vel = { x: -12, y: 0 };
-  check('driving straight into the handle opens the gate', pushingGate(r, cmd({}), 'blue'));
-}
-
-// ---- gate handle is a PHYSICAL one-way door: solid when idle, YIELDS on the same
-// ---- tick you ram it (no 1-tick jolt), and retracts further the harder you ram -----
-{
-  // gateColliderPos is the open fraction buildGateArms uses for the handle collider.
-  // With the arm pinned CLOSED (gatePos 0): an idle/strafing robot sees the solid stub;
-  // a robot ramming it sees the handle already retracting THIS tick (anticipated lift),
-  // so it glides through instead of bouncing off — and a harder ram retracts it more.
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: (gateArmRect('blue').x0 + gateArmRect('blue').x1) / 2, y: GATE_TAPE_Y };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  w.goals.blue.gatePos = 0; // handle down (closed)
-  const push = new Map([[0, cmd({ driveY: 1 })]]);
-  r.vel = { x: 0, y: 0 };
-  const idle = gateColliderPos(w, SIM_DT, new Map([[0, cmd({})]]), 'blue');
-  r.vel = { x: -10, y: 0 }; // gentle ram toward the -x wall
-  const soft = gateColliderPos(w, SIM_DT, push, 'blue');
-  r.vel = { x: -55, y: 0 }; // hard ram
-  const hard = gateColliderPos(w, SIM_DT, push, 'blue');
-  check('idle at a closed gate leaves the handle down (collider not retracted)', idle === 0, `pos ${idle.toFixed(3)}`);
-  check('ramming retracts the handle collider on the same tick (no 1-tick jolt)', soft > 0, `pos ${soft.toFixed(3)}`);
-  check(
-    'a harder ram retracts the handle collider further (speed-scaled)',
-    hard > soft,
-    `hard ${hard.toFixed(3)} > soft ${soft.toFixed(3)}`,
-  );
-}
-
-// ---- resting against the OPEN gate holds it open without re-pushing ---------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const g = w.goals.blue;
-  const zone = gateZone('blue');
-  const r = w.robots[0];
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI;
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 0.5); // push it open
-  check('gate is open after the push', g.gateOpen && g.gatePos >= 0.99, `gatePos ${g.gatePos.toFixed(3)}`);
-  // now STOP driving but stay resting against the arm — it must stay open (no re-push)
-  r.pos = { x: (gateArmRect('blue').x0 + gateArmRect('blue').x1) / 2, y: GATE_TAPE_Y };
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({}), 2); // idle, just touching — well past the latch time
-  check('resting against the open gate holds it open (no constant push needed)', g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-  // back away entirely — now it swings shut
-  r.pos = { x: 0, y: -30 };
-  run(w, cmd({}), GATE_OPEN_LATCH_S + 1);
-  check('leaving the gate lets it swing shut', g.gatePos === 0 && !g.gateOpen, `gatePos ${g.gatePos.toFixed(3)}`);
-}
-
-// ---- a near-closed gate does NOT reopen when a fresh ball reaches the gateway -----
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  const g = w.goals.blue;
-  w.robots[0].pos = { x: 0, y: -30 }; // robot nowhere near the gate
-  // one ball sitting right in the gateway window
-  const b = w.balls[0];
-  b.state = { kind: 'rail', goal: 'blue', s: 0, v: 0, overflow: false };
-  b.pos = railPos('blue', 0);
-  b.vel = { x: 0, y: 0 };
-  // arm caught almost shut (below the pass fraction) with a little downward swing
-  g.gatePos = 0.25;
-  g.gateVel = -1;
-  g.gateLatch = 0;
-  g.gateOpen = false;
-  run(w, cmd({}), 0.5);
-  check(
-    'a ball reaching an almost-closed gate does not reopen it',
-    g.gatePos === 0 && !g.gateOpen,
-    `gatePos ${g.gatePos.toFixed(3)}`,
-  );
-}
-
-// fill the blue rail with 9 retained balls by direct placement (bypasses
-// scoring — counters stay 0)
-function fillBlueRail(w: World, v = 0): void {
-  for (let i = 0; i < 9; i++) {
-    const b = w.balls[i];
-    const s = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'blue', s, v, overflow: false };
-    b.pos = railPos('blue', s);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-}
-
-// drop a 10th ball into the blue basin right at the funnel entrance
-function queueTenth(w: World): void {
-  const tenth = w.balls[9];
-  tenth.state = { kind: 'basin', goal: 'blue' };
-  tenth.pos = basinFunnelTarget('blue');
-  tenth.vel = { x: 0, y: 0 };
-  tenth.z = BASIN_FLOOR_Z;
-  tenth.vz = 0;
-}
-
-// ---- overflow decided at contact: full column + closed gate ---------------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  queueTenth(w);
-  // long enough for an OVERFLOW artifact to clamber the length of the ramp. It rides over the
-  // retained column rather than rolling a clear ramp, so it is slower than the ramp lane —
-  // the window follows the ride's own physics rather than a number tuned to an older one.
-  // Clambering accelerates at RAIL_ACCEL - OVERFLOW_ROLL_LOSS, so the trip takes
-  // sqrt(2*s/a); doubled for the lurch over the scallops and the landing at the end.
-  run(w, cmd({}), Math.sqrt((2 * RAIL_S_MAX) / (RAIL_ACCEL - OVERFLOW_ROLL_LOSS)) * 2);
-  const g = w.goals.blue;
-  check(
-    '10th ball meeting a full column overflows (1 pt)',
-    g.overflowCount === 1 && g.classifiedCount === 0 && w.match.scores.blue.autoOverflow === 1,
-    `classified=${g.classifiedCount} overflow=${g.overflowCount}`,
-  );
-  check('overflow ball rode over the closed gate and exited', w.balls[9].state.kind === 'ground');
-}
-
-// ---- a SHUT gate retains the whole column, indefinitely --------------------------
-// The suite passed for a whole session while this was broken: the rail solver's two
-// constraints (the artifact ahead / the gate) were both made conditional on "was it above
-// this last tick", so one artifact dipping a hair below its neighbour fell through the
-// entire column and out through a closed gate at terminal speed. Nothing here is subtle —
-// it just was not being watched.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  run(w, cmd({}), 5);
-  const onRail = w.balls.filter((b) => b.state.kind === 'rail');
-  const ss = onRail.map((b) => (b.state as { s: number }).s).sort((p, q) => p - q);
-  check(
-    'a closed gate retains all 9 for 5s',
-    onRail.length === 9 && !w.goals.blue.gateOpen,
-    `onRail=${onRail.length} gateOpen=${w.goals.blue.gateOpen}`,
-  );
-  check(
-    'the retained column rests packed against the gate',
-    Math.abs(ss[0] - GATE_STOP_S) < 0.05 &&
-      ss.every((s, i) => i === 0 || Math.abs(s - ss[i - 1] - RAIL_PITCH) < 0.05),
-    `s=${ss.map((s) => s.toFixed(2)).join(',')}`,
-  );
-  check(
-    'nothing scored while the gate stayed shut',
-    w.goals.blue.classifiedCount === 0 && w.goals.blue.overflowCount === 0,
-  );
-}
-
-// ---- overflow decided at contact: gate cleared in time -> classified -------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  // tap the gate, drive away — the column starts draining
-  const r = w.robots[0];
-  const zone = gateZone('blue');
-  r.pos = { x: zone.x1 + 7, y: (zone.y0 + zone.y1) / 2 };
-  r.heading = Math.PI; // face the -x (blue) wall
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 0.3); // tap: push opens the gate...
-  r.pos = { x: 0, y: -30 };
-  run(w, cmd({}), 0.7);
-  // a late ball arrives while the drain is under way: by the time it reaches
-  // the column there are fewer than 9 below it, so it must classify
-  queueTenth(w);
-  run(w, cmd({}), 5);
-  const g = w.goals.blue;
-  check(
-    'ball arriving during a gate drain classifies (3 pts, not overflow)',
-    g.overflowCount === 0 && g.classifiedCount === 1 && w.match.scores.blue.autoClassified === 3,
-    `classified=${g.classifiedCount} overflow=${g.overflowCount} pts=${w.match.scores.blue.autoClassified}`,
-  );
-}
-
-// ---- a drain settles ALONG the tunnel, not across the field ---------------------
-// Reported twice: artifacts leaving the gate "hyper accelerated... all going diagonally in
-// one direction" when they should pile up in front of the gate, along the secret tunnel, or
-// in the human player zone. Two causes, both fixed: a doorway nudge that compounded to
-// 91 in/s, and a release that set a flat floor velocity on a wide fan. They now roll off the
-// GATE_LIP_Z lip and land, so this watches WHERE nine of them come to rest.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  const ids = w.balls.slice(0, 9).map((b) => b.id);
-  const g = w.goals.blue;
-  const mouth = railPos('blue', RAIL_EXIT_S);
-  for (let i = 0; i < 60 * 12; i++) {
-    g.gatePos = 1; // hold it open: this is about the outflow, not the lever
-    g.gateOpen = true;
-    step(w, SIM_DT, new Map());
-  }
-  const drained = w.balls.filter((b) => ids.includes(b.id)); // the HP restocks others
-  const far = drained.map((b) => hyp(b.pos.x - mouth.x, b.pos.y - mouth.y));
-  const offWall = drained.map((b) => FIELD_HALF - Math.abs(b.pos.x));
-  // The three places a drain is allowed to end up, in the user's words: in front of the gate,
-  // along the secret tunnel, or in the human player zone. That is the WALL CORRIDOR — the
-  // tunnel plus the loading zone at the audience corner — not the tunnel alone. (An earlier
-  // version of this check bounded it at the tunnel length and failed artifacts that had rolled
-  // into the loading zone, which is a destination, not an escape.)
-  const corridor = TUNNEL_STRIP_LEN + LOAD_ZONE_SIZE;
-  check(
-    'a full drain settles in the wall corridor: gate, tunnel, or loading zone',
-    drained.every((b) => b.state.kind === 'ground') && Math.max(...far) < corridor,
-    `max=${Math.max(...far).toFixed(0)}in corridor=${corridor}in`,
-  );
-  check(
-    'the drain settles ALONG the wall, not out on a diagonal',
-    offWall.filter((d) => d < 20).length >= 7,
-    `off-wall=${offWall.map((d) => d.toFixed(0)).join(',')}`,
-  );
-}
-
-// ---- a column in CONTACT shares its momentum -------------------------------------
-/**
- * "You just made overflow and coming down the ramp insanely fast, but when you tap the gate
- * open it is still pretty slow. I think the balls higher up don't accelerate much and don't
- * transfer much momentum to the ones below."
- *
- * They accelerated; the exit threw it away. When an artifact met the one ahead, the clamp took
- * the SLOWER of the two and left the one ahead alone — so every contact lost the difference,
- * and because the lane is walked front to back, one slow artifact at the lip pulled the whole
- * column down within a single tick. Measured on a tap: 29 in/s to 17 across five artifacts at
- * once, over and over, as each one reached the gate.
- *
- * Touching artifacts are a perfectly inelastic collision between equal masses, so both end at
- * the mean — the one behind cannot pass (the position clamp is untouched), but the one ahead
- * is pushed ALONG. The exception is a column held against something that cannot move: that is
- * a contact with the FIELD, and sharing into it invents speed the stack can never spend.
- */
-{
-  const drain = () => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const b of w.balls) b.state = { kind: 'held', robot: 99 };
-    fillBlueRail(w);
-    const r = w.robots[0];
-    r.pos = { x: -55, y: 1 };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    const out: number[] = [];
-    const seen = new Set<number>();
-    let worstDrop = 0;
-    let prev = new Map<number, number>();
-    for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-      const push = i * SIM_DT < 0.25;
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: push ? 1 : 0, leftDrive: push ? 1 : 0, rightDrive: push ? 1 : 0 })]]));
-      const now = new Map<number, number>();
-      for (const b of w.balls) {
-        if (b.state.kind === 'rail') {
-          const v = Math.abs((b.state as { v: number }).v);
-          now.set(b.id, v);
-          const was = prev.get(b.id);
-          // a rolling artifact losing a big chunk of its speed in one tick, with nothing in
-          // front of it to hit — that is the contact throwing momentum away
-          // as a FRACTION of what it was doing: an equal-mass inelastic contact with a
-          // stationary artifact loses exactly half, and nothing may lose more than that
-          if (was !== undefined && was > 10 && (was - v) / was > worstDrop) worstDrop = (was - v) / was;
-        } else if (prev.has(b.id) && !seen.has(b.id)) {
-          seen.add(b.id);
-          out.push(i * SIM_DT);
-        }
-      }
-      prev = now;
-    }
-    const gaps = out.slice(1).map((t, j) => t - out[j]);
-    return { rate: gaps.length / gaps.reduce((a, b) => a + b, 0), worstDrop };
-  };
-  const d = drain();
-  check(
-    'a tap drains at the pace the column is actually moving',
-    d.rate > 5,
-    `${d.rate.toFixed(2)} artifacts a second (was 4.53 when each contact discarded the difference, 3.10 before the chute was steepened)`,
-  );
-  check(
-    '...because a contact SHARES the speed rather than discarding it',
-    d.worstDrop <= 0.5,
-    `worst single-tick loss on a rolling artifact: ${(d.worstDrop * 100).toFixed(0)}% of its speed — an equal-mass inelastic contact with a STOPPED artifact loses exactly half, so half is the ceiling. It used to hand over the whole difference, and to the whole column at once.`,
-  );
-}
-
-// ---- the basin hands off at the ramp's pace, not at a crawl ------------------------
-/**
- * "Basin frequency needs to be like 5 times faster."
- *
- * The entrance was the bottleneck and nothing else was: the next artifact cannot board until
- * the last is a PITCH clear of the top, so the hand-off rate is boarding speed over pitch —
- * and boarding was floored at 8 in/s, which is two a second however hard the funnel pulled.
- * Raising the funnel acceleration bought 3.4/s, widening the catch radius bought nothing at
- * all, and moving the block up bought 0.2. The boarding speed is the whole of it.
- *
- * It is now the ramp's own delivery speed (RAIL_ACCEL / RAIL_RATTLE_DRAG), which keeps the
- * invariant that nothing on the ramp outruns the ramp — an artifact entering at the terminal
- * the ramp converges on is exactly as fast as the ramp's fastest.
- */
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  const entry = basinFunnelTarget('blue');
-  const ids: number[] = [];
-  let k = 0;
-  for (const b of w.balls) {
-    if (k < 12) {
-      b.state = { kind: 'basin', goal: 'blue' };
-      b.pos = { x: entry.x - 6 + (k % 4) * 5.2, y: entry.y + 6 + Math.floor(k / 4) * 5.2 };
-      b.vel = { x: 0, y: 0 };
-      b.z = BASIN_FLOOR_Z;
-      b.vz = 0;
-      ids.push(b.id);
-    } else b.state = { kind: 'held', robot: 99 };
-    k++;
-  }
-  const boarded: number[] = [];
-  const seen = new Set<number>();
-  for (let i = 0; i < Math.round(15 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map());
-    for (const b of w.balls) {
-      if (ids.includes(b.id) && b.state.kind === 'rail' && !seen.has(b.id)) {
-        seen.add(b.id);
-        boarded.push(i * SIM_DT);
-      }
-    }
-  }
-  const gaps = boarded.slice(1).map((t, j) => t - boarded[j]);
-  const rate = gaps.length / gaps.reduce((a, b) => a + b, 0);
-  check(
-    "a loaded basin feeds the classifier at the ramp's pace, not at a crawl",
-    boarded.length === 12 && rate > 4.5,
-    `${rate.toFixed(2)} hand-offs/s (was 2.04; the ceiling for a ${RAIL_PITCH}in artifact at the ramp's ${(RAIL_ACCEL / RAIL_RATTLE_DRAG).toFixed(0)}in/s delivery speed is ${((RAIL_ACCEL / RAIL_RATTLE_DRAG) / RAIL_PITCH).toFixed(1)})`,
-  );
-}
-
-// ---- the ramp has a DELIVERY SPEED, it does not accelerate unopposed ---------------
-// "The balls get supercharged and dash down if I gate intake." Nothing was taking anything back
-// once the pile outside stopped throttling the discharge, so the last artifacts off a full
-// column ran the whole 59in of ramp unopposed and arrived at 69 in/s. RAIL_ACCEL's note is
-// right that ROLLING resistance does not grow with speed — but the channel is a 6in groove
-// around a 5in artifact, and weaving down it (railWander) works the walls harder the faster it
-// goes. That loss does grow with speed, and it is what gives a chute a delivery speed.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  w.balls.length = RAMP_SLOTS + 1; // the first ten are re-purposed below, the rest leave the field (an off-field POSITION is clamped back in, onto one point)
-  fillBlueRail(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  const nine = w.balls.slice(0, RAMP_SLOTS);
-  const seen = new Set<number>();
-  const exits: number[] = [];
-  let firstOut = NaN;
-  for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map());
-    for (const b of nine) {
-      if (b.state.kind === 'rail' || seen.has(b.id)) continue;
-      seen.add(b.id);
-      exits.push(hyp(b.vel.x, b.vel.y));
-      if (Number.isNaN(firstOut)) firstOut = (i + 1) * SIM_DT;
-    }
-  }
-  const terminal = RAIL_ACCEL / RAIL_RATTLE_DRAG;
-  check(
-    'the ramp delivers at its own speed rather than accelerating the whole way down',
-    Math.max(...exits) < terminal,
-    `exits ${Math.min(...exits).toFixed(0)}..${Math.max(...exits).toFixed(0)} in/s against a delivery speed of ${terminal.toFixed(0)} (was 24..69 with nothing taking it back)`,
-  );
-  // ...and the START is untouched, which is the whole point of a drag rather than a cap: an
-  // artifact at rest has no speed for it to take, so the first one out is as quick as it was.
-  check(
-    '...and the first artifact out is no slower for it',
-    firstOut < 0.7,
-    `first out at ${firstOut.toFixed(2)}s`,
-  );
-}
-
-// ---- nothing on the ramp outruns the ramp ---------------------------------------
-// "Sometimes balls come down the ramp extremely fast. Only sometimes. And way too fast."
-// An artifact boarded the rail carrying whatever vel.y the BASIN had given it, and the
-// basin's funnel pull is a scripted drain aid (BASIN_FUNNEL_ACCEL, three times gravity, there
-// to stop the basin clogging) rather than a slope. Measured over six seeds of a firing robot:
-// artifacts boarded at up to 52 in/s and peaked at 75 on the ramp, 12 of 18 of them over
-// 60 — against a ramp whose own free-fall ceiling over its whole length is 54. "Sometimes"
-// was whether an artifact happened to dive at the entrance or jumble first.
-{
-  const board: number[] = [];
-  const peak: number[] = [];
-  for (const seed of [7, 19, 42]) {
-    const w = mkWorld('match', 'blue', seed);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.robots[0].pos = { x: -20, y: 20 };
-    const seen = new Map<number, number>();
-    for (let i = 0; i < Math.round(30 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ fire: true, intake: true })]]));
-      for (const b of w.balls) {
-        if (b.state.kind !== 'rail' || b.state.goal !== 'blue') continue;
-        const v = Math.abs((b.state as { v: number }).v);
-        if (!seen.has(b.id)) board.push(v);
-        seen.set(b.id, Math.max(seen.get(b.id) ?? 0, v));
-      }
-    }
-    peak.push(...seen.values());
-  }
-  // the ONE bound, and it is the ramp's own: nothing on it can be moving faster than
-  // something released at the very top of it. A little slack for the tick the paddle shoves.
-  const ceiling = Math.sqrt(2 * RAIL_ACCEL * (RAIL_S_MAX - RAIL_EXIT_S));
-  check(
-    'nothing on the ramp is faster than an artifact released at the top of it',
-    peak.length >= 6 && Math.max(...peak) < ceiling * 1.05,
-    `peak ${Math.min(...peak).toFixed(0)}..${Math.max(...peak).toFixed(0)} in/s over ${peak.length} artifacts, ramp ceiling ${ceiling.toFixed(0)} (was 75)`,
-  );
-  check(
-    '...because boarding the ramp is capped at what the ramp itself could have given it',
-    // + one tick of gravity: the sample is taken after the step that boarded it
-    Math.max(...board) <= RAIL_ENTRY_V + RAIL_ACCEL * SIM_DT + 1e-6,
-    `boarding ${Math.min(...board).toFixed(0)}..${Math.max(...board).toFixed(0)} in/s (was 8..52)`,
-  );
-}
-
-// ---- the ramp discharges STRAIGHT DOWN its own line -----------------------------
-// "All the balls keep coming out of the gate at the same angle" — the release leaned every
-// artifact off the wall by a jittered 5-15 degrees, and because the jitter varied the lean's
-// MAGNITUDE and never its SIGN, the whole drain left on one diagonal. The channel runs down
-// the wall and an artifact rolls off the END of it, so it leaves in the direction it was
-// already going. The only sideways motion it keeps is the weave it was doing across the
-// groove (railWanderRate), which is signed and per artifact.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  fillBlueRail(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  const tracked = w.balls.slice(0, 9);
-  const seen = new Set<number>();
-  const angles: number[] = [];
-  for (let i = 0; i < Math.round(12 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map([[0, cmd({})]]));
-    for (const b of tracked) {
-      if (b.state.kind === 'rail' || seen.has(b.id)) continue;
-      seen.add(b.id);
-      // the heading it leaves on, in degrees off straight-down-tunnel
-      angles.push((Math.atan2(b.vel.x, -b.vel.y) * 180) / Math.PI);
-    }
-  }
-  const worst = Math.max(...angles.map((d) => Math.abs(d)));
-  check(
-    'artifacts leave the gate straight down the tunnel, not on a lean',
-    angles.length >= 7 && worst < 5,
-    `${angles.length} out, worst ${worst.toFixed(1)}deg off straight (the fan was 5-15deg)`,
-  );
-  /**
-   * ...AND THERE IS NO LEAN AT ALL NOW. The exit used to hand the artifact its weave across
-   * the groove as a lateral velocity, which is honest at 20 in/s and a spray at 40 — the same
-   * wander rate times twice the speed. Steepening the chute turned the drift into the "weird
-   * angles for no reason" that were reported, so the synthesised component is gone entirely:
-   * "the spreading out should be fundamentally from collisions mostly".
-   *
-   * Which means the spread has to come from somewhere real, and this is where that is
-   * checked: they leave on identical headings and still end up in different places, because
-   * each one caroms off whatever stopped before it.
-   */
-  // ...still on the field: the human player collects from the audience corner, and a collected
-  // artifact is spliced out of the world but stays in `tracked`, frozen where it was
-  const finals = tracked.filter((b) => b.state.kind === 'ground' && w.balls.includes(b));
-  const spreadY = Math.max(...finals.map((b) => b.pos.y)) - Math.min(...finals.map((b) => b.pos.y));
-  const spreadX = Math.max(...finals.map((b) => b.pos.x)) - Math.min(...finals.map((b) => b.pos.x));
-  // ...and they do NOT end up stacked on one spot: every pair at least a diameter apart is the
-  // spread a corridor this narrow can actually show. Lateral room by the wall is a few inches,
-  // so it is the DISTANCE each one travels before its own collision stops it that varies.
-  const pairs = finals.flatMap((p1, i) => finals.slice(i + 1).map((p2) => hyp(p1.pos.x - p2.pos.x, p1.pos.y - p2.pos.y)));
-  /**
-   * ...and the lean each one leaves on is SMALL, SIGNED, and not proportional to its speed.
-   *
-   * The old fan multiplied the artifact's weave RATE by its speed, so the same groove made a
-   * drift at 20in/s and a spray at 40 — "weird angles for no reason". Removing it entirely
-   * left them in single file: "balls come down as a straight line too much, a slight variation
-   * please." So the weave decides the DIRECTION and a fixed couple of inches a second decides
-   * the size, which is a few degrees at drain speed and cannot grow with the chute.
-   */
-  const leans = angles.map((d) => Math.abs(d));
-  check(
-    '...on a slight, signed lean — and the spread still comes from COLLISIONS',
-    Math.max(...leans) < 6 &&
-      angles.some((d) => d > 0.2) &&
-      angles.some((d) => d < -0.2) &&
-      // a PILE now, not a line: with honest collisions the drain ends two and three abreast in
-      // the corner, so the along-tunnel extent SHRINKS (it was the line's 20in+) while the
-      // across-tunnel extent appears; what the spread has to show is that it fills the corner
-      // in both directions and nobody is stacked
-      spreadY > 12 &&
-      spreadX > 6 &&
-      Math.min(...pairs) >= BALL_RADIUS * 2 - 0.5,
-    `headings ${angles.map((d) => d.toFixed(1)).join(',')} — and they finish spread over ${spreadY.toFixed(0)}in of tunnel and ${spreadX.toFixed(0)}in across it, closest pair ${Math.min(...pairs).toFixed(1)}in`,
-  );
-}
-
-// ---- artifacts do not JITTER against the classifier --------------------------------
-// "They keep teleporting up and down the classifier depending on how I turn the robot."
-// An artifact squeezed between a bumper and the channel was resolved by two position
-// writes taking turns — the bespoke robot push drove it in, the static eviction shoved it
-// back out — and neither could see the other. Slice 2 put the chassis into the ball solve
-// so the squeeze is ONE constraint problem. This measures the symptom directly: movement
-// in a tick that the artifact's own velocity does not account for.
-{
-  const w = mkWorld('free', 'blue', 9);
-  w.balls.length = 0;
-  for (let i = 0; i < 8; i++) {
-    w.balls.push({
-      id: 900 + i,
-      color: 'purple',
-      state: { kind: 'ground' },
-      pos: { x: 53 + (i % 4) * 5, y: -60 + Math.floor(i / 4) * 5 },
-      vel: { x: 0, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  }
-  const r = w.robots[0];
-  r.pos = { x: 42, y: -78 + 24 };
-  r.fieldCentric = false;
-  const prev = new Map<number, { x: number; y: number; v: number; k: string }>();
-  let jumpFrames = 0;
-  let worst = 0;
-  for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-    for (const b of w.balls) {
-      prev.set(b.id, { x: b.pos.x, y: b.pos.y, v: hyp(b.vel.x, b.vel.y), k: b.state.kind });
-    }
-    // grind the pile into the classifier corner, turning as it goes
-    step(w, SIM_DT, new Map([[r.id, cmd({ driveY: 1, rotate: i % 120 < 60 ? 0.4 : -0.4 })]]));
-    for (const b of w.balls) {
-      const p = prev.get(b.id);
-      if (!p || p.k !== 'ground' || b.state.kind !== 'ground') continue;
-      const unexplained = hyp(b.pos.x - p.x, b.pos.y - p.y) / SIM_DT - p.v;
-      if (unexplained > 60) jumpFrames++; // 60 in/s-equiv = 1in in a single tick
-      worst = Math.max(worst, unexplained);
-    }
-  }
-  // Baseline before slice 2 was 41 jump-frames and 2.88in worst; after, 4 and 1.84in. The
-  // bound is deliberately loose — it guards the ORDER of magnitude, not the exact solver
-  // output, which legitimately shifts when contact tuning changes. It shifted again when the
-  // align ceiling came down (CONTACT_ALIGN_RATE_MAX 0.12 -> 0.05, "way too fast"): a robot
-  // that squares up more slowly grinds at an angle for longer, so it is 16 rather than 4.
-  check(
-    'artifacts do not jitter against the classifier when a robot grinds a pile in',
-    jumpFrames <= 20 && worst < 2.5 / SIM_DT,
-    `${jumpFrames} jump-frames of ${Math.round(8 / SIM_DT)}, worst ${(worst * SIM_DT).toFixed(2)}in in one tick`,
-  );
-}
-
-// ---- nothing sinks into a chassis, corners included ------------------------------
-/**
- * "Balls go thru the chassis still."
- *
- * Two holes, both at the same feature. `ballRobotContact` dealt with the chassis only while
- * an artifact was BEHIND the front face plane (`local.x <= hl`); a hair forward of it the
- * chassis stopped existing and, outboard of the frame, so did everything else — so an
- * artifact sitting on a front corner met nothing at all. And where a wall was behind it, the
- * eviction that should have pushed it out was refused by the wall clamp and kept only the
- * part along the wall, which does not separate anything.
- *
- * The union of chassis and intake is one body with a straight side running back to front, so
- * the closest feature outboard of it is that SIDE (not the chassis's corner, which is
- * interior to the union — treating it as a corner makes the correction flip between a
- * diagonal and the rail's sideways push, and that jitters). And a push the field refuses is
- * refused whole: the artifact either finds a way out sideways within BALL_ESCAPE_REACH, or it
- * stays where it is.
- *
- * Swept by driving back and forth through a field of loose artifacts, worst overlap per
- * intake: 2.33 / 2.19 / 0.43in before, 0.90 / 1.42 / 0.44 after, and never a centre inside.
- */
-{
-  const grind = (intake: 'vector' | 'sloped' | 'triangle', spin: number) => {
-    const w = mkWorld('match', 'blue', 7, { intake });
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.pos = { x: -30, y: 0 };
-    r.heading = 0;
-    r.fieldCentric = false;
-    r.hopper = ['green', 'green', 'green']; // full, so this is about collision and not capture
-    let k = 0;
-    for (const b of w.balls) {
-      if (b.state.kind === 'held') continue;
-      b.state = { kind: 'ground' };
-      b.pos = { x: -20 + (k % 8) * 5, y: -14 + Math.floor(k / 8) * 7 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-      k++;
-    }
-    let worst = -Infinity;
-    let insideTicks = 0;
-    for (let i = 0; i < Math.round(12 / SIM_DT); i++) {
-      const fwd = Math.sin(i * SIM_DT * 1.2) > 0 ? 1 : -1;
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: fwd, leftDrive: fwd, rightDrive: fwd, rotate: spin })]]));
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground') continue;
-        const d = pointDepthInChassis(r, b.pos);
-        worst = Math.max(worst, d);
-        if (d > 0) insideTicks++;
-      }
-    }
-    return { overlap: BALL_RADIUS + worst, insideTicks };
-  };
-  const runs = [
-    grind('vector', 0),
-    grind('sloped', 0),
-    grind('triangle', 0),
-    grind('vector', 1),
-  ];
-  check(
-    'artifacts do not sink into a chassis when a robot grinds through them',
-    runs.every((x) => x.overlap < 2.35),
-    `worst overlap per run: ${runs.map((x) => x.overlap.toFixed(2)).join(' / ')}in on a ${BALL_RADIUS}in radius (2.33 / 2.19 / 0.43 / 1.23 before). The bound is not tighter because the JAM rule deliberately leaves a wedged artifact where it is rather than advancing it — a jam reads as a jam, and being stuck against a robot is how it looks.`,
-  );
-  check(
-    '...and no artifact centre is ever inside one',
-    runs.every((x) => x.insideTicks === 0),
-    `${runs.map((x) => x.insideTicks).join('/')} artifact-ticks with the centre inside the chassis`,
-  );
-}
-
-// ---- nothing on the rail hangs in the air, and nothing runs off the end of it --------
-/**
- * "They're all floating." "Still floating by."
- *
- * Two ways an artifact ended up somewhere the rail does not go, both of them at the exit:
- *
- *  · HELD UP BY A ROOF THE COLUMN DID NOT SEE. The descent floors an artifact's height on any
- *    intake beneath it, so it is set down ON an intake rather than through it. That test and
- *    `railBlock`'s asked the same question with different tolerances, at different points, and
- *    over different stretches of rail — so the column would descend past the channel mouth
- *    while the height test held it at lid height, leaving it hanging over open apron with
- *    nothing under it either pass agreed was there: measured s = -2.5 at z = 10.3.
- *  · NO FLOOR AT ALL BELOW THE LIP. `exitFloor` was -Infinity whenever the way out LOOKED
- *    clear, but the release also waits on the doorway and on its own one-per-tick budget, and
- *    while it waited the column had nothing under it: measured five artifacts at s = -290,
- *    hundreds of inches off the end of the world, sliding through robots and walls alike
- *    because a rail artifact is in neither solve.
- *
- * So the two roof tests are now one question, asked at one point, over the stretch the block
- * actually walks; and the rail has a floor a pitch below its lip, which is enough to slide out
- * through and not enough to leave on.
- */
-{
-  const worst = { air: 0, run: 0 };
-  for (const over of [0, -1, -2, -3.5]) {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const b of w.balls) b.state = { kind: 'held', robot: 99 };
-    fillBlueRail(w);
-    const r = w.robots[0];
-    const exit = railPos('blue', RAIL_EXIT_S);
-    const tip = DEFAULT_SPEC.length / 2 + INTAKE_PRESETS[DEFAULT_SPEC.intake].reach;
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    r.hopper = [];
-    // FLUSH with the wall, not centred on the rail line: the line is 3in from the wall and a
-    // chassis is 16.5in wide, so parking its centre there put 5in of it inside the wall, and the
-    // solver's ejection torqued the idle robot until its roof swept over the drop point
-    const park = { x: -FIELD_HALF + DEFAULT_SPEC.width / 2 + 0.1, y: exit.y - tip + over };
-    for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-      r.pos = { ...park };
-      r.vel = { x: 0, y: 0 };
-      w.goals.blue.gatePos = 1;
-      w.goals.blue.gateOpen = true;
-      w.goals.blue.gateLatch = 1;
-      step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-      for (const b of w.balls) {
-        if (b.state.kind !== 'rail') continue;
-        const st = b.state as { s: number; v: number };
-        // past the channel mouth there is no ramp: an artifact that has STOPPED there is
-        // either on the floor or it is hanging in mid-air
-        if (st.s < RAIL_OPEN_S && Math.abs(st.v) < 1) worst.air = Math.max(worst.air, b.z);
-        worst.run = Math.max(worst.run, RAIL_EXIT_S - st.s);
-      }
-    }
-  }
-  check(
-    'nothing on the rail comes to rest in mid-air past the channel mouth',
-    worst.air < 1,
-    `worst resting height below the mouth: ${worst.air.toFixed(1)}in (was 10.3 — held on an intake lid the column did not know about)`,
-  );
-  check(
-    '...and nothing slides off the end of the rail',
-    worst.run <= RAIL_PITCH + 0.5,
-    `furthest past the exit lip: ${worst.run.toFixed(1)}in against a ${RAIL_PITCH.toFixed(1)}in leak (was 290in — off the map, through everything)`,
-  );
-}
-
-// ---- every DECODE preset loads robot-centric --------------------------------------
-/**
- * "All DECODE robot presets should be robot centric."
- *
- * The presets are real team BUILDS and a real FTC team drives robot-centric; field-centric is
- * the rarity. None of them carried assists, so each one picked up the player default (all on,
- * field-centric included) and choosing a build silently chose a drive frame with it.
- *
- * Only the frame is pinned — the rest is still the player default, and the menu toggle still
- * works, which is what the second half of this checks.
- */
-{
-  check(
-    'every DECODE preset loads ROBOT-centric',
-    ROBOT_PRESETS.every((p) => p.assists?.fieldCentric === false),
-    `${ROBOT_PRESETS.filter((p) => p.assists?.fieldCentric === false).length} of ${ROBOT_PRESETS.length}: ${ROBOT_PRESETS.map((p) => p.name).join(', ')}`,
-  );
-  check(
-    "...and pins nothing else — the rest is the player's own default",
-    ROBOT_PRESETS.every(
-      (p) =>
-        p.assists?.aimAssist === PLAYER_ASSISTS.aimAssist &&
-        p.assists?.autoIntake === PLAYER_ASSISTS.autoIntake &&
-        p.assists?.autoFire === PLAYER_ASSISTS.autoFire,
-    ),
-    'aim / auto-intake / auto-fire match PLAYER_ASSISTS',
-  );
-  // ...and it survives the coercer every load path runs through
-  const loaded = coerceSpec({ ...ROBOT_PRESETS[0] }, undefined, 'decode');
-  check(
-    '...and coerceSpec keeps the frame the preset asked for',
-    loaded.assists?.fieldCentric === false,
-    `fieldCentric=${loaded.assists?.fieldCentric}`,
-  );
-}
-
-// ---- an overflow rider never parks on a crest -------------------------------------
-/**
- * "Overflow balls sometimes just get stuck on the classifier and don't go down."
- *
- * The ride was tuned right up against its own invariant — the crest lurch (OVERFLOW_BUMP ×
- * slope) at 3.8 against a net pull of 4 — chasing the "in steps" feel. Numerically that
- * satisfies "the scallop never cancels the ramp", and in a discrete tick it does not: gravity
- * gives 1.67 in/s a tick, the rolling loss takes back nearly all of it, and a crest takes the
- * remainder. A rider that arrives at a crest with no speed then has nothing left to leave with
- * and sits there. Measured: four riders on a stationary column, ZERO inches of travel in
- * fifteen seconds.
- *
- * A sphere balanced on two spheres is an UNSTABLE equilibrium — it cannot rest there, it rolls
- * into the next hollow — so the pull has to keep a real margin over the lurch rather than
- * meeting it. At 6 against 3 the ride still visibly steps (the lead rider's speed goes
- * 3, 3, 2, 2, 3, 3, 4 as it crests and drops) and never stops.
- */
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  const riders: number[] = [];
-  let k = 0;
-  for (const b of w.balls) {
-    if (k < 9) {
-      const s = GATE_STOP_S + k * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    } else if (k < 13) {
-      const s = RAIL_S_MAX - (k - 9) * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: true };
-      b.pos = railPos('blue', s);
-      b.vel = { x: 0, y: 0 };
-      b.z = OVERFLOW_Z;
-      b.vz = 0;
-      riders.push(b.id);
-    } else b.state = { kind: 'held', robot: 99 };
-    k++;
-  }
-  const speeds: number[] = [];
-  for (let i = 0; i < Math.round(15 / SIM_DT); i++) {
-    step(w, SIM_DT, new Map());
-    const lead = w.balls.find((b) => b.id === riders[0]);
-    if (lead && lead.state.kind === 'rail') speeds.push(Math.abs((lead.state as { v: number }).v));
-  }
-  const stuck = w.balls.filter((b) => riders.includes(b.id) && b.state.kind === 'rail').length;
-  check(
-    'overflow riders always get off the pile — none parks on a crest',
-    stuck === 0,
-    `${riders.length - stuck} of ${riders.length} left the ramp in 15s (0 of 4 when the lurch met the pull)`,
-  );
-  /**
-   * ...INCLUDING THE ONE PERCHED ON THE END OF A STOPPED COLUMN.
-   *
-   * The carry — how a rider takes the speed of what it is rolling over — pulled toward the
-   * carrier in BOTH directions, which makes a stationary pile a brake rather than a surface.
-   * A rider that arrived over the top of a column held against a shut gate was dragged to zero
-   * and parked: measured, two artifacts sat at s = 52 and 47 for twenty-five seconds with a
-   * clear ramp beneath them. "Overflows keep getting stuck in the classifier."
-   *
-   * A rider is a sphere on a lumpy slope, not a box on a conveyor: what is underneath can push
-   * it along when it is moving faster, and cannot grip it. So the carry only ever speeds a
-   * rider up, and this is the case that proves it — riders spaced ABOVE the top of the pile,
-   * gate shut, nothing moving anywhere.
-   */
-  {
-    const w2 = mkWorld('match', 'blue', 42);
-    startMatch(w2);
-    w2.match.phase = 'teleop';
-    const perched: number[] = [];
-    let j = 0;
-    for (const b of w2.balls) {
-      if (j < 9) {
-        const sPos = GATE_STOP_S + j * RAIL_PITCH;
-        b.state = { kind: 'rail', goal: 'blue', s: sPos, v: 0, overflow: false };
-        b.pos = railPos('blue', sPos);
-        b.vel = { x: 0, y: 0 };
-        b.z = RAMP_SURFACE_Z;
-        b.vz = 0;
-      } else if (j < 13) {
-        // ABOVE the column's top (which ends near s = 43), where the carry grabbed them
-        const sPos = RAIL_S_MAX - (j - 9) * RAIL_PITCH * 1.4;
-        b.state = { kind: 'rail', goal: 'blue', s: sPos, v: 0, overflow: true };
-        b.pos = railPos('blue', sPos);
-        b.vel = { x: 0, y: 0 };
-        b.z = OVERFLOW_Z;
-        b.vz = 0;
-        perched.push(b.id);
-      } else b.state = { kind: 'held', robot: 99 };
-      j++;
-    }
-    for (let i = 0; i < Math.round(15 / SIM_DT); i++) step(w2, SIM_DT, new Map());
-    const parked = w2.balls.filter((b) => perched.includes(b.id) && b.state.kind === 'rail').length;
-    check(
-      '...including one perched on the end of a column that is not moving at all',
-      parked === 0,
-      `${perched.length - parked} of ${perched.length} got off a STOPPED pile (2 of 4 sat there for 25s when the carry could brake them)`,
-    );
-  }
-  // ...and it is still a LURCH rather than a glide: what varies is how hard it is being
-  // pulled tick to tick, which is the crest-and-hollow shape of what it is rolling over
-  const gains = speeds.slice(1).map((v, i) => (v - speeds[i]) / SIM_DT);
-  const hi = Math.max(...gains);
-  const lo = Math.min(...gains);
-  check(
-    '...and it still rides in steps rather than gliding',
-    hi > lo * 2 + 1,
-    `pull swings ${lo.toFixed(1)}..${hi.toFixed(1)} in/s² over the crests (a glide would be flat)`,
   );
 }
 
@@ -4413,1046 +1611,6 @@ function queueTenth(w: World): void {
   );
 }
 
-// ---- THE RAIL IS NOT A HOLE IN THE FIELD ----------------------------------------
-// An artifact walked off the end of the world: in `rail` state, position written straight
-// down the rail line, from y=-64.9 to y=-75.6 — six inches outside the audience wall —
-// where it was finally released and the ground clamp snapped it back in as a 394 in/s
-// teleport ("they go past the field wall then teleport back in"). The rail is a scripted
-// 1D flow with no wall awareness, so nothing about being off the field stops it; the
-// invariant has to be that it is never down there. It got there because the solver and the
-// release disagreed: an open gate dropped the floor to -Infinity while the release refused
-// on an occupied doorway, and the `wasS >= base` exemption then freed it permanently.
-{
-  const w = mkWorld('match', 'red', 11);
-  startMatch(w);
-  w.balls.length = 0;
-  // 9 retained + 2 overflow. NOT more: the channel is RAIL_S_MAX long and stacking past it
-  // puts the top artifact through the far wall — a fixture bug, not a sim one.
-  const staged = Math.min(11, Math.floor((RAIL_S_MAX - GATE_STOP_S) / RAIL_PITCH) + 1);
-  for (let i = 0; i < staged; i++) {
-    const s0 = GATE_STOP_S + i * RAIL_PITCH;
-    w.balls.push({
-      id: 900 + i,
-      color: 'purple',
-      state: { kind: 'rail', goal: 'red', s: s0, v: 0, overflow: i >= 9, pending: false },
-      pos: railPos('red', s0),
-      vel: { x: 0, y: 0 },
-      z: i >= 9 ? OVERFLOW_Z : RAMP_SURFACE_Z,
-      vz: 0,
-    });
-  }
-  const r = w.robots[0];
-  r.pos = { x: 60, y: -10 };
-  r.fieldCentric = false;
-  let oobFrames = 0;
-  let worstOob = 0;
-  let oobKind = '';
-  let belowExit = 0;
-  for (let i = 0; i < Math.round(14 / SIM_DT); i++) {
-    // drive at the gate, grind along the wall, back off spinning — the reported scenario
-    const ph = i % 240;
-    const c =
-      ph < 90
-        ? cmd({ driveY: 1 })
-        : ph < 150
-          ? cmd({ driveX: ph % 2 ? 1 : -1, driveY: 0.6 })
-          : ph < 190
-            ? cmd({ driveY: -1, rotate: 0.7 })
-            : cmd({ driveY: 1, rotate: -0.5, intake: true });
-    step(w, SIM_DT, new Map([[r.id, c]]));
-    for (const b of w.balls) {
-      if (b.state.kind === 'rail' && b.state.s < RAIL_EXIT_S - 0.01) belowExit++;
-      if (b.state.kind === 'stock' || b.state.kind === 'held') continue;
-      const out = Math.max(Math.abs(b.pos.x), Math.abs(b.pos.y)) - (FIELD_HALF - BALL_RADIUS);
-      if (out > 0.01) {
-        oobFrames++;
-        if (out > worstOob) { worstOob = out; oobKind = `${b.state.kind} at (${b.pos.x.toFixed(1)}, ${b.pos.y.toFixed(1)})`; }
-      }
-    }
-  }
-  check(
-    'no artifact is ever drawn outside the field wall',
-    oobFrames === 0,
-    `${oobFrames} ball-frames out, worst ${worstOob.toFixed(2)}in — ${oobKind}`,
-  );
-  check(
-    'no artifact rides the rail below the exit (that is off the field)',
-    belowExit === 0,
-    `${belowExit} ball-frames below RAIL_EXIT_S`,
-  );
-}
-
-// ---- a FULL classifier tapped mostly drains, but not always ------------------------
-// The clarification behind the "closes up too quickly" complaint: it was about a FULL
-// classifier being tapped. A packed column is its own momentum — every artifact arrives before
-// the arm can fall past the pass line — so the flow carries it and the tap empties the ramp.
-// That is the case that must NOT peter out. But "full" is not a guarantee either ("full
-// shouldnt drain all always"): the run-up and how briefly the arm was struck still decide it,
-// so a firm tap on a packed ramp usually empties it and sometimes gives out partway.
-{
-  const yields: number[] = [];
-  for (const tapS of [0.15, 0.3, 0.5]) {
-    for (const standoff of [4, 7, 11]) {
-      const w = mkWorld('match', 'blue', 42);
-      startMatch(w);
-      fillBlueRail(w); // PACKED at RAIL_PITCH — a full classifier
-      const r = w.robots[0];
-      const z = gateZone('blue');
-      r.pos = { x: z.x1 + standoff, y: (z.y0 + z.y1) / 2 };
-      r.heading = Math.PI;
-      r.fieldCentric = false;
-      r.vel = { x: 0, y: 0 };
-      run(w, cmd({ driveY: 1 }), tapS);
-      r.pos = { x: 0, y: -30 };
-      run(w, cmd({}), 12);
-      yields.push(9 - w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length);
-    }
-  }
-  /**
-   * ...AND ONE OF THESE NINE IS NOW A DIFFERENT SCENARIO. At the closest standoff the robot's
-   * INTAKE ends up over the outflow, and an intake occupying the space an artifact is set
-   * down into holds the drain shut (see `railBlock`'s roof test, and the check below). Held
-   * there for the length of the tap, the arm's fall runs while nothing can leave, and that
-   * one condition drops from 9 to 3 — which is the rule working, not the tap failing.
-   *
-   * So this counts against 4 rather than half: a firm tap on a packed ramp usually empties
-   * it, and the ways it does not are both real — parking on your own outflow, and a short
-   * tap that leaves the flow too slow to keep knocking the arm up.
-   */
-  const mostly = yields.filter((y) => y >= 7).length;
-  check(
-    'a tap on a FULL classifier usually drains most of it',
-    mostly >= 4,
-    `${mostly} of ${yields.length} taps drained 7+: ${yields.join(',')}`,
-  );
-  /**
-   * ...AND IT DRAINS ALL OF IT NOW, which is a change and not a drift. A steeper chute
-   * ("balls come down at a slightly too slow frequency") makes the stream dense enough to
-   * keep knocking the arm up, so a tap that reaches the lever carries the whole ramp. The
-   * conditions that used to give out part way — a short tap, a loose column — no longer do;
-   * the note on the tap-gradient check above says what to turn to bring that back.
-   */
-  check(
-    '...and it drains ALL of it: the stream holds the arm up',
-    yields.every((y) => y >= 7),
-    `${new Set(yields).size} distinct yields, best ${Math.max(...yields)}, worst ${Math.min(...yields)}`,
-  );
-  // The worst case is a SHORT tap from a long run-up, and it is not a weak tap — the arm still
-  // commits to fully open (measured peak 1.00). It gives little because the column is starting
-  // from REST: the robot leaves, the arm falls back through the passable height, and the first
-  // artifact is still accelerating and arrives too late to knock it up. Same race, decided the
-  // other way.
-}
-
-// ---- with nothing coming down, the arm shuts briskly -------------------------------
-// "the gate should close faster with no momentum going in". There is no longer a constant that
-// makes a flowing gateway close slowly — gravity is the same either way. The difference is
-// entirely that a flowing gateway keeps knocking the arm back up, so it has to fall the same
-// height several times over before it finally gets below the passable line.
-{
-  const shutTime = (withFlow: boolean): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    if (withFlow) fillBlueRail(w, -RAIL_TERMINAL);
-    const g = w.goals.blue;
-    g.gatePos = 1;
-    g.gateOpen = true;
-    g.gateLatch = 0;
-    g.gateVel = 0;
-    w.robots[0].pos = { x: 0, y: -40 };
-    for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map());
-      if (g.gatePos <= 0) return i * SIM_DT;
-    }
-    return Infinity;
-  };
-  const empty = shutTime(false);
-  const flowing = shutTime(true);
-  check(
-    'an empty gateway lets the arm shut faster than a flowing one does',
-    flowing > empty * 1.4,
-    `empty ${empty.toFixed(2)}s vs flowing ${flowing.toFixed(2)}s (${(flowing / empty).toFixed(1)}x)`,
-  );
-}
-
-// ---- artifacts accelerate the whole way down, they do not flow at one speed --------
-// "the balls shouldn't be rolling down with constant speed". RAIL_ACCEL was 80 in/s^2 (a
-// 17-degree ramp) and RAIL_TERMINAL capped the result at 30 in/s after 5.6in — barely one
-// artifact spacing — so every artifact hit the cap before reaching the gate and the whole
-// column moved at one speed. Rolling resistance does not grow with speed, so there is no
-// terminal velocity to reach: how fast an artifact is going depends on how far it has come.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  const g = w.goals.blue;
-  const lastV = new Map<number, number>();
-  const arrivals: number[] = [];
-  const gone = new Set<number>();
-  const outAt: number[] = [];
-  for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-    g.gatePos = 1;
-    g.gateOpen = true;
-    g.gateLatch = 1; // held wide open: this is about the RAMP, not the gate
-    step(w, SIM_DT, new Map());
-    for (const b of w.balls) {
-      if (b.state.kind === 'rail' && b.state.goal === 'blue') {
-        lastV.set(b.id, -(b.state as { v: number }).v);
-      } else if (lastV.has(b.id) && !gone.has(b.id)) {
-        gone.add(b.id);
-        arrivals.push(lastV.get(b.id)!);
-        outAt.push(i * SIM_DT);
-      }
-    }
-  }
-  const first = arrivals[0];
-  const last = arrivals[arrivals.length - 1];
-  check(
-    'each artifact reaches the gate faster than the one in front of it',
-    arrivals.length >= 8 && last > first * 1.7,
-    `arrivals: ${arrivals.map((v) => v.toFixed(0)).join(' ')} in/s (the ratio is 1.7 rather than 2 because a steeper chute reaches the delivery speed sooner, so the last few converge)`,
-  );
-  // ...and the visible consequence: the ramp speeds up as it empties.
-  const gaps = outAt.slice(1).map((t, k) => t - outAt[k]);
-  check(
-    '...so the gaps between them shorten as the column drains',
-    gaps[gaps.length - 1] < gaps[0] * 0.75,
-    `first gap ${gaps[0].toFixed(2)}s, last ${gaps[gaps.length - 1].toFixed(2)}s`,
-  );
-  check(
-    'and nothing on the ramp ever reaches RAIL_TERMINAL, which is only a safety cap',
-    last < RAIL_TERMINAL * 0.6,
-    `fastest arrival ${last.toFixed(0)} in/s against a ${RAIL_TERMINAL} in/s cap`,
-  );
-}
-
-// ---- an arriving artifact knocks the arm back UP -----------------------------------
-// Stated mechanism: "the gate opens fully, then closes slightly until the momentum of the next
-// ball forces it back open a certain amount... the momentum of the next ball is not enough to
-// force it back open if the gate is already closed too much". The arm BOBS. It used to be able
-// to come to rest on something but never be LIFTED by it, so a tap was a plain timed fall and
-// the yield came out bimodal — the whole ramp, or almost none of it.
-{
-  // 1) THE HEIGHT TRACKS THE SPEED. A brisker artifact knocks the arm higher; that IS the
-  //    momentum term. It has to be measured with a SINGLE artifact passing under a
-  //    part-closed arm — feed it a slow COLUMN instead and the artifacts simply stack up and
-  //    hold the arm at their own surface height, which is the geometric term, and both speeds
-  //    then report the same number for a reason that has nothing to do with momentum.
-  const knockTo = (speed: number, startPos = GATE_RIDE_FRAC): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    const b0 = w.balls[0];
-    const s0 = GATE_LINE_S + BALL_RADIUS + 0.4; // just above the paddle: arrives immediately
-    b0.state = { kind: 'rail', goal: 'blue', s: s0, v: -speed, overflow: false, pending: false };
-    b0.pos = railPos('blue', s0);
-    b0.vel = { x: 0, y: 0 };
-    b0.z = RAMP_SURFACE_Z;
-    b0.vz = 0;
-    const g = w.goals.blue;
-    // Comfortably above the pass line, not sitting on it: gravity is undamped now, so an arm
-    // started a hair above GATE_PASS_FRAC drops below it within a couple of ticks and the
-    // artifact arrives to find nothing it can get under — which measures the engagement rule,
-    // not the impulse this check is about.
-    g.gatePos = startPos;
-    g.gateOpen = true;
-    g.gateLatch = 0;
-    g.gateVel = 0;
-    w.robots[0].pos = { x: 0, y: -40 };
-    let peak = g.gatePos;
-    for (let i = 0; i < 40; i++) {
-      step(w, SIM_DT, new Map());
-      peak = Math.max(peak, g.gatePos);
-    }
-    return peak;
-  };
-  /**
-   * ...measured on a SAGGING arm, which is the only place the impulse is legible.
-   *
-   * A real ramp arrival (18-45 in/s) throws an arm at GATE_RIDE_FRAC straight to fully open,
-   * so comparing two of them there asks about two speeds that both saturate and reports the
-   * same 1.00 twice. The mechanism lives at the bottom of the swing: an arm that has sagged
-   * to where a passing artifact's own surface would hold it (gateRestOn at first contact) is
-   * exactly the arm a drain is deciding the fate of.
-   */
-  // an arm that has sagged BELOW the pass line but is still high enough for an artifact to
-  // reach the paddle at all — below gateStopS's block the artifact never gets there, and the
-  // pair (gateStopS/gateRestOn) simply parks: the arm settles at exactly the height the
-  // artifact it stopped holds it at, and neither moves again.
-  const SAG = (GATE_SEAT_FRAC + GATE_PASS_FRAC) / 2 - 0.06;
-  const falter = knockTo(5, SAG);
-  const steady = knockTo(10, SAG);
-  const brisk = knockTo(18, SAG);
-  check(
-    'a brisker artifact knocks the arm higher than a faltering one',
-    // margins are small because the arm's gravity is derived from the ramp's pace and the ramp
-    // is brisk — what matters is that the ORDER is strict, not that the gaps are wide
-    brisk > steady + 0.01 && steady > falter + 0.01,
-    `from ${SAG.toFixed(2)}: 5 in/s -> ${falter.toFixed(2)}, 10 -> ${steady.toFixed(2)}, 18 -> ${brisk.toFixed(2)}`,
-  );
-  // ...and THAT is what a tap is worth: the artifact coming out lifts the arm back over the
-  // pass line, or it does not and the drain ends there. Reported as "a tap only lets out one
-  // ball now, because a ball coming out is not lifting the gate back up".
-  check(
-    '...and a brisk one lifts a sagging arm back over the pass line, a faltering one does not',
-    brisk > GATE_PASS_FRAC && falter < GATE_PASS_FRAC,
-    `brisk ${brisk.toFixed(2)} vs pass ${GATE_PASS_FRAC}, faltering ${falter.toFixed(2)}`,
-  );
-
-  // 2) AND IT REALLY GOES BACK UP. The arm dips into the gap between two artifacts and the
-  //    next one lifts it again — only observable while it is still above the pass line, which
-  //    is exactly the condition stated for the lift being possible at all.
-  let rises = 0;
-  for (const spacing of [0, 2, 4, 6]) {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    for (let i = 0; i < 9; i++) {
-      const b = w.balls[i];
-      const cs = GATE_STOP_S + i * (RAIL_PITCH + spacing);
-      b.state = { kind: 'rail', goal: 'blue', s: cs, v: -RAIL_TERMINAL, overflow: false, pending: false };
-      b.pos = railPos('blue', cs);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const g = w.goals.blue;
-    g.gatePos = 1;
-    g.gateOpen = true;
-    g.gateLatch = 0;
-    g.gateVel = 0;
-    w.robots[0].pos = { x: 0, y: -40 };
-    let prev = g.gatePos;
-    for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map());
-      if (g.gateLatch <= 0 && g.gatePos > prev + 1e-6) rises++;
-      prev = g.gatePos;
-    }
-  }
-  check(
-    'a released arm is knocked back up by the artifacts passing under it',
-    rises > 0,
-    `${rises} tick(s) where the arm rose with nobody touching it`,
-  );
-}
-
-// ---- the arm comes down on a stalled column, and rests on a robot rather than shoving --
-// Two rules that meet here. "when i gate intake and the ball flow is stalled ... the gate
-// should be closing but its not" — touch-hold tested the INTAKE-EXTENDED footprint, so the
-// open mouth re-armed the latch every tick and pinned the arm fully open; holding the arm is
-// done with a front CORNER, which is bumper, so touch-hold is the chassis.
-//
-// And "my robot is getting pushed back by the gate" — the handle's reach GROWS as it closes
-// (a lever swinging down is a bar getting longer from above), and it is a static in the robot
-// solve, so it shoved a parked robot 3.85in head-on and 6.68in at an angle. The arm is the
-// light thing: it comes to rest ON a robot in its swing, exactly as it does on an artifact.
-//
-// So the arm still comes down whenever it is free to, and where a robot is in the way it stops
-// on the robot instead of moving it.
-{
-  const rests: number[] = [];
-  let worstShove = 0;
-  for (const y0 of [-12, -10, -8, -6]) {
-    for (const headDeg of [19, 45, 70]) {
-      const w = mkWorld('match', 'red', 5, { intake: 'vector', width: 17.5, length: 14.5 });
-      startMatch(w);
-      w.match.phase = 'teleop';
-      for (const b of w.balls) {
-        b.state = { kind: 'ground' };
-        b.pos = { x: -40, y: -60 };
-        b.vel = { x: 0, y: 0 };
-        b.z = 0;
-        b.vz = 0;
-      }
-      // a STALLED column, parked so the arm sits in the gap between two artifacts
-      for (let i = 0; i < 9; i++) {
-        const b = w.balls[i];
-        const cs = GATE_LINE_S + BALL_RADIUS + 0.6 + i * RAIL_PITCH;
-        b.state = { kind: 'rail', goal: 'red', s: cs, v: 0, overflow: false, pending: false };
-        b.pos = railPos('red', cs);
-        b.vel = { x: 0, y: 0 };
-        b.z = RAMP_SURFACE_Z;
-        b.vz = 0;
-      }
-      const r = w.robots[0];
-      r.pos = { x: 57.3, y: y0 };
-      r.heading = (headDeg * Math.PI) / 180;
-      r.hopper = ['green', 'green', 'green'];
-      r.fieldCentric = false;
-      r.vel = { x: 0, y: 0 };
-      const g = w.goals.red;
-      g.gatePos = 1;
-      g.gateOpen = true;
-      g.gateLatch = GATE_OPEN_LATCH_S;
-      // let it settle against the field first, so spawn overlap is not read as gate shove
-      for (let i = 0; i < 40; i++) {
-        g.gatePos = 1;
-        g.gateLatch = GATE_OPEN_LATCH_S;
-        step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-      }
-      const x0 = r.pos.x;
-      for (let i = 0; i < Math.round(4 / SIM_DT); i++) {
-        step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-        worstShove = Math.max(worstShove, x0 - r.pos.x);
-      }
-      rests.push(g.gatePos);
-    }
-  }
-  check(
-    'the arm comes down on a stalled column when it is free to',
-    rests.some((p) => p < GATE_PASS_FRAC),
-    `resting gatePos across poses: ${rests.map((p) => p.toFixed(2)).join(' ')}`,
-  );
-  check(
-    '...and never shoves the robot to get there — it rests on it instead',
-    // an inch and a half, not one: the arm SQUARES a robot leaning on it now, and squaring at
-    // the arm's own (deliberately slow) rate keeps the contact alive for about a second and a
-    // half, over which the chassis settles a fraction further out as it turns. That is the
-    // rotation resolving, not the arm shoving — the shove this was written for was 3.85in.
-    worstShove < 1.5,
-    `worst displacement ${worstShove.toFixed(2)}in (was 3.85in head-on, 6.68in angled)`,
-  );
-}
-
-// ---- nothing squeezes through a gap it does not fit in -----------------------------
-// Reported: artifacts "squeezing through the small gap with the top right corner of the robot
-// and the field wall when gate intaking". Each constraint in the tick was individually
-// satisfied — the eviction pushed the artifact out of the chassis, the wall clamp refused that
-// push and put it back — so it ended the tick overlapping but not stopped, and the flow
-// carried it through. Measured: a 5in artifact through a 4.0in gap, three per drain.
-{
-  const diameter = 2 * BALL_RADIUS;
-  const results: { gap: number; through: number }[] = [];
-  for (const want of [4.6, 4.0, 3.4, 2.8]) {
-    const w = mkWorld('match', 'red', 5, { intake: 'vector', width: 17.5, length: 14.5 });
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const b of w.balls) {
-      b.state = { kind: 'ground' };
-      b.pos = { x: -40, y: -60 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-    }
-    const ids: number[] = [];
-    for (let i = 0; i < 9; i++) {
-      const b = w.balls[i];
-      const cs = GATE_STOP_S + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'red', s: cs, v: 0, overflow: false, pending: false };
-      b.pos = railPos('red', cs);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-      ids.push(b.id);
-    }
-    const r = w.robots[0];
-    r.heading = (19 * Math.PI) / 180;
-    r.hopper = [];
-    r.fieldCentric = false;
-    r.pos = { x: 50, y: -10 };
-    // bisect the robot's x for the requested corner-to-wall gap
-    let lo = 40;
-    let hi = FIELD_HALF;
-    for (let it = 0; it < 40; it++) {
-      const mid = (lo + hi) / 2;
-      r.pos.x = mid;
-      if (FIELD_HALF - Math.max(...chassisCorners(r).map((c) => c.x)) > want) lo = mid;
-      else hi = mid;
-    }
-    r.pos.x = lo;
-    const ry = r.pos.y;
-    for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-      r.pos.x = lo;
-      r.pos.y = ry;
-      r.vel = { x: 0, y: 0 };
-      w.goals.red.gatePos = 1;
-      w.goals.red.gateOpen = true;
-      w.goals.red.gateLatch = 1;
-      step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-    }
-    let through = 0;
-    for (const b of w.balls) {
-      if (!ids.includes(b.id) || b.state.kind !== 'ground') continue;
-      if (b.pos.x > 64 && b.pos.y < ry - 10) through++;
-    }
-    results.push({ gap: FIELD_HALF - Math.max(...chassisCorners(r).map((c) => c.x)), through });
-  }
-  check(
-    'an artifact does not pass between a robot corner and the wall through a gap it cannot fit',
-    results.every((x) => x.through === 0),
-    results.map((x) => `${x.gap.toFixed(1)}in:${x.through}`).join(' ') + ` (artifact is ${diameter}in)`,
-  );
-}
-
-// ---- ...and the gap that matters when GATE INTAKING is to the INTAKE ------------------
-/**
- * "I'm gate intaking and they get thru the gap." "We fixed this a long time ago and when we
- * started changing how the gate collision turn behaves, it came back again."
- *
- * The check above measures to the CHASSIS corner. When someone is gate intaking, the thing
- * nearest the wall is the INTAKE, and two of this session's changes went straight past the
- * old protection there: the jam rule ("nothing squeezes through a gap it does not fit in")
- * only ever asked about the chassis, and the classifier outflow started being set down on the
- * intake's LID — as a FLIGHT artifact, which is outside the ground solve — still carrying the
- * ramp's 40in/s, so it simply sailed down the tunnel past the robot.
- *
- * Bisected against the pre-gate-work build: square to the wall, gaps of 3.0 / 3.5 / 4.0in
- * passed 0 / 0 / 0 artifacts before and 3 / 2 / 4 after. The lid release is the one that did
- * it, and an artifact set down on a lid now keeps the LID's motion instead of the ramp's.
- */
-{
-  const drainPast = (want: number, headDeg: number): number => {
-    const w = mkWorld('match', 'red', 5);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const b of w.balls) b.state = { kind: 'held', robot: 99 };
-    const ids: number[] = [];
-    for (let i = 0; i < 9; i++) {
-      const b = w.balls[i];
-      const cs = GATE_STOP_S + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'red', s: cs, v: 0, overflow: false, pending: false };
-      b.pos = railPos('red', cs);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-      ids.push(b.id);
-    }
-    const r = w.robots[0];
-    r.heading = (headDeg * Math.PI) / 180;
-    r.hopper = [];
-    r.fieldCentric = false;
-    r.pos = { x: 50, y: -10 };
-    // bisect the robot's x for the requested FOOTPRINT-to-wall gap — chassis plus intake,
-    // which is what is actually beside the wall in this pose
-    const gapNow = () =>
-      FIELD_HALF - Math.max(...footprintCorners(r.spec, r.pos, r.heading).map((c) => c.x));
-    let lo = 40;
-    let hi = FIELD_HALF;
-    for (let it = 0; it < 40; it++) {
-      const mid = (lo + hi) / 2;
-      r.pos.x = mid;
-      if (gapNow() > want) lo = mid;
-      else hi = mid;
-    }
-    r.pos.x = lo;
-    const ry = r.pos.y;
-    for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-      r.pos.x = lo;
-      r.pos.y = ry;
-      r.vel = { x: 0, y: 0 };
-      r.hopper.length = 0; // a driver cycling what they catch, so the mouth never backs up
-      w.goals.red.gatePos = 1;
-      w.goals.red.gateOpen = true;
-      w.goals.red.gateLatch = 1;
-      step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-    }
-    return w.balls.filter(
-      (b) => ids.includes(b.id) && b.state.kind === 'ground' && b.pos.x > 64 && b.pos.y < ry - 10,
-    ).length;
-  };
-  const square = [3.0, 3.5, 4.0, 4.6].map((g) => drainPast(g, 0));
-  check(
-    'the drain does not squeeze past an INTAKE parked a gap too small beside the wall',
-    square.every((n) => n === 0),
-    `square to the wall, gaps 3.0/3.5/4.0/4.6in -> ${square.join('/')} artifacts past (was 3/2/4/0 once the outflow moved onto the lid)`,
-  );
-}
-
-// ---- an artifact comes DOWN as it leaves the ramp ----------------------------------
-// Reported: "still skipping over the chassis when the balls come down from the classifier".
-// An artifact on the ramp rides RAMP_SURFACE_Z up, which is true inside the channel and false
-// past the mouth — out there it is on the open apron with nothing under it, and robots stand
-// there. It used to hold full ramp height across that whole stretch and snap to the floor only
-// at release, so it crossed open ground ten inches up and rode over anything in the way.
-{
-  const w = mkWorld('match', 'blue', 5);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  fillBlueRail(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  // sampled PER ARTIFACT as it crosses each landmark, never bucketed by `s`. Bucketing was
-  // aliased: the height across this stretch falls four inches of z per inch of s, so a
-  // half-inch bucket spans two inches of height, and which artifact happened to write the
-  // bucket last decided whether the check passed. A column that BACKS UP against the queue
-  // outside now comes to rest part way down that stretch, which is correct and made the
-  // aliasing visible.
-  const halfWay = (RAIL_OPEN_S + RAIL_EXIT_S) / 2;
-  let atMouth = 0;
-  let atExit = 99;
-  let mid = 99;
-  let midS = 0;
-  const seenMouth = new Set<number>();
-  const seenMid = new Set<number>();
-  for (let i = 0; i < 400; i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map());
-    for (const b of w.balls) {
-      if (b.state.kind !== 'rail') continue;
-      const sNow = (b.state as { s: number }).s;
-      if (sNow <= RAIL_OPEN_S && !seenMouth.has(b.id)) {
-        seenMouth.add(b.id);
-        atMouth = Math.max(atMouth, b.z); // the height it LEAVES the channel at
-      }
-      if (sNow <= halfWay && !seenMid.has(b.id)) {
-        seenMid.add(b.id);
-        if (b.z < mid) {
-          mid = b.z;
-          midS = sNow;
-        }
-      }
-      if (sNow <= RAIL_EXIT_S) atExit = Math.min(atExit, b.z);
-    }
-  }
-  check(
-    'an artifact leaves the ramp at ramp height and reaches the floor by the exit',
-    atMouth > RAMP_SURFACE_Z - 0.5 && atExit < 0.5,
-    `mouth z=${atMouth.toFixed(1)} exit z=${atExit.toFixed(1)}`,
-  );
-  /**
-   * ...CONTINUOUSLY, checked against the law rather than a band.
-   *
-   * The height across this stretch is pure geometry — RAMP_SURFACE_Z tapering to 0 over
-   * RAIL_DROP_S of travel — and the sample is the first TICK past the halfway point, which
-   * is not the halfway point: a faster ramp overshoots it further in one tick, so a fixed
-   * band reads as a failure when the only thing that changed is how fast the artifact is
-   * going. So compare the artifact's height to what the law says at the `s` it was actually
-   * sampled at, which is the statement that was meant all along.
-   */
-  const expectedMid = RAMP_SURFACE_Z * (1 - Math.min(1, Math.max(0, (RAIL_OPEN_S - midS) / RAIL_DROP_S)));
-  check(
-    'and it gets there continuously, not by snapping at the exit',
-    mid > 0.2 && Math.abs(mid - expectedMid) < 0.5,
-    `at s=${midS.toFixed(2)} it is z=${mid.toFixed(2)}, and the ramp taper says ${expectedMid.toFixed(2)}`,
-  );
-}
-
-// ---- ...but PRESSING THE LEVER is not parking on the outflow ---------------------
-// "I only get one or two balls from a tap way too often." The roof's blocking region carried
-// a radius of slop around the mouth, and at the gate that radius is the difference between a
-// robot whose mouth is over the drain and one merely pressing the lever with its intake tip.
-// A driver who bumped the gate and STAYED — which is what a driver does — was reading as
-// parked on their own outflow and got NOTHING: 0 of 9 at every tap length from 0.10s to 0.5s,
-// against 2/3/9/9/9 for the same taps if the robot backed away afterwards.
-{
-  const tapStay = (tapS: number, standoff: number): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    fillBlueRail(w);
-    const r = w.robots[0];
-    const z = gateZone('blue');
-    r.pos = { x: z.x1 + standoff, y: (z.y0 + z.y1) / 2 };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: 1 }), tapS);
-    run(w, cmd({}), 12); // ...and STAYS: no teleport away
-    return 9 - w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-  };
-  const close = [0.15, 0.3, 0.5].map((t) => tapStay(t, 4));
-  check(
-    'a driver who taps the lever and stays there still gets the drain',
-    Math.max(...close) >= 7 && close.every((y) => y >= 1),
-    `pressed in close, 0.15/0.3/0.5s taps -> ${close.join(' ')} (was 0 0 0)`,
-  );
-}
-
-// ---- parking ON the outflow puts artifacts ON the intake, never inside it -------------
-// "Once I open the gate and then stand directly in front of where the balls come out, there
-// is no space for the balls to drop, so it would drop on top of the intake. However, it is
-// being intaked, still." The ramp discharges at RAMP_SURFACE_Z and an intake's roof is at
-// about the same height (intakeLidZ), so an artifact leaving the channel with a robot parked
-// under it has nowhere to be set down. The descent used to run straight through the intake
-// and put it on the floor INSIDE the mouth, which is the one place it cannot have got to.
-//
-// The answer to that was to make the column WAIT for floor to appear, and that was wrong in a
-// way that only shows up in play: the robot holding the gate open is the robot in the way, so
-// the floor never appears. Measured, holding the lever and intaking — the ordinary way anyone
-// drains a ramp — 0 of 9 artifacts came out in 20 seconds with the gate wide open, for both
-// intakes whose reach covers the outflow. "When I gate intake the balls go infinitely."
-//
-// So the ramp always runs, and the roof answers at the RELEASE: the artifact is set down ON
-// the lid and has to come off it. Nothing is ever handed to a robot off the rail — that is
-// the rule, and it is what the two checks below actually watch.
-{
-  const parkRun = (over: number): { taken: number; onRamp: number; straightIn: number } => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.balls.length = RAMP_SLOTS + 1; // the first ten are re-purposed below, the rest leave the field (an off-field POSITION is clamped back in, onto one point)
-    fillBlueRail(w);
-    const r = w.robots[0];
-    const exit = railPos('blue', RAIL_EXIT_S);
-    const tip = DEFAULT_SPEC.length / 2 + INTAKE_PRESETS[DEFAULT_SPEC.intake].reach;
-    r.heading = Math.PI / 2; // in the tunnel, facing back up at the gate
-    r.fieldCentric = false;
-    r.hopper = [];
-    const park = { x: exit.x, y: exit.y - tip + over };
-    const nine = w.balls.slice(0, 9);
-    const wasOn = new Map(nine.map((b) => [b.id, b.state.kind]));
-    // an artifact taken WITHOUT ever leaving the ramp — the one thing the drop-space rule
-    // forbids, and the only way to ask it that does not also outlaw the ramp running
-    let straightIn = 0;
-    for (let i = 0; i < Math.round(14 / SIM_DT); i++) {
-      r.pos = { ...park };
-      r.vel = { x: 0, y: 0 };
-      w.goals.blue.gatePos = 1;
-      w.goals.blue.gateOpen = true;
-      w.goals.blue.gateLatch = 1;
-      step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-      for (const b of nine) {
-        if (b.state.kind === 'held' && wasOn.get(b.id) === 'rail') straightIn++;
-        wasOn.set(b.id, b.state.kind);
-      }
-    }
-    return {
-      taken: nine.filter((b) => b.state.kind === 'held').length,
-      onRamp: nine.filter((b) => b.state.kind === 'rail').length,
-      straightIn,
-    };
-  };
-  const on = parkRun(0); // intake tip right on the drop point
-  check(
-    'a robot parked on the outflow never takes an artifact straight off the ramp',
-    on.straightIn === 0,
-    `${on.straightIn} rail->held; ${on.taken} ended up held after crossing the lid, ${on.onRamp} still on the ramp`,
-  );
-  /**
-   * ...AND THE WAIT ENDS WHEN THE ROBOT DOES.
-   *
-   * Parked ON the outflow the column stops at the intake, exactly as it does at a bumper: the
-   * mouth is open to an artifact rolling IN, it is not open from above, and the ramp
-   * discharges from above. Both ways round that were tried are worse — setting the artifact
-   * down on the intake's LID leaves it in flight, which is outside the ground solve (it
-   * skated through gaps it does not fit through, and when that was damped, it hovered:
-   * "they're all floating"), and setting it on the floor puts it inside the mouth, which is
-   * the one place it cannot have got to.
-   *
-   * So the guarantee is not that the ramp never waits. It is that the wait is a ROBOT, and
-   * ends when the robot moves: back off the drop point and the whole column comes out.
-   */
-  const off = parkRun(-3);
-  check(
-    '...and the wait ends the moment the robot moves off — it is a robot, not a deadlock',
-    on.onRamp === 9 && off.onRamp < 6,
-    `parked on it: ${on.onRamp} of 9 left after 14s; backed off 3in: ${off.onRamp} left and ${off.taken} taken (the rest is the hopper filling and the doorway backing up behind it, not the block)`,
-  );
-  // ...and the rule is about the DROP SPACE, not about being near the gate: back off a few
-  // inches and the artifacts land on the floor and roll into the mouth as they should. This
-  // is the same technique the drain cadence work protects (gate intaking), and it must not
-  // be what the check above outlaws.
-  const back = off; // same call as above (parkRun(-3)) — reuse instead of re-simulating
-  check(
-    '...but backed off the drop point it feeds normally, so gate intaking still works',
-    back.taken > 0 && back.onRamp < 9,
-    `3in back: took ${back.taken}, ${back.onRamp} left on the ramp`,
-  );
-  /**
-   * WHERE THE LINE IS: "there needs to be adequate space ON THE GROUND for the ball to DROP
-   * ON THE GROUND which can then be intaked by the robot", with a lenience because "if the
-   * ball drops on the very front edge of the intake rollers, they can suck them in due to
-   * compliance."
-   *
-   * So the drop point needs a full artifact RADIUS of clearance from the intake, less
-   * INTAKE_CATCH_LENIENCE in front of the roller face and nowhere else. Swept by how far the
-   * intake tip sits from the drop point, this is a clean step: nothing until there is room,
-   * everything after.
-   */
-  const need = BALL_RADIUS - INTAKE_CATCH_LENIENCE;
-  const tooClose = [-1, 0, need - 0.3].map((g) => parkRun(-g));
-  const roomy = [need + 0.2, need + 1.2, need + 3.7].map((g) => parkRun(-g));
-  check(
-    'the drop point needs ground to drop ONTO, less the roller-face lenience',
-    tooClose.every((x) => x.straightIn === 0) && roomy.every((x) => x.taken > 0),
-    `no ground -> over the lid every time; ${(need + 0.2).toFixed(1)}in clear -> ${roomy[0].taken} taken off the floor`,
-  );
-}
-
-// ---- NO LOAD, NO TORQUE: a robot touching something is not being turned by it -------
-// "Torque is being applied with me not doing anything." The response's gain was
-// `1 + press * CONTACT_PRESS_GAIN` — a floor of 1 — so the geometric torque alone rotated a
-// chassis at zero press. Against a FACE it hides, because the flush cap stops it the moment
-// the robot is square; against the gate handle, which is a point and has no flush to stop at,
-// a robot parked beside it turned 359.6 degrees on its own.
-{
-  const idleTurn = (label: string, place: (w: World) => void, driveFirst: boolean): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    for (const b of w.balls) b.state = { kind: 'held', robot: 99, slot: 0, lx: 0, ly: 0, side: 0 };
-    const r = w.robots[0];
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    place(w);
-    if (driveFirst) run(w, cmd({ driveY: 1 }), 1.5);
-    const h0 = r.heading;
-    let worst = 0;
-    for (let i = 0; i < Math.round(4 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({})]])); // nothing pressed
-      // WRAPPED. `heading` lives in (-pi, pi], so a chassis resting a hair either side of the
-      // boundary reads as a full revolution the moment it crosses — this check reported an
-      // idle robot spinning 359.6deg while its angular velocity was 0.001 rad/s and the
-      // square-up was contributing no torque at all (press was 0 at every contact). The spin
-      // was arithmetic, not physics.
-      worst = Math.max(worst, Math.abs(wrapAngle(r.heading - h0)));
-    }
-    void label;
-    return (worst * 180) / Math.PI;
-  };
-  const z = gateZone('blue');
-  const turns = [
-    idleTurn('gate, never driven', (w) => {
-      // RESTING on the closed stub's field edge, not placed through it: at z.x1 + 2 the intake
-      // tip sat 4in inside the classifier and the stub, and the 3deg it 'turned' was the
-      // solver walking it back out of two solids by one corner
-      const tip = DEFAULT_SPEC.length / 2 + INTAKE_PRESETS[DEFAULT_SPEC.intake].reach;
-      w.robots[0].pos = { x: gateArmRect('blue').x1 + tip, y: GATE_TAPE_Y - 6 };
-      w.robots[0].heading = Math.PI;
-    }, false),
-    idleTurn('gate, driven then released', (w) => {
-      w.robots[0].pos = { x: z.x1 + 8, y: GATE_TAPE_Y - 6 };
-      w.robots[0].heading = Math.PI;
-    }, true),
-    idleTurn('wall, driven then released', (w) => {
-      w.robots[0].pos = { x: 0, y: FIELD_HALF - 20 };
-      w.robots[0].heading = Math.PI / 2 + 0.15;
-    }, true),
-    idleTurn('classifier, driven then released', (w) => {
-      w.robots[0].pos = { x: classifierRect('blue').x1 + 12, y: 20 };
-      w.robots[0].heading = Math.PI + 0.15;
-    }, true),
-  ];
-  check(
-    'a robot resting against something does not turn while the driver does nothing',
-    turns.every((t) => t < 1),
-    `worst idle turn over four resting poses: ${Math.max(...turns).toFixed(2)}deg (the gate turned 359.6 on its own)`,
-  );
-}
-
-// ---- a contact NEVER turns you the wrong way ---------------------------------------
-// "It's turning me the other way sometimes." The contact list is every corner within
-// CONTACT_TOUCH_EPS of the surface, and the load used to be shared as `depth + CONTACT_BIAS` —
-// a floor, which is a vote for corners that are NOT touching. The two front corners do not
-// have mirror-image lever arms once the chassis is tilted (the intake extends the front), so a
-// fabricated vote from the corner half an inch clear could outweigh the one actually bearing
-// and reverse the torque. Load is shared by COMPRESSION now: full at the deepest corner,
-// nothing beyond CONTACT_COMPLIANCE of it.
-{
-  const settle = (tiltDeg: number, at: 'wall' | 'gate', dy = 0): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.balls.length = 0; // off-field positions are clamped back INTO the field, onto one point
-    const r = w.robots[0];
-    const face = at === 'wall' ? Math.PI / 2 : Math.PI;
-    if (at === 'wall') r.pos = { x: 0, y: FIELD_HALF - 20 };
-    else r.pos = { x: gateZone('blue').x1 + 8, y: GATE_TAPE_Y + dy };
-    r.heading = face + (tiltDeg * Math.PI) / 180;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: 1 }), 3);
-    const q = Math.PI / 2;
-    let rel = r.heading - face;
-    rel -= Math.round(rel / q) * q;
-    return (rel * 180) / Math.PI;
-  };
-  const tilts = [-12, -6, -3, -1, 1, 3, 6, 12];
-  const cases: { label: string; tilt: number; ended: number }[] = [];
-  /**
-   * ...INCLUDING WHEN YOU ARRIVE HARD. "Even if I hit it with a large impact it doesn't turn
-   * me": the impulse a collision hands the chassis was gated on `flushErr > 0.05` and sat
-   * inside an `else if`, so arriving fast and nearly square produced nothing at all. It is its
-   * own term now, and it is guarded by the TILT rather than by the alignment — comparing it
-   * against `align` passes trivially whenever `align` has been zeroed for pointing the wrong
-   * way, which is exactly when the guard is needed.
-   *
-   * ONLY FACES ARE ASKED ABOUT FLUSH. A wall, a goal face and the classifier's side can align
-   * a chassis because two corners bear on them. The gate handle is 2.5in of bar and cannot —
-   * it PIVOTS you, and its own check is below.
-   */
-  const hardCases: { tilt: number; ended: number }[] = [];
-  /**
-   * ...AND THE GATE HANDLE PIVOTS YOU INSTEAD, which is what a 2.5in stub can do to an 18in
-   * chassis. "When I hit the gate with the leftmost or rightmost side of the robot, I should
-   * be turning but I square up instead."
-   *
-   * The moment is `r x n`, so it vanishes when the contact comes to lie on the line through
-   * the robot's centre along the push: lean on the arm off-centre and you turn about it until
-   * it is dead ahead; arrive already centred on it and you are not turned at all. No cap and
-   * no target angle — the equilibrium is in the geometry.
-   */
-  const armHit = (offCentre: number): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.balls.length = 0; // the field CLEARED — 'held by robot 99' drops them back to the floor on tick one
-    for (const a of ['red', 'blue'] as const) w.humanPlayers[a].box.length = 0;
-    const r = w.robots[0];
-    r.pos = { x: gateZone('blue').x1 + 14, y: GATE_TAPE_Y - offCentre };
-    r.heading = Math.PI;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    const h0 = r.heading;
-    run(w, cmd({ driveY: 1 }), 3);
-    // UNWRAP: the sim wraps the heading, so a raw delta reads as a full turn. Three separate
-    // diagnoses this session started as "it spun 360" and were this.
-    let d = r.heading - h0;
-    d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI;
-    return Math.abs((d * 180) / Math.PI);
-  };
-  const centred = armHit(0);
-  const withSide = [2, 4, 6, 8].map(armHit);
-  /**
-   * THE SOLVER'S OWN MOMENT ARM NOW, not the hand-rolled point impulse's. A 3in-tall stub met
-   * 2in off the centre of a 16.5in face is very nearly a square hit, and the solver turns the
-   * chassis about 2°; the old '> 3 at every offset' was the impulse model's number. What is
-   * physical — and what is asserted — is that a square hit turns you not at all, every
-   * off-centre hit turns you, and the turn GROWS with the lever arm: measured 2/6/10/21.
-   */
-  check(
-    'hitting the gate arm off-centre TURNS the robot, and hitting it square does not',
-    centred < 1 && withSide.every((t) => t > 1) && withSide.every((t, i) => i === 0 || t >= withSide[i - 1]),
-    `centred ${centred.toFixed(0)}deg; 2/4/6/8in off centre ${withSide.map((t) => t.toFixed(0)).join('/')}deg`,
-  );
-  /**
-   * ...AND HOW MUCH IT TURNS YOU GROWS WITH THE LEVER ARM, which is the physics showing.
-   *
-   * The moment of a contact force is r x F: meet the stub further off your centre and the
-   * same push turns you more. That ordering was absent while the normal came from the robot's
-   * CENTRE clamped onto the stub (7/7/7/11 degrees — flat, because the geometry it measured
-   * was not the contact's), and it appears as soon as the normal is the separation direction
-   * the shapes actually have: 5/12/22/32.
-   *
-   * The ceiling is a right angle, which is the thing the old complaint was about ("it spins me
-   * around like 90 degrees instantly"), and the rate is what makes it not that: 32 degrees is
-   * over three full seconds of driving into the arm, about 11 deg/s.
-   */
-  /**
-   * ⚠️ THIS SCENE IS NOT ISOLATED, AND HALF OF WHAT IT USED TO MEASURE WAS NOT THE ARM.
-   *
-   * The setup holds every artifact off the field, but the human player restocks and the
-   * classifier drains into exactly this corner: measured, 27 ground artifacts, one in contact
-   * with the chassis on 140-180 of the 180 ticks. Until the artifact solve became mutual, the
-   * bespoke `ballRobotFeedback` answered a pinned artifact by PIVOTING THE HEADING directly
-   * (`pushRobotAt` with `squareTo = false` — "point contacts pivot the chassis freely"), and
-   * that is where most of these degrees came from. Re-run with the artifacts genuinely
-   * deleted, the arm ALONE gives 2.9 / 10.4 / 0.0 / 0.0 on the tunnel side and 0/0/0/0 on the
-   * channel side — the same numbers before and after that change, to the digit.
-   *
-   * So the arm's own off-centre pivot is what needs fixing here, and it is the same defect the
-   * check above is already red on. Do not "fix" this one by putting an artifact pivot back.
-   */
-  const fromChannelSide = [2, 4, 6, 8].map((d) => armHit(-d));
-  const allHits = [...withSide, ...fromChannelSide];
-  check(
-    '...and how far grows with how far off centre you hit it, without ever spinning you round',
-    allHits.every((t) => t < 45) && withSide[3] > withSide[0] * 2,
-    `tunnel side ${withSide.map((t) => t.toFixed(0)).join('/')}deg vs channel side ${fromChannelSide.map((t) => t.toFixed(0)).join('/')}deg (was 7/7/7/11 and 2/10/0/15 — flat)`,
-  );
-}
-
-// ---- the gate arm is a POINT CONTACT, and it is solved as one ----------------------
-/**
- * Three reports, one lever, and in the end one piece of physics.
- *
- * "The gate applies way too much torque way too fast" — a 2.5in hinged bar squaring a chassis
- * at a wall's rate. Then, damped: "even if I hit it with a large impact it doesn't turn me",
- * "the chassis is barely turning". Then: "it is a collision to the SIDE of the robot, meaning
- * the robot should turn INTO THE CORNER."
- *
- * The square-up model could not answer the last one at any setting, because it is a stand-in
- * for a distributed FACE contact — it settles a chassis flush, and a normal push through a
- * POINT can only ever swing a robot away from what it touched. Catching a post with your flank
- * does the opposite, and the reason is friction: the post drags that side back. So the arm is
- * solved as what it is, a single point contact on a rigid body:
- *
- *   J_n = -(1 + e)(v_p . n) / (1 + (r x n)^2 / (I/m))
- *   J_t = clamp(-(v_p . t) / (1 + (r x t)^2 / (I/m)), -mu J_n, mu J_n)
- *
- * with the normal impulse read from the approach the collision pass actually removed this tick
- * (a steady push is a small one every tick, a hard hit one big one), and I/m the square
- * chassis's (l^2 + w^2)/12, so mass cancels. The arm's own softness multiplies it: while the
- * lever has travel, part of the push lifts it rather than landing on the robot.
- */
-{
-  const armTurn = (y0: number, seconds = 3): number => {
-    const w = mkWorld('match', 'red', 5);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.balls.length = 0; // the field CLEARED — 'held by robot 99' drops them back to the floor on tick one
-    for (const a of ['red', 'blue'] as const) w.humanPlayers[a].box.length = 0;
-    const r = w.robots[0];
-    r.pos = { x: 52, y: y0 };
-    r.heading = 0; // nose at the wall; the arm meets a FLANK, not the front
-    r.fieldCentric = false;
-    const h0 = r.heading;
-    for (let i = 0; i < Math.round(seconds / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })]]));
-    }
-    let d = r.heading - h0;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    return (d * 180) / Math.PI;
-  };
-  // below the gate the arm is off the robot's LEFT flank, so INTO the corner is +y (CCW)
-  const below = [-12, -9, -6, -3].map((y) => armTurn(y));
-  /**
-   * ...WHERE THE FLANK ACTUALLY REACHES THE STUB. The stub spans y in [-1, 2] and a chassis is
-   * 16.5in wide, so from y = -12 the flank's top edge passes 2.75in below it and from y = -9 it
-   * grazes it by a quarter inch: neither is a hit, and the solver turns the robot by nothing
-   * for neither. The old '> 2 at every offset' came from the hand-rolled impulse counting a
-   * near-miss inside its half-inch touch slop as contact. From y = -6 and -3 the stub is met
-   * on the flank and the robot is turned INTO the corner — 23° and 3°, the second small
-   * because the front corner then meets the classifier face and is squared against it.
-   */
-  check(
-    'a SIDE hit on the gate arm turns the robot INTO the corner',
-    Math.abs(below[0]) < 1 && Math.abs(below[1]) < 1 && below[2] > 2 && below[3] > 1,
-    `driving at the wall from y = -12/-9/-6/-3: turned ${below.map((t) => t.toFixed(0)).join('/')}deg toward the gate (the first two never reach the stub)`,
-  );
-  /**
-   * ...AND THE ARM'S TRAVEL IS WHAT DECIDES HOW MUCH OF IT LANDS.
-   *
-   * A lever absorbs a push with its travel: shove a closed arm and most of the shove goes into
-   * lifting it, and at full lift there is none left, so the whole impulse arrives. "If the gate
-   * is fully open, then that part acts like a wall essentially for collisions."
-   */
-  const pinnedTurn = (holdAt: number): number => {
-    const w = mkWorld('match', 'red', 5);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.balls.length = 0; // the field CLEARED — 'held by robot 99' drops them back to the floor on tick one
-    for (const a of ['red', 'blue'] as const) w.humanPlayers[a].box.length = 0;
-    const r = w.robots[0];
-    r.pos = { x: 52, y: -6 };
-    r.heading = 0;
-    r.fieldCentric = false;
-    const h0 = r.heading;
-    for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-      w.goals.red.gatePos = holdAt;
-      w.goals.red.gateOpen = holdAt >= GATE_PASS_FRAC;
-      w.goals.red.gateLatch = GATE_OPEN_LATCH_S;
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })]]));
-    }
-    let d = r.heading - h0;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    return Math.abs((d * 180) / Math.PI);
-  };
-  const shut = pinnedTurn(0);
-  const stop = pinnedTurn(1);
-  /**
-   * ...AND A SIDE HIT CANNOT LIFT THE LEVER. The handle hinges UP when pushed toward the wall;
-   * a chassis sliding into it along the wall loads the hinge sideways, which is rigid. So the
-   * closed arm — the full 2.5in stub — turns the robot MORE than the retracted one, whose stub
-   * is half an inch, and the old expectation (the closed arm 'gives', turning the robot less
-   * than half as much) was the scaled heuristic torque, not a lever. Measured 30.5° vs 23.1°.
-   */
-  check(
-    '...and the closed arm, being the longer stub, turns the robot more than one at its stop',
-    shut > stop && stop > 2,
-    `pinned shut it turns the robot ${shut.toFixed(1)}deg, at its stop ${stop.toFixed(1)}deg`,
-  );
-}
-
 {
   /**
    * ...AND NOTHING SNAPS A ROBOT ROUND, structure or not.
@@ -5495,722 +1653,6 @@ function queueTenth(w: World): void {
     'ramming a wall at speed never snaps the chassis round — it squares it',
     worstTick < 4 && peakAng < 3.5,
     `worst ${worstTick.toFixed(1)}deg in one tick (was 6.9), peak spin ${peakAng.toFixed(2)} rad/s (was 3.23)`,
-  );
-}
-
-// ---- ramming a structure SQUARES you up, from any angle and either end -------------
-// "Even when I ram with the back of the chassis where there is no intake, the robot only turns
-// if I impact it at certain specific angles, weird." The classifier passed `contacts.length > 1`
-// as its square-to flag, so a single-corner press took applyContactTorque's PIVOT mode, which
-// has no flush cap: measured across ten approach angles it spun rather than settling. A flat
-// face aligns a chassis whether one corner is on it or two — the walls have always said so.
-{
-  const ramInto = (target: Vec2, faceAngle: number, tiltDeg: number, backwards: boolean): number => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.balls.length = 0; // off-field positions are clamped back INTO the field, onto one point
-    const r = w.robots[0];
-    r.heading = (backwards ? faceAngle + Math.PI : faceAngle) + (tiltDeg * Math.PI) / 180;
-    r.pos = { x: target.x - Math.cos(faceAngle) * 16, y: target.y - Math.sin(faceAngle) * 16 };
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    run(w, cmd({ driveY: backwards ? -1 : 1 }), 4);
-    // how far off FLUSH it ended, mod 90 — the chassis is square, and raw heading deltas are
-    // meaningless because the sim wraps the angle (which is what made this look like a 360)
-    const q = Math.PI / 2;
-    let rel = r.heading - faceAngle;
-    rel -= Math.round(rel / q) * q;
-    return Math.abs((rel * 180) / Math.PI);
-  };
-  const tilts = [-30, -20, -12, -6, -3, 3, 6, 12, 20, 30];
-  const cl = classifierRect('blue');
-  const worstAt = (target: Vec2, faceAngle: number) =>
-    Math.max(...tilts.flatMap((t) => [ramInto(target, faceAngle, t, false), ramInto(target, faceAngle, t, true)]));
-  const wall = Math.max(...tilts.flatMap((t) => [ramInto({ x: 0, y: FIELD_HALF }, Math.PI / 2, t, false), ramInto({ x: 0, y: FIELD_HALF }, Math.PI / 2, t, true)]));
-  const classifier = worstAt({ x: cl.x1, y: 20 }, Math.PI);
-  check(
-    'ramming a wall squares the chassis up, at every angle and either end',
-    wall < 1,
-    `worst of 20 approaches: ${wall.toFixed(1)}deg off flush`,
-  );
-  check(
-    '...and so does the classifier, which used to pivot instead of squaring',
-    classifier < 1,
-    `worst of 20 approaches: ${classifier.toFixed(1)}deg off flush`,
-  );
-}
-
-// ---- NOTHING JITTERS: no entity oscillates in place --------------------------------
-// "Get rid of all cases where artifacts or robots jitter." Jitter is a direction reversal with
-// nothing to show for it — two constraints taking turns rather than resolving. This sweeps the
-// contact situations where that can hide and measures the symptom directly: reversals per
-// second on anything whose NET movement over the window is under two inches.
-{
-  const jitterIn = (
-    label: string,
-    seconds: number,
-    build: () => World,
-    commands: () => Map<number, RobotCommand>,
-  ): { label: string; rate: number; who: string; amp: number } => {
-    const w = build();
-    const prev = new Map<string, { x: number; y: number }>();
-    const last = new Map<string, { x: number; y: number }>();
-    const first = new Map<string, { x: number; y: number }>();
-    const rev = new Map<string, number>();
-    const amp = new Map<string, number>(); // how far each reversal actually moves it
-    const see = (key: string, p: { x: number; y: number }) => {
-      if (!first.has(key)) first.set(key, { ...p });
-      const l = last.get(key);
-      last.set(key, { ...p });
-      if (!l) return;
-      const sx = p.x - l.x;
-      const sy = p.y - l.y;
-      if (hyp(sx, sy) < 0.02) return; // at rest is not jitter
-      const pv = prev.get(key);
-      prev.set(key, { x: sx, y: sy });
-      if (pv && sx * pv.x + sy * pv.y < 0 && hyp(pv.x, pv.y) > 0.02) {
-        rev.set(key, (rev.get(key) ?? 0) + 1);
-        amp.set(key, Math.max(amp.get(key) ?? 0, hyp(sx, sy)));
-      }
-    };
-    for (let i = 0; i < Math.round(seconds / SIM_DT); i++) {
-      step(w, SIM_DT, commands());
-      for (const b of w.balls) if (b.state.kind === 'ground') see(`artifact ${b.id}`, b.pos);
-      for (const r of w.robots) see(`robot ${r.id}`, r.pos);
-    }
-    let worst = { label, rate: 0, who: '-', amp: 0 };
-    for (const [k, n] of rev) {
-      const net = hyp(last.get(k)!.x - first.get(k)!.x, last.get(k)!.y - first.get(k)!.y);
-      if (net > 2) continue; // it went somewhere — being pushed around is not jitter
-      // ...and a reversal you cannot SEE is not jitter either. A tenth of an inch is a fifth
-      // of a pixel at match zoom; what the eye reads as buzzing is amplitude, not count.
-      if ((amp.get(k) ?? 0) < 0.1) continue;
-      if (n / seconds > worst.rate) worst = { label, rate: n / seconds, who: k, amp: amp.get(k) ?? 0 };
-    }
-    return worst;
-  };
-  const twoBots = (place: (w: World) => void): (() => World) => () => {
-    const w = createWorld('match', 5, [
-      { id: 0, alliance: 'blue', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
-      { id: 1, alliance: 'red', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
-    ]);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.robots[1].pos = { x: -60, y: -60 };
-    w.robots[0].fieldCentric = false;
-    place(w);
-    return w;
-  };
-  const push = () => new Map([[0, cmd({ driveY: 1 })], [1, cmd({})]]);
-  const results = [
-    // a robot leaning on each kind of structure, off-square so it has something to settle into
-    jitterIn('robot on the wall', 4, twoBots((w) => { w.robots[0].pos = { x: 40, y: 55 }; w.robots[0].heading = Math.PI / 2 + 0.2; }), push),
-    jitterIn('robot in a corner', 4, twoBots((w) => { w.robots[0].pos = { x: 55, y: -55 }; w.robots[0].heading = -Math.PI / 4 + 0.15; }), push),
-    jitterIn('robot on the goal face', 4, twoBots((w) => { w.robots[0].pos = { x: 45, y: 45 }; w.robots[0].heading = Math.PI / 4 + 0.2; }), push),
-    jitterIn('robot on the classifier', 4, twoBots((w) => { w.robots[0].pos = { x: classifierRect('red').x0 - 11, y: 20 }; w.robots[0].heading = 0.2; }), push),
-    jitterIn('robot on a robot', 4, twoBots((w) => { w.robots[0].pos = { x: 0, y: 0 }; w.robots[0].heading = 0; w.robots[1].pos = { x: 19, y: 2 }; w.robots[1].heading = 0.3; }), push),
-    // ...and a robot shovelling a pile of artifacts into a wall, which is where it was real:
-    // separation pushed a pair apart, the wall clamp put them back, 27 reversals a second
-    jitterIn('a clump shoved into a wall', 4, twoBots((w) => {
-      let k = 0;
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground') continue;
-        if (k < 9) b.pos = { x: 30 + (k % 3) * 5.2, y: 60 + Math.floor(k / 3) * 5.2 };
-        k++;
-      }
-      w.robots[0].pos = { x: 35, y: 40 };
-      w.robots[0].heading = Math.PI / 2;
-    }), push),
-    // ...and an untouched match, left alone
-    jitterIn('an untouched match', 8, twoBots((w) => { w.robots[0].pos = { x: 0, y: 0 }; }), () => new Map()),
-  ];
-  /**
-   * SIX OF THE SEVEN ARE CLEAN, and the seventh is stated rather than hidden.
-   *
-   * What fixed the rest is damping the corrections: `BALL_SEPARATION_RELAX` takes out half an
-   * overlap per pass instead of all of it, over more passes. A full correction overshoots the
-   * moment another constraint disagrees, which against a wall it always does — separation
-   * pushes a pair apart, the clamp puts them back, and they trade positions forever (27
-   * reversals a second on a shoved clump; none now).
-   *
-   * STILL OPEN: an artifact squeezed between a driving robot's INTAKE and two walls, which
-   * oscillates 1.48in at 4 reversals a second. It is the squeeze case the classifier note
-   * already describes — no single constraint can answer it, and the two that can each answer
-   * half take turns. Three narrower fixes were tried and all made it worse: extending the
-   * wall-pinch jam rule from the chassis to any solid part of the robot (the corner-gap check
-   * went from 0 artifacts through to 2), rate-limiting the eviction to a step per pass (25
-   * reversals a second at 2.30in), and reverting resting artifacts near a robot (a robot can
-   * then creep through one). The bound below holds it where it is so it cannot get worse.
-   */
-  const bad = results.filter((r) => r.label !== 'robot in a corner' && r.rate > 3);
-  const corner = results.find((r) => r.label === 'robot in a corner')!;
-  check(
-    'nothing jitters against the field, another robot, or a shoved clump',
-    bad.length === 0,
-    bad.length === 0
-      ? `worst of the six clean scenes: ${Math.max(...results.filter((r) => r.label !== 'robot in a corner').map((r) => r.rate)).toFixed(1)} reversals/s`
-      : bad.map((r) => `${r.label}: ${r.who} ${r.rate.toFixed(0)}/s at ${r.amp.toFixed(2)}in`).join('; '),
-  );
-  check(
-    'the one squeeze that still rings — an artifact between a driving intake and two walls — does not get worse',
-    corner.rate <= 5 && corner.amp <= 1.8,
-    `${corner.rate.toFixed(0)} reversals/s at ${corner.amp.toFixed(2)}in (was 15/s before the separation was damped)`,
-  );
-}
-
-// ---- an artifact that lands ON a robot does not jolt ------------------------------
-// "If an artifact lands on top of the robot and I move away, they jolt." A robot had no TOP:
-// an artifact coming down on the chassis fell into it and was ejected out of the nearest FACE
-// by ballRobotContact — measured, dropped on the middle of an 18in chassis it moved 9.8in
-// sideways in ONE tick and was then shovelled along by the departing robot to 76 in/s.
-{
-  const w = mkWorld('free', 'blue', 3);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: -40, y: -40 };
-  r.heading = 0;
-  r.vel = { x: 0, y: 0 };
-  r.fieldCentric = false;
-  r.hopper = [];
-  for (const b of w.balls) b.pos = { x: 400, y: 400 };
-  const ball = w.balls[0];
-  ball.state = { kind: 'flight', target: 'blue' };
-  ball.pos = { x: r.pos.x, y: r.pos.y }; // dead centre of the chassis
-  ball.vel = { x: 0, y: 0 };
-  ball.z = 24;
-  ball.vz = 0;
-  let worstStep = 0;
-  let worstJump = 0;
-  let landedOnTop = false;
-  for (let i = 0; i < Math.round(1.5 / SIM_DT); i++) {
-    const v0 = { ...ball.vel };
-    const p0 = { ...ball.pos };
-    step(w, SIM_DT, new Map([[0, cmd(i > 12 ? { driveY: -1 } : {})]]));
-    if (Math.abs(ball.z - ROBOT_HEIGHT) < 1e-6) landedOnTop = true;
-    worstStep = Math.max(worstStep, hyp(ball.vel.x - v0.x, ball.vel.y - v0.y));
-    // how far it moved, against what its own speed could account for
-    const moved = hyp(ball.pos.x - p0.x, ball.pos.y - p0.y);
-    worstJump = Math.max(worstJump, moved - (Math.max(hyp(v0.x, v0.y), hyp(ball.vel.x, ball.vel.y)) * SIM_DT + 0.05));
-  }
-  check(
-    'an artifact that lands on a robot rests on its TOP instead of being ejected out a face',
-    landedOnTop && worstJump < 0.2,
-    `worst unexplained move ${Math.max(0, worstJump).toFixed(2)}in in a tick (was 9.8), landed on top: ${landedOnTop}`,
-  );
-  check(
-    '...and driving out from under it does not step its speed',
-    worstStep < 10,
-    `worst single-tick velocity change ${worstStep.toFixed(1)} in/s (the shove reached 76)`,
-  );
-}
-
-// ---- a funnel intake can collect an artifact from a CORNER -----------------------
-// "I can't intake a ball in the corner anymore. Please fix this for sloped and triangle."
-// A wedge preset only swallows at the THROAT and the suction walks the artifact there, which
-// works in open field and cannot work in a corner: an artifact tucked against two walls sits
-// 2.5in off each, and the chassis half-width (9in) is what decides how close the robot can
-// get, so it ends up ~6.5in off the mouth's centre — outside a 3in throat, and unable to be
-// moved any closer by anything. A real funnel pressed into a corner still collects it.
-{
-  const grab = (intake: 'sloped' | 'triangle' | 'vector', headingDeg: number, start: { x: number; y: number }) => {
-    const w = mkWorld('free', 'blue', 3, { intake });
-    startMatch(w);
-    const r = w.robots[0];
-    r.hopper = [];
-    for (const b of w.balls) b.pos = { x: -400, y: -400 };
-    // the audience corner IS the loading zone, and the human player restocks it mid-scene:
-    // three artifacts staged across the diagonal approach, which the robot now stops against
-    // instead of ploughing through. The scene is about the ONE artifact in the corner.
-    for (const a of ['red', 'blue'] as const) w.humanPlayers[a].box.length = 0;
-    const ball = w.balls[0];
-    const c = FIELD_HALF - BALL_RADIUS;
-    ball.state = { kind: 'ground' };
-    ball.pos = { x: c, y: -c }; // the AUDIENCE corner — the far corners are goal structure
-    ball.vel = { x: 0, y: 0 };
-    ball.z = 0;
-    ball.vz = 0;
-    r.heading = (headingDeg * Math.PI) / 180;
-    r.fieldCentric = false;
-    r.pos = { ...start };
-    r.vel = { x: 0, y: 0 };
-    for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ intake: true, driveY: 0.4 })]]));
-      if (ball.state.kind === 'held') return (i + 1) * SIM_DT;
-    }
-    return NaN;
-  };
-  const wall = (['sloped', 'triangle'] as const).map((i) => grab(i, 0, { x: 48, y: -62 }));
-  // 40°, not 45: dead on the diagonal both front corners meet the two walls at once, which is a
-  // symmetric wedge with no torque to turn out of — an unstable equilibrium a real robot leaves
-  // by noise and this one, having none, does not. A driver never hits a corner to the degree.
-  const diag = (['sloped', 'triangle'] as const).map((i) => grab(i, -40, { x: 52, y: -52 }));
-  check(
-    'a funnel intake collects an artifact tucked in a corner',
-    wall.every((t) => t > 0) && diag.every((t) => t > 0),
-    `sloped/triangle: along the wall ${wall.map((t) => t.toFixed(2)).join('/')}s, on the diagonal ${diag.map((t) => t.toFixed(2)).join('/')}s`,
-  );
-}
-
-// ---- an artifact DROPPED on the intake is not swallowed by it ---------------------
-// "The intake should not intake if a ball drops on top of it." The mouth is open at BALL
-// HEIGHT — that is what lets an artifact roll in under the rollers, and why ballRobotContact
-// returns nothing there — but it was open from ABOVE too, so an artifact dropped on the
-// intake fell through the rollers into the throat and was taken. Measured before: a drop from
-// 24in onto the mouth of all three presets ended up held, as did one onto the front of the
-// CHASSIS, which the contact code ejects forward into the mouth on its way down.
-{
-  let swallowed = 0;
-  let cleared = 0;
-  for (const intake of ['sloped', 'vector', 'triangle'] as const) {
-    const spec = { ...DEFAULT_SPEC, intake };
-    const hl = spec.length / 2;
-    const tip = hl + INTAKE_PRESETS[intake].reach;
-    for (const lx of [hl - 1, (hl + tip) / 2, tip]) {
-      for (const ly of [0, 3]) {
-        const w = mkWorld('free', 'blue', 3, { intake });
-        startMatch(w);
-        const r = w.robots[0];
-        r.pos = { x: 0, y: 0 };
-        r.heading = 0;
-        r.vel = { x: 0, y: 0 };
-        r.hopper = [];
-        for (const b of w.balls) b.pos = { x: 400, y: 400 };
-        const ball = w.balls[0];
-        ball.state = { kind: 'flight', target: 'blue' };
-        ball.pos = { x: lx, y: ly };
-        ball.vel = { x: 0, y: 0 };
-        ball.z = 24;
-        ball.vz = 0;
-        let held = false;
-        for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-          step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-          if (ball.state.kind === 'held') {
-            held = true;
-            break;
-          }
-        }
-        if (held) swallowed++;
-        else if (rot({ x: ball.pos.x - r.pos.x, y: ball.pos.y - r.pos.y }, -r.heading).x > tip) cleared++;
-      }
-    }
-  }
-  check(
-    'an artifact dropped on the intake is not swallowed by it',
-    swallowed === 0,
-    `${swallowed} of 18 drops taken (was 11 of 18)`,
-  );
-  check(
-    '...it lands on the rollers and is thrown clear in front of the mouth',
-    cleared === 18,
-    `${cleared} of 18 ended up forward of the roller line (was 6)`,
-  );
-}
-
-// ---- the chassis is not transparent to an artifact in the air ----------------------
-// Reported: "artifacts sometimes jump over the chassis". `collideBallRobot` skipped the
-// chassis outright on the grounds that Rapier had already resolved it — but Rapier only
-// solves GROUND artifacts. Anything in `flight` state got no chassis at all, and `flight` is
-// not just a shot in the air: a landed artifact keeps bouncing in that state until its vz
-// falls below the settle threshold, so an artifact hopping across the floor sailed straight
-// through a robot. Measured 12 of 15 low approaches crossing, 7.3in deep, one of them at z=0.
-{
-  let crossed = 0;
-  let total = 0;
-  let over = 0;
-  for (const z0 of [0, 2, 5, 9, 13]) {
-    for (const vz0 of [0, 30, 60]) {
-      const w = mkWorld('match', 'red', 5);
-      startMatch(w);
-      w.match.phase = 'teleop';
-      for (const b of w.balls) {
-        b.state = { kind: 'ground' };
-        b.pos = { x: -40, y: -60 };
-        b.vel = { x: 0, y: 0 };
-        b.z = 0;
-        b.vz = 0;
-      }
-      const r = w.robots[0];
-      r.pos = { x: 0, y: 0 };
-      r.heading = Math.PI / 2;
-      r.vel = { x: 0, y: 0 };
-      r.hopper = [];
-      const b = w.balls[0];
-      b.state = { kind: 'flight' };
-      b.pos = { x: -30, y: 0 };
-      b.vel = { x: 90, y: 0 };
-      b.z = z0;
-      b.vz = vz0;
-      let peak = z0;
-      for (let i = 0; i < 90; i++) {
-        step(w, SIM_DT, new Map());
-        peak = Math.max(peak, b.z);
-      }
-      total++;
-      if (b.pos.x > 12) {
-        // crossing is only legitimate if it actually cleared the robot's height
-        if (peak > ROBOT_HEIGHT) over++;
-        else crossed++;
-      }
-    }
-  }
-  check(
-    'an artifact in the air cannot pass through a chassis it never cleared',
-    crossed === 0,
-    `${crossed}/${total} crossed below robot height (${over} legitimately went over)`,
-  );
-}
-
-// ---- a robot OUTSIDE the channel cannot touch what is inside it --------------------
-// Reported: "i can still interact with the balls in the classifier. i can push them around
-// with the corner of the chassis". `railBlock` measures distance from a chassis to the rail
-// CENTRELINE and cannot see the classifier wall in between — and the centreline sits
-// RAMP_RAIL_INSET (3in) from that wall, less than an artifact radius. So a robot leaning on
-// the OUTSIDE of the classifier came within a radius of artifacts it was walled off from, and
-// drove the column up-ramp at RAIL_PUSH_RATE: measured as far as s=22.4, two feet up a channel
-// the robot was never in.
-{
-  let worstUp = 0;
-  let where = '';
-  for (const py of [-12, -5, 1, 3]) {
-    for (const head of [0.5, 1.0, 2.2]) {
-      const w = mkWorld('match', 'blue', 42);
-      startMatch(w);
-      w.match.phase = 'teleop';
-      fillBlueRail(w);
-      const r = w.robots[0];
-      r.pos = { x: -55, y: py };
-      r.heading = head;
-      r.fieldCentric = false;
-      r.hopper = [];
-      r.vel = { x: 0, y: 0 };
-      const above = () =>
-        new Map(
-          w.balls
-            .filter((b) => b.state.kind === 'rail' && (b.state as { s: number }).s > RAIL_OPEN_S)
-            .map((b) => [b.id, (b.state as { s: number }).s] as const),
-        );
-      for (let i = 0; i < 30; i++) step(w, SIM_DT, new Map([[0, cmd({})]]));
-      const start = above();
-      // jam in and out of the gate zone, the motion that produced the report
-      for (let i = 0; i < Math.round(5 / SIM_DT); i++) {
-        const push = Math.floor(i / 40) % 2 === 0 ? 1 : -1;
-        step(w, SIM_DT, new Map([[0, cmd({ driveY: push, driveX: 0.4 * push })]]));
-        for (const [id, sNow] of above()) {
-          const s0 = start.get(id);
-          if (s0 === undefined) continue;
-          if (sNow - s0 > worstUp) {
-            worstUp = sNow - s0;
-            where = `y${py} h${head.toFixed(1)}`;
-          }
-        }
-      }
-    }
-  }
-  check(
-    'a robot working the gate zone never drives the column up inside the classifier',
-    worstUp < 0.1,
-    `worst net up-move above the mouth ${worstUp.toFixed(2)}in ${where}`,
-  );
-}
-
-// ---- the column is single file, but it is not a ruled line -------------------------
-// Reported: "the balls come down all in a single file line at the same tilted angle which is
-// uncanny". The flow is solved in 1D along `s`, so every artifact used to be placed on the
-// exact centreline. Single file is right (the channel is one artifact wide); perfectly
-// collinear is not — see `railWander`.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.match.phase = 'teleop';
-  fillBlueRail(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  for (let i = 0; i < 120; i++) step(w, SIM_DT, new Map());
-  const rail = w.balls.filter((b) => b.state.kind === 'rail');
-  const centre = railPos('blue', 0).x;
-  const offs = rail.map((b) => b.pos.x - centre);
-  const slop = CLASSIFIER_W / 2 - BALL_RADIUS;
-  const spread = Math.max(...offs) - Math.min(...offs);
-  check(
-    'artifacts on the ramp do not sit on one ruled line',
-    rail.length >= 6 && spread > 0.08,
-    `${rail.length} artifacts spread over ${spread.toFixed(2)}in`,
-  );
-  // ...but the channel is a MARBLE TRACK, so it is a hint of offset and not a wobble. The
-  // first cut used most of the slop and read as balls rolling around in there.
-  check(
-    'and they stay in the groove doing it — a track guides, it does not wobble',
-    offs.every((o) => Math.abs(o) <= slop * RAIL_WANDER_AMP + 1e-6),
-    `worst offset ${Math.max(...offs.map(Math.abs)).toFixed(2)}in, bound ${(slop * RAIL_WANDER_AMP).toFixed(2)}in`,
-  );
-}
-
-// ---- a robot's BODY is where the column stops, wherever that body is ------------
-// Reported: "balls can STILL pass through the robot when the robot is slightly blocking the
-// classifier". The mouth used to be ONE point with a boolean on it, so a robot sitting on the
-// outflow stopped the flow while the floor stayed at RAIL_EXIT_S — the column stacked 7.3in
-// INSIDE the chassis and sat there. A robot 9in to the side, touching nothing, blocked the
-// whole ramp for the same reason. Both are geometry, so both are measured here.
-{
-  const offsets = [0, 6, 9, 13, 18];
-  const inside: number[] = [];
-  const drained: number[] = [];
-  for (const off of offsets) {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    fillBlueRail(w);
-    const ids = w.balls.slice(0, 9).map((b) => b.id);
-    const g = w.goals.blue;
-    const mouth = railPos('blue', RAIL_EXIT_S);
-    const r = w.robots[0];
-    r.heading = 0;
-    let worst = 0;
-    for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-      r.pos = { x: mouth.x - off, y: mouth.y }; // pinned, straddling the mouth by `off`
-      r.vel = { x: 0, y: 0 };
-      g.gatePos = 1;
-      g.gateOpen = true;
-      step(w, SIM_DT, new Map());
-      if (i < 90) continue; // let the staged column settle out of its spawn positions first
-      for (const b of w.balls) {
-        if (!ids.includes(b.id) || b.state.kind === 'held') continue;
-        worst = Math.max(worst, pointDepthInRobot(r, b.pos));
-      }
-    }
-    inside.push(worst);
-    drained.push(w.balls.filter((b) => ids.includes(b.id) && b.state.kind === 'rail').length);
-  }
-  check(
-    'no artifact ever rests inside the robot, at any coverage of the mouth',
-    inside.every((d) => d <= 0),
-    offsets.map((o, i) => `${o}in:${inside[i].toFixed(2)}`).join(' '),
-  );
-  check(
-    'a robot ON the mouth holds the column; one CLEAR of it does not',
-    drained[0] === 9 && drained[drained.length - 1] === 0,
-    `on=${drained[0]} clear=${drained[drained.length - 1]} all=${drained.join(',')}`,
-  );
-}
-
-// ---- gate outflow stops against a parked robot instead of shoving it ------------
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  fillBlueRail(w);
-  // robot parked square across the tunnel exit path (as when intaking the drain)
-  const r = w.robots[0];
-  r.pos = { x: -63, y: -14 };
-  r.heading = Math.PI / 2; // front (intake) faces the oncoming flow
-  r.vel = { x: 0, y: 0 };
-  const start = { x: r.pos.x, y: r.pos.y };
-  w.goals.blue.gatePos = 1; // arm lifted open; flow keeps it up while balls stream out
-  w.goals.blue.gateOpen = true;
-  run(w, cmd({}), 4);
-  const moved = Math.hypot(r.pos.x - start.x, r.pos.y - start.y);
-  const strays = w.balls.filter(
-    (b) => b.state.kind === 'ground' && Math.abs(b.pos.x) > FIELD_HALF - BALL_RADIUS + 0.01,
-  ).length;
-  // a quarter inch, not an inch and a half: a 0.2 lb artifact cannot move a robot, and the pinned
-  // circle is sized so that it never tries (see `world.ts`, a pin may undo the robot's own advance
-  // and nothing more) — the old tolerance was hiding 0.8in of drain-shove
-  check('gate outflow cannot shove the parked robot', moved < 0.25, `moved ${moved.toFixed(2)} in`);
-  check('blocked outflow stays in the field', strays === 0, `${strays} out of bounds`);
-
-  /**
-   * GATE INTAKING. "When gate intaking, the balls that come down should not be pushing the robot
-   * away." The robot parks with its flank on the wall and its mouth over the exit, intake on, and
-   * the drain rolls into it: three are taken and the rest pile against the held ones. Every one
-   * of those arrivals used to end as a pin, and the pinned circle — sized as the full inflated
-   * ball and carrying the ball's velocity — shoved the robot 0.8in over one drain. The circle is
-   * now tangent to a robot that did not move toward the ball and stands still unless that robot
-   * is pushing, so the drain cannot move the robot at all: 0.00in measured, at either standoff.
-   */
-  for (const standoff of [2, 6]) {
-    const w2 = mkWorld('match', 'blue', 42);
-    startMatch(w2);
-    w2.match.phase = 'teleop';
-    for (const a of ['red', 'blue'] as const) {
-      w2.humanPlayers[a].box = ['green', 'green', 'green', 'green', 'green', 'green'];
-      w2.humanPlayers[a].nextPlaceAt = 1e9;
-    }
-    w2.balls.length = RAMP_SLOTS;
-    fillBlueRail(w2);
-    const r2 = w2.robots[0];
-    r2.hopper = [];
-    r2.fieldCentric = false;
-    const exit = railPos('blue', RAIL_EXIT_S);
-    const tip = DEFAULT_SPEC.length / 2 + INTAKE_PRESETS[DEFAULT_SPEC.intake].reach;
-    r2.heading = Math.PI / 2;
-    r2.pos = { x: -FIELD_HALF + r2.spec.width / 2 + 0.1, y: exit.y - tip - standoff };
-    r2.vel = { x: 0, y: 0 };
-    const p0 = { x: r2.pos.x, y: r2.pos.y };
-    let worst = 0;
-    for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-      w2.goals.blue.gatePos = 1;
-      w2.goals.blue.gateOpen = true;
-      w2.goals.blue.gateLatch = 1;
-      step(w2, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-      worst = Math.max(worst, hyp(r2.pos.x - p0.x, r2.pos.y - p0.y));
-    }
-    check(
-      `gate intaking with the tip ${standoff}in below the exit: the drain does not move the robot`,
-      worst < 0.1 && r2.hopper.length === 3,
-      `displaced ${worst.toFixed(2)}in at most (was 0.80), hopper ${r2.hopper.length}`,
-    );
-  }
-}
-
-// ---- point-blank shots never miss ------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 11);
-  startMatch(w);
-  const r = w.robots[0];
-  r.pos = { x: -44, y: 54 }; // right up against the blue goal face
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ fire: true }), 0.5);
-  run(w, cmd({}), 6);
-  const g = w.goals.blue;
-  check('point-blank shots all enter the goal', g.classifiedCount + g.overflowCount === 3, `entered=${g.classifiedCount + g.overflowCount}`);
-
-  const w2 = mkWorld('match', 'blue', 12);
-  startMatch(w2);
-  const r2 = w2.robots[0];
-  r2.pos = { x: 30, y: 35 }; // long cross-court shot
-  run(w2, cmd({ fire: true }), 0.5);
-  run(w2, cmd({}), 6);
-  const g2 = w2.goals.blue;
-  check('long shots all enter the goal', g2.classifiedCount + g2.overflowCount === 3, `entered=${g2.classifiedCount + g2.overflowCount}`);
-}
-
-// ---- auto intake & auto fire ----------------------------------------------------
-{
-  const w = mkWorld('free', 'blue', 5);
-  const r = w.robots[0];
-  r.hopper = [];
-  w.balls = w.balls.filter((b) => b.state.kind !== 'held'); // clear physical preloads too
-  r.autoIntake = true;
-  r.autoFire = true;
-  // drive up the blue spike column with no buttons held
-  r.pos = { x: 46, y: -55 };
-  r.heading = Math.PI / 2;
-  r.fieldCentric = false;
-  run(w, cmd({ driveY: 0.5 }), 2.5);
-  run(w, cmd({}), 6);
-  const g = w.goals.blue;
-  check('auto intake collected without holding intake', r.hopper.length > 0 || g.classifiedCount + g.overflowCount > 0);
-  check('auto fire launched without pressing fire', g.classifiedCount + g.overflowCount >= 1, `entered=${g.classifiedCount + g.overflowCount}`);
-}
-
-// ---- auto fire must NOT fire before the match starts ------------------------------
-{
-  const w = mkWorld('match', 'blue', 13);
-  w.robots[0].autoFire = true;
-  run(w, cmd({}), 2); // still in 'pre'
-  check('auto fire holds until AUTO begins', w.robots[0].hopper.length === 3, `hopper=${w.robots[0].hopper.length}`);
-  startMatch(w);
-  run(w, cmd({}), 2);
-  check('auto fire engages once AUTO starts', w.robots[0].hopper.length === 0, `hopper=${w.robots[0].hopper.length}`);
-}
-
-// ---- match flow ---------------------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 9);
-  startMatch(w);
-  run(w, cmd({ driveY: 0.5 }), 25);
-  // park clearly off every launch line before the end-of-auto assessment
-  w.robots[0].pos = { x: 0, y: -20 };
-  w.robots[0].vel = { x: 0, y: 0 };
-  w.robots[0].heading = 0;
-  run(w, cmd({}), 6);
-  check('auto -> transition after 30s', w.match.phase === 'transition', w.match.phase);
-  run(w, cmd({}), 8.1);
-  check('transition -> teleop after 8s', w.match.phase === 'teleop', w.match.phase);
-  run(w, cmd({}), 120.2);
-  check('teleop -> post after 2:00', w.match.phase === 'post', w.match.phase);
-  check('leave scored (drove off launch lines)', w.match.scores.blue.leave === 3, `${w.match.scores.blue.leave}`);
-}
-
-// ---- Rule A: artifacts assessed BEFORE teleop (incl. the post-auto transition
-// settle) count as AUTO, not TELEOP -------------------------------------------------
-{
-  const w = mkWorld('match', 'blue', 7);
-  w.match.phase = 'transition';
-  addClassified(w, 'blue');
-  addOverflow(w, 'blue');
-  check(
-    'artifact scored during transition banks as AUTO, not TELEOP (Rule A)',
-    w.match.scores.blue.autoClassified === 3 &&
-      w.match.scores.blue.autoOverflow === 1 &&
-      w.match.scores.blue.teleClassified === 0 &&
-      w.match.scores.blue.teleOverflow === 0,
-    `autoC=${w.match.scores.blue.autoClassified} autoO=${w.match.scores.blue.autoOverflow} teleC=${w.match.scores.blue.teleClassified}`,
-  );
-}
-
-// ---- Rules C/D/F: resting-position scores (TELEOP PATTERN / DEPOT / BASE) are
-// RE-ASSESSED through the post-match settle window, not frozen on the buzzer tick ---
-{
-  const spec = { length: 11.5, width: 12, intake: 'vector' as const };
-  const w = mkWorld('match', 'blue', 8, spec);
-  const zone = baseZone('blue');
-  const cx = (zone.x0 + zone.x1) / 2;
-  const cy = (zone.y0 + zone.y1) / 2;
-  // enter 'post' with the robot AWAY from its base, as if the buzzer caught it out
-  w.robots[0].pos = { x: 0, y: 0 };
-  w.match.phase = 'post';
-  w.match.phaseTimeLeft = 0;
-  assessMatchEnd(w); // buzzer snapshot: no base credit yet
-  check('base not yet earned at the buzzer', w.match.scores.blue.base === 0, `base=${w.match.scores.blue.base}`);
-  // the robot comes to rest inside its base during the settle window
-  w.robots[0].pos = { x: cx, y: cy };
-  w.robots[0].heading = 0;
-  w.robots[0].vel = { x: 0, y: 0 };
-  run(w, cmd({}), 0.1); // post-phase ticks -> stepMatch recomputes assessMatchEnd
-  check(
-    'BASE re-assessed as the robot settles in the post window (Rules C/D/F)',
-    w.match.scores.blue.base === 10,
-    `base=${w.match.scores.blue.base}`,
-  );
-}
-
-// ---- base parking counts wheels on the ground, not intake overhang --------------
-{
-  const spec = { length: 11.5, width: 12, intake: 'vector' as const };
-  const zone = baseZone('blue');
-  const cx = (zone.x0 + zone.x1) / 2;
-  const cy = (zone.y0 + zone.y1) / 2;
-
-  // all four wheels inside, wide/long intake hanging out over the edge -> FULL
-  const w1 = mkWorld('free', 'blue', 14, spec);
-  w1.robots[0].pos = { x: cx, y: cy };
-  w1.robots[0].heading = Math.PI / 2; // intake pokes out the top of the base
-  assessMatchEnd(w1);
-  check(
-    'base FULL credit with intake overhanging (wheels all in)',
-    w1.match.scores.blue.base === 10,
-    `base=${w1.match.scores.blue.base}`,
-  );
-
-  // only the intake reaches into the base, wheels outside -> NO credit
-  const w2 = mkWorld('free', 'blue', 14, spec);
-  w2.robots[0].pos = { x: cx, y: zone.y1 + 11 };
-  w2.robots[0].heading = -Math.PI / 2; // intake dips into the zone from above
-  assessMatchEnd(w2);
-  check(
-    'intake-only overhang earns no base credit (no wheel touching)',
-    w2.match.scores.blue.base === 0,
-    `base=${w2.match.scores.blue.base}`,
-  );
-
-  // just ONE wheel in (parked over the inner corner) -> PARTIAL
-  const w3 = mkWorld('free', 'blue', 14, spec);
-  w3.robots[0].pos = { x: zone.x0, y: zone.y1 }; // one wheel dips over the corner
-  w3.robots[0].heading = Math.PI / 2;
-  const wheelsIn = wheelContacts(w3.robots[0]).filter((c) => inRect(c, zone)).length;
-  assessMatchEnd(w3);
-  check(
-    'a single wheel in the base earns partial credit',
-    wheelsIn === 1 && w3.match.scores.blue.base === 5,
-    `wheelsIn=${wheelsIn} base=${w3.match.scores.blue.base}`,
   );
 }
 
@@ -6312,8 +1754,14 @@ function queueTenth(w: World): void {
      on purpose, and pressed by accident it re-aims the sticks mid-match — the last thing to put
      on a button a thumb lands on. It has a default KEY (H), so the key half below still holds. */
   const PAD_DEFAULT_EXEMPT: readonly string[] = ['driveFrame'];
-  const noKey = KEY_ACTIONS.filter((a) => DEFAULT_BINDINGS.keys[a].length === 0);
-  const noPad = PAD_ACTIONS.filter((a) => DEFAULT_BINDINGS.pad.buttons[a].length === 0 && !PAD_DEFAULT_EXEMPT.includes(a));
+  /* THE FTC25 CONTROLS' OWN ACTIONS ARE OUT OF THIS RULE ON THE DSIM MAP, ON PURPOSE (owner,
+     2026-10-12: DSim controls stay exactly as they were). They are team 2627's gamepad layout,
+     unbound in `DEFAULT_BINDINGS` and not on the DSim screen. The other half of the rule binds
+     them where they belong: every one has a pad bind on the FTC25 map (the block after this). */
+  const noKey = KEY_ACTIONS.filter((a) => DEFAULT_BINDINGS.keys[a].length === 0 && !FTC25_ONLY.includes(a));
+  const noPad = PAD_ACTIONS.filter(
+    (a) => DEFAULT_BINDINGS.pad.buttons[a].length === 0 && !PAD_DEFAULT_EXEMPT.includes(a) && !FTC25_ONLY.includes(a),
+  );
   const exemptBound = PAD_DEFAULT_EXEMPT.filter((a) => (DEFAULT_BINDINGS.pad.buttons[a as PadAction] ?? []).length > 0);
   check(
     'bindings: every action has a default key, and a default pad button unless it is on the exempt list',
@@ -6590,7 +2038,8 @@ function ramOffCentreSamples(
   const results: { victim: number; peakW: number; aggressor: number }[] = [];
   let next = 0;
   for (let i = 0; i < sampleTicks[sampleTicks.length - 1]; i++) {
-    step(w, SIM_DT, cmds);
+    // FLAT: fifteen seconds of shove carries the victim along y=0 to the far wall, ON the beam
+    stepFlat(w, SIM_DT, cmds);
     peakW = Math.max(peakW, Math.abs(b.angVel));
     if (next < sampleTicks.length && i + 1 === sampleTicks[next]) {
       results.push({ victim: d(b.heading), peakW, aggressor: d(a.heading) });
@@ -6704,7 +2153,8 @@ function ramOffCentreSamples(
   let peakW = 0;
   let peakH = 0;
   for (let i = 0; i < 40; i++) {
-    step(w, SIM_DT, new Map([[0, drive], [1, drive]]));
+    // FLAT: the pair straddles y≈8, and one of them riding the y=0 beam IS relative motion
+    stepFlat(w, SIM_DT, new Map([[0, drive], [1, drive]]));
     peakW = Math.max(peakW, Math.abs(a.angVel), Math.abs(b.angVel));
     peakH = Math.max(peakH, offFlush(a.heading), offFlush(b.heading));
   }
@@ -6751,8 +2201,9 @@ function ramOffCentreSamples(
   b.pos = { x: 0, y: 0 }; b.heading = 0; b.vel = { x: 0, y: 0 }; b.angVel = 0; b.fieldCentric = false;
   a.pos = { x: -34, y: 5 }; a.heading = 0; a.vel = { x: 0, y: 0 }; a.angVel = 0; a.fieldCentric = false;
   // drive up to a real resting contact (no seeded overlap), then pivot ONLY
+  // FLAT: the pivoting robot starts at (-34,5), astride the y=0 beam
   for (let i = 0; i < 60; i++) {
-    step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })], [1, cmd({})]]));
+    stepFlat(w, SIM_DT, new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })], [1, cmd({})]]));
   }
   const h0 = a.heading;
   const bh0 = b.heading;
@@ -6764,7 +2215,7 @@ function ramOffCentreSamples(
   for (let i = 0; i < 240; i++) {
     const before = a.heading;
     const vBefore = b.heading;
-    step(w, SIM_DT, pivot);
+    stepFlat(w, SIM_DT, pivot);
     // UNWRAP: raw heading deltas read as full 360 turns when the chassis crosses +/-pi, and
     // this check is about per-tick reversals, so a wrap would look like a 351-degree flip.
     const d = wrapAngle(a.heading - before);
@@ -6929,227 +2380,6 @@ function ramOffCentreSamples(
   );
 }
 
-// ---- a robot on an AUTO PATH is solid ---------------------------------------
-{
-  /**
-   * It used to get no Rapier body at all, so for the whole 30s of AUTO it was a GHOST — an
-   * opponent drove clean through it end to end and it never moved a thousandth of an inch.
-   * Kinematic: everybody collides with it, nothing pushes it, and the path still owns its pose.
-   */
-  const w = createWorld('free', 7, [setup(0, 'blue', {}, 0), setup(1, 'red', {}, 1)]);
-  const [a, b] = w.robots;
-  a.pos = { x: -20, y: 0 }; a.heading = 0; a.vel = { x: 0, y: 0 }; a.angVel = 0; a.fieldCentric = false;
-  b.pos = { x: 0, y: 0 }; b.heading = 0; b.vel = { x: 0, y: 0 }; b.angVel = 0;
-  b.autoPathActive = true;
-  const cmds = new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })]]);
-  for (let i = 0; i < 120; i++) { a.heading = 0; step(w, SIM_DT, cmds); }
-  check(
-    'a robot on an auto path is SOLID — an opponent cannot drive through it',
-    a.pos.x < b.pos.x - 4,
-    `pusher stopped at x=${a.pos.x.toFixed(2)}, path robot at x=${b.pos.x.toFixed(2)}`,
-  );
-  check(
-    '...and is never shoved off its path by the robot hitting it',
-    Math.abs(b.pos.x) < 1e-9 && Math.abs(b.pos.y) < 1e-9 && Math.abs(b.heading) < 1e-9,
-    `path robot (${b.pos.x.toFixed(4)}, ${b.pos.y.toFixed(4)}) h=${b.heading.toFixed(4)}`,
-  );
-}
-
-// ---- ...and a MOVING one pushes what is in its way, instead of eating it -----
-{
-  /**
-   * The stationary case above is the easy half, and it was the only half. A path robot
-   * TELEPORTS 1.56 in/tick at the default spec, and a kinematic body the solver believes is
-   * stationary leaves nothing but the soft positional correction acting on the bystander —
-   * which cannot keep up. Measured with a zero linvel: the overlap grew monotonically to
-   * 15.2 in on a 17.5 in pair, the SAT min axis then flipped, the bystander was ejected 4 in
-   * sideways and 3 in backwards, and the path robot passed clean through it. `world.ts` gives
-   * the body the sweep velocity now.
-   */
-  const path: AutoPathData = {
-    fileName: 'smoke',
-    startPoint: { x: -50, y: 0, heading: 'constant', degrees: 0 },
-    lines: [{ id: 'l1', endPoint: { x: 50, y: 0, heading: 'constant', degrees: 0 } }],
-    // the sequence is what actually advances the traversal — `lines` alone never moves
-    sequence: [{ kind: 'path', lineId: 'l1' }],
-  };
-  // RED on purpose: paths are stored in the canonical goalSide=+1 (red) frame and MIRRORED for
-  // blue at spawn, so a blue robot would run this one right-to-left and the geometry below
-  // would be measuring the wrong side of it.
-  const w = createWorld('match', 7, [
-    { ...setup(0, 'red', {}, 0), autoPath: path, autoPathEnabled: true },
-    setup(1, 'blue', {}, 1),
-  ]);
-  for (const ball of w.balls) ball.state = { kind: 'held', robot: 99 };
-  const [mover, bystander] = w.robots;
-  w.match.phase = 'auto';
-  w.match.phaseTimeLeft = 30;
-  w.match.preCountdown = undefined;
-  mover.pos = { x: -50, y: 0 }; mover.heading = 0; mover.vel = { x: 0, y: 0 }; mover.angVel = 0;
-  bystander.pos = { x: 0, y: 0 }; bystander.heading = 0; bystander.vel = { x: 0, y: 0 }; bystander.angVel = 0;
-  bystander.fieldCentric = false;
-  /** the footprint's x-interval, for a chassis whose heading is 0 or pi (both are here). */
-  const spanX = (r: RobotState) => {
-    const e = robotExtents(r);
-    const ahead = Math.cos(r.heading) > 0 ? e.front : e.rear;
-    const behind = Math.cos(r.heading) > 0 ? e.rear : e.front;
-    return { lo: r.pos.x - behind, hi: r.pos.x + ahead };
-  };
-  let worstOverlap = -Infinity;
-  let passedThrough = false;
-  let worstSideways = 0;
-  let worstSpeed = 0;
-  let worstOut = -Infinity;
-  const startedAt = bystander.pos.x;
-  let pushed = 0;
-  // DIRECTION-AGNOSTIC, and read AFTER the first tick: a path is stored in the canonical frame
-  // and MIRRORED per alliance, and `initializePathTraversal` teleports the chassis onto its
-  // start point — so which side the mover approaches from is not knowable until it has run.
-  let side0 = 0;
-  // ONLY WHILE THE PATH IS DRIVING, and only while the bystander still has ROOM. Once it
-  // reaches the far wall it is crushed between a wall and a kinematic body that will not
-  // yield, which is a different (and bounded — see below) situation.
-  for (let i = 0; i < 120 && mover.autoPathActive; i++) {
-    step(w, SIM_DT, new Map());
-    worstSpeed = Math.max(worstSpeed, Math.hypot(bystander.vel.x, bystander.vel.y), Math.hypot(mover.vel.x, mover.vel.y));
-    for (const corner of robotCorners(bystander)) {
-      worstOut = Math.max(worstOut, Math.abs(corner.x) - FIELD_HALF, Math.abs(corner.y) - FIELD_HALF);
-    }
-    if (!mover.autoPathActive) break;
-    if (side0 === 0) side0 = Math.sign(mover.pos.x - bystander.pos.x);
-    if (Math.abs(bystander.pos.x) > FIELD_HALF - 16) continue; // out of room — see the crush check
-    const m = spanX(mover);
-    const b2 = spanX(bystander);
-    worstOverlap = Math.max(worstOverlap, Math.min(m.hi, b2.hi) - Math.max(m.lo, b2.lo));
-    worstSideways = Math.max(worstSideways, Math.abs(bystander.pos.y));
-    pushed = Math.abs(bystander.pos.x - startedAt);
-    if (Math.sign(mover.pos.x - bystander.pos.x) === -side0) passedThrough = true;
-  }
-  check(
-    'a MOVING auto-path robot carries a bystander instead of passing through it',
-    !passedThrough && pushed > 20,
-    `bystander driven ${pushed.toFixed(1)}in, mover at x=${mover.pos.x.toFixed(1)}`,
-  );
-  check(
-    '...without burying it (no runaway penetration, no min-axis flip)',
-    worstOverlap < 0 && worstSideways < 1,
-    `worst overlap ${worstOverlap.toFixed(2)}in (negative = never touching), sideways ${worstSideways.toFixed(2)}in`,
-  );
-  /* ------------------------------------------------ a path WAIT ends, and the path goes on ----
-     Both of a segment's waits re-armed themselves, so either one stalled the whole auto:
-       • waitBeforeMs fired whenever `pathSegmentProgress === 0` — which is ALSO the state the
-         robot is in the tick its own timer runs out, so it armed again, forever.
-       • waitAfterMs armed the timer but left the sequence index on the FINISHED segment with
-         progress still at 1.0, so the tick it expired re-entered the same branch.
-     A wait is now recorded (`pathWaitedBefore`) / advanced with the timer, exactly as a `wait`
-     sequence item already was. The measurable consequence is the only one that matters: the
-     robot reaches the end of a two-segment path with waits on it. */
-  {
-    const waited: AutoPathData = {
-      fileName: 'waits',
-      startPoint: { x: -50, y: 0, heading: 'constant', degrees: 0 },
-      lines: [
-        { id: 'w1', endPoint: { x: -20, y: 0, heading: 'constant', degrees: 0 }, waitBeforeMs: 150, waitAfterMs: 150 },
-        { id: 'w2', endPoint: { x: 10, y: 0, heading: 'constant', degrees: 0 } },
-      ],
-      sequence: [{ kind: 'path', lineId: 'w1' }, { kind: 'path', lineId: 'w2' }],
-    };
-    const ww = createWorld('match', 11, [{ ...setup(0, 'red', {}, 0), autoPath: waited, autoPathEnabled: true }]);
-    for (const ball of ww.balls) ball.state = { kind: 'held', robot: 99 };
-    ww.match.phase = 'auto';
-    ww.match.phaseTimeLeft = 30;
-    ww.match.preCountdown = undefined;
-    const runner = ww.robots[0];
-    let waitTicks = 0;
-    for (let i = 0; i < 600 && runner.autoPathActive; i++) {
-      step(ww, SIM_DT, new Map());
-      if (runner.pathWaitTimer > 0) waitTicks++;
-    }
-    // RED, so the canonical path is MIRRORED at spawn: it runs +50 → −10, not −50 → +10
-    check(
-      'auto path: a segment WAIT expires and the path finishes (it used to re-arm forever)',
-      !runner.autoPathActive && runner.pos.x < -5,
-      `x=${runner.pos.x.toFixed(1)} active=${runner.autoPathActive}`,
-    );
-    // and the waits were actually SERVED — a fix that merely skipped them would also finish.
-    // 150 ms before + 150 ms after = 18 ticks at 60 Hz, and nothing like the 540 the stall
-    // spent sitting on the start point.
-    check(
-      'auto path: the waits were served once each, not skipped and not repeated',
-      waitTicks >= 14 && waitTicks <= 24,
-      `${waitTicks} ticks waiting`,
-    );
-  }
-
-  /**
-   * ...and crushing it against the far wall is a bounded SHOVE, not a launch. A kinematic body
-   * that will not yield plus a wall that will not move is the one genuinely over-constrained
-   * case on this field; the solver squirted the pair out at 959 in/s — six field widths a
-   * second — before  bounded it.
-   */
-  /**
-   * ...AND IT IS NEVER DRIVEN OUT OF THE FIELD. The crisp invariant is the CENTRE: a chassis
-   * whose centre leaves the board has been expelled, and that is what used to happen — the
-   * bystander reached y=76.88 against a wall at 72, i.e. entirely outside, because a kinematic
-   * body does not yield and nothing else contained it.
-   *
-   * The corner bound is looser than `PHYS_CONTAIN_SLOP` on purpose. Containment acts on
-   * translation, and the square-up pass rotates the chassis afterwards — a 14.5x16.5 footprint
-   * resting on a wall sweeps up to ~3in further out as it turns, which is ordinary and which
-   * the next tick resolves. What is not ordinary is being carried out bodily.
-   */
-  check(
-    '...and is never driven out of the field, however hard it is crushed',
-    worstOut < 2.5 && Math.abs(bystander.pos.x) < FIELD_HALF && Math.abs(bystander.pos.y) < FIELD_HALF,
-    `deepest corner past the wall ${worstOut.toFixed(2)}in, centre (${bystander.pos.x.toFixed(1)}, ${bystander.pos.y.toFixed(1)}) inside +/-${FIELD_HALF}`,
-  );
-  check(
-    '...and crushing it against the wall stays a shove, not a launch',
-    worstSpeed <= PHYS_MAX_ROBOT_SPEED * 1.001,
-    `peak ${worstSpeed.toFixed(1)} in/s vs cap ${PHYS_MAX_ROBOT_SPEED}`,
-  );
-}
-
-// ---- ...and nothing writes to a path robot's chassis behind the accumulator ---
-{
-  /**
-   * `applyAcc` skips auto-path robots, but the GATE HANDLE resolves a point impulse inside
-   * `squareUpStatics` and writes `vel`/`heading`/`angVel` straight onto the chassis, bypassing
-   * it. That was unreachable while the press came only from the robot's own drive (a path
-   * robot's velocity is written by the path, so `pressAlong` returned 0); `pressOn`'s
-   * transmitted load gave it a press it never had, and an opponent ramming a path robot parked
-   * on the blue gate handle rotated it 7.4° off the heading its path commands — permanently,
-   * because a `wait` segment never rewrites heading.
-   */
-  const path: AutoPathData = {
-    fileName: 'smoke-gate',
-    startPoint: { x: -53.65, y: 4.5, heading: 'constant', degrees: 180 },
-    lines: [],
-    sequence: [{ kind: 'wait', durationMs: 20000 }],
-  };
-  const w = createWorld('match', 7, [
-    { ...setup(0, 'blue', {}, 0), autoPath: path, autoPathEnabled: true },
-    setup(1, 'red', {}, 1),
-  ]);
-  for (const ball of w.balls) ball.state = { kind: 'held', robot: 99 };
-  const [parked, pusher] = w.robots;
-  w.match.phase = 'auto';
-  w.match.phaseTimeLeft = 30;
-  w.match.preCountdown = undefined;
-  parked.pos = { x: -53.65, y: 4.5 }; parked.heading = Math.PI; parked.vel = { x: 0, y: 0 }; parked.angVel = 0;
-  pusher.pos = { x: -29.65, y: 10.5 }; pusher.heading = Math.PI; pusher.vel = { x: 0, y: 0 }; pusher.angVel = 0;
-  pusher.fieldCentric = false;
-  const ram = new Map([[1, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })]]);
-  for (let i = 0; i < 240; i++) { pusher.heading = Math.PI; step(w, SIM_DT, ram); }
-  const drift = Math.abs(wrapAngle(parked.heading - Math.PI));
-  for (let i = 0; i < 240; i++) step(w, SIM_DT, new Map([[1, cmd({ driveY: -1, leftDrive: -1, rightDrive: -1 })]]));
-  check(
-    'ramming a parked auto-path robot onto the gate handle does not rotate it off its path',
-    drift < 1e-9 && Math.abs(wrapAngle(parked.heading - Math.PI)) < 1e-9,
-    `off-heading ${((drift * 180) / Math.PI).toFixed(3)}° during, ${((Math.abs(wrapAngle(parked.heading - Math.PI)) * 180) / Math.PI).toFixed(3)}° after`,
-  );
-}
-
 // ---- the bespoke contact response does not depend on WHICH ROBOT IS WHICH ----
 {
   /**
@@ -7275,21 +2505,6 @@ function ramOffCentreSamples(
   const da = Math.hypot(a.pos.x - a0.x, a.pos.y - a0.y);
   const db = Math.hypot(b.pos.x - b0.x, b.pos.y - b0.y);
   check('equal-mass robots separate symmetrically', Math.abs(da - db) < 0.05, `da=${da.toFixed(2)} db=${db.toFixed(2)}`);
-}
-
-// ---- every bundled preset obeys its drivetrain's clamps ---------------------
-{
-  let ok = true;
-  const bad: string[] = [];
-  for (const p of ROBOT_PRESETS) {
-    const mass = massLimits(p.drivetrain, p.flywheelInertia);
-    const rpm = rpmLimits(p.drivetrain);
-    if (p.massLb < mass.min || p.massLb > mass.max || p.driveRpm < rpm.min || p.driveRpm > rpm.max) {
-      ok = false;
-      bad.push(`${p.name}(${p.massLb}lb/${p.driveRpm}rpm want mass[${mass.min},${mass.max}] rpm[${rpm.min},${rpm.max}])`);
-    }
-  }
-  check('all ROBOT_PRESETS satisfy their drivetrain mass/rpm clamps (incl. inertia floor)', ok, bad.join(' '));
 }
 
 // ---- accel ordering: tank > swerve > mecanum > xdrive -----------------------
@@ -7613,7 +2828,10 @@ function ramOffCentreSamples(
   r4.fieldCentric = false;
   r4.pos = { x: 0, y: -40 };
   r4.heading = Math.PI / 2;
-  for (let i = 0; i < 140; i++) step(w4, SIM_DT, new Map([[0, fwd1]]));
+  // FLAT: x=0 is the line of a beam, and a mecanum driving down it has wheels on the ridge.
+  // 80 ticks, not 140: the Chain Reaction build reaches the far wall (y≈63) on tick 87, and the
+  // impact, not the drive, is what moved x
+  for (let i = 0; i < 80; i++) stepFlat(w4, SIM_DT, new Map([[0, fwd1]]));
   check('mecanum holds a perfect line + heading (no wobble)', Math.abs(r4.pos.x) < 1e-6 && Math.abs(r4.heading - Math.PI / 2) < 1e-6, `x=${r4.pos.x.toFixed(3)}`);
 
   // MODULE OPTIMIZATION (pod flip): a 180° reversal must NOT rotate the pods —
@@ -7797,26 +3015,6 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   );
 }
 
-// ---- power draw: a spun-up flywheel is slightly slower far from goal ---------
-{
-  const measure = (inertia: number) => {
-    const w = mkWorld('free', 'blue', 9, { flywheelInertia: inertia });
-    const r = w.robots[0];
-    // far from the blue goal + heading +x so driving forward keeps distance high
-    r.pos = { x: 0, y: -60 }; r.heading = 0; r.vel = { x: 0, y: 0 }; r.fieldCentric = false;
-    run(w, cmd({ driveY: 1 }), 0.7);
-    return Math.hypot(r.vel.x, r.vel.y);
-  };
-  const v0 = measure(0), v1 = measure(1);
-  const ratio = v1 / v0;
-  check('power draw: spun-up flywheel is ~10% slower far from goal', ratio > 0.8 && ratio < 0.97, `inertia1 ${v1.toFixed(1)} vs inertia0 ${v0.toFixed(1)} (${(ratio * 100).toFixed(0)}%)`);
-  check(
-    'power draw leaves driveParams calibration byte-identical',
-    driveParams({ ...DEFAULT_SPEC, flywheelInertia: 1 }).maxSpeed ===
-      driveParams({ ...DEFAULT_SPEC, flywheelInertia: 0 }).maxSpeed,
-  );
-}
-
 // ---- per-drivetrain clamps + inertia→mass-floor coupling --------------------
 {
   check('massLimits mecanum floor is 18 at inertia 0', massLimits('mecanum', 0).min === 18);
@@ -7833,7 +3031,9 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     const sw = accelOf('swerve'), me = accelOf('mecanum');
     check('swerve out-accels a 500rpm max-inertia min-weight mecanum', sw > me, `swerve ${sw.toFixed(1)} vs mecanum ${me.toFixed(1)}`);
   }
+  // Chain Reaction: a game-less save is BIOBUZZ's now, and BIOBUZZ has its own chassis floors
   const s = coerceSettings({
+    game: 'chain',
     spec: { drivetrain: 'swerve', massLb: 18, driveRpm: 600, flywheelInertia: 0.8 },
   });
   const floor = massLimits('swerve', 0.8).min; // 21.5 + 4·0.8 = 24.7
@@ -7841,22 +3041,19 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   check('coerceSettings clamps swerve rpm down to 500', s.spec.driveRpm === 500, `${s.spec.driveRpm}`);
 }
 
-// ---- saved robot / auto libraries are validated + capped ---------------------
+// ---- the saved robot library is validated + capped -------------------------
+// (The `.pp` auto-path library was DECODE's — the one game that ran auto paths. Since DECODE was
+// removed, 2026-10-12, it is not read or coerced, only carried opaque for the account copy.)
 {
-  const validAuto = (name: string) => ({
-    fileName: name,
-    startPoint: { x: 0, y: 0, heading: 'constant', degrees: 0 },
-    lines: [],
-    sequence: [],
-  });
+  const autos = [{ fileName: 'a.pp', startPoint: { x: 0, y: 0 }, lines: [] }, null, { bogus: true }];
   const lib = coerceSettings({
     savedRobots: Array.from({ length: 6 }, () => ({ drivetrain: 'mecanum' })),
-    savedAutos: [validAuto('a'), null, { bogus: true }, validAuto('b'), validAuto('c'), validAuto('d'), validAuto('e')],
+    savedAutos: autos,
   });
   check('savedRobots capped at MAX_SAVED_ROBOTS', lib.savedRobots.length === 3, `${lib.savedRobots.length}`);
   check('each saved robot is coerced to a legal spec', lib.savedRobots.every((r) => r.driveRpm >= 200 && r.massLb >= 10));
-  check('savedAutos drops invalid entries + caps at MAX_SAVED_AUTOS', lib.savedAutos.length === 4, `${lib.savedAutos.length}`);
-  check('defaultSettings starts with empty libraries', coerceSettings({}).savedRobots.length === 0 && coerceSettings({}).savedAutos.length === 0);
+  check('savedAutos is carried verbatim, not read (DECODE data)', JSON.stringify(lib.retired?.savedAutos) === JSON.stringify(autos));
+  check('defaultSettings starts with an empty library', coerceSettings({}).savedRobots.length === 0);
 }
 
 // ---- the performance read-out's level ------------------------------------------
@@ -7943,27 +3140,27 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     check('queue counts: anyoneQueued mirrors it', anyoneQueued(pres(0, 1)) && !anyoneQueued(pres(0, 0)));
 
     // ---- PER-GAME depth --------------------------------------------------
-    // The matchmaker buckets by game, so a combined count told a DECODE player that
+    // The matchmaker buckets by game, so a combined count told a BIOBUZZ player that
     // a Chain Reaction queuer was waiting FOR THEM — a number they could act on and
     // never match from, printed next to the button whose whole job is to get them to
     // act on it. Depth is per game now, everywhere it is shown.
-    const gp = (decode: [number, number], chain: [number, number]) =>
+    const gp = (biobuzz: [number, number], chain: [number, number]) =>
       ({
         online: 0,
         signedIn: 0,
-        queues: { '1v1': decode[0] + chain[0], '2v2': decode[1] + chain[1] },
+        queues: { '1v1': biobuzz[0] + chain[0], '2v2': biobuzz[1] + chain[1] },
         gameQueues: {
-          decode: { '1v1': decode[0], '2v2': decode[1] },
+          biobuzz: { '1v1': biobuzz[0], '2v2': biobuzz[1] },
           chain: { '1v1': chain[0], '2v2': chain[1] },
         },
       }) as never;
 
-    check('per-game: DECODE reads its OWN 1v1 depth, not the combined one',
-      queuesFor(gp([1, 0], [5, 0]), 'decode')?.['1v1'] === 1);
+    check('per-game: BIOBUZZ reads its OWN 1v1 depth, not the combined one',
+      queuesFor(gp([1, 0], [5, 0]), 'biobuzz')?.['1v1'] === 1);
     check('per-game: ...and Chain Reaction reads its own',
       queuesFor(gp([1, 0], [5, 0]), 'chain')?.['1v1'] === 5);
     check('per-game: a game with an empty queue lists NO modes',
-      queuedModes(gp([0, 0], [3, 0]), 'decode').length === 0);
+      queuedModes(gp([0, 0], [3, 0]), 'biobuzz').length === 0);
     check('per-game: ...while the busy one still does',
       j(queuedModes(gp([0, 0], [3, 0]), 'chain')) === j(['1v1']));
     check('per-game: an unknown game reads as empty, never as the combined total',
@@ -7971,9 +3168,9 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
 
     // the TOP BAR lists every game that has somebody waiting, each labelled — and
     // omits a game with an empty queue ENTIRELY, name included
-    const games = ['decode', 'chain'] as const;
+    const games = ['biobuzz', 'chain'] as const;
     const both = queuedGames(gp([1, 3], [2, 0]), games);
-    check('top bar: every busy game is listed', j(both.map((g) => g.game)) === j(['decode', 'chain']));
+    check('top bar: every busy game is listed', j(both.map((g) => g.game)) === j(['biobuzz', 'chain']));
     check('top bar: with each of its non-empty modes',
       j(both[0].modes) === j([{ mode: '1v1', n: 1 }, { mode: '2v2', n: 3 }]));
     check('top bar: a mode at 0 is dropped from a busy game',
@@ -7988,7 +3185,7 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     // rendering nothing. It is the pre-fix number, but it is the only one such a
     // server can give, and a rollout window should not blank the count.
     check('per-game: an old server without gameQueues still yields a count',
-      queuesFor(pres(2, 0), 'decode')?.['1v1'] === 2);
+      queuesFor(pres(2, 0), 'biobuzz')?.['1v1'] === 2);
     check('per-game: ...and the labelled top-bar form shows nothing rather than guessing',
       queuedGames(pres(2, 0), games).length === 0);
 
@@ -9061,7 +4258,6 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     );
   }
 
-
     // ---- the room itself is browser-portable, which is what makes hosting in a tab possible
     {
       const roomSrc = readFileSync('server/room.ts', 'utf8');
@@ -9830,7 +5026,7 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     let disposed = 0, left = 0;
     const fakeLobby = () => ({ dispose: () => disposed++, leaveQueue: () => left++ }) as never;
     const mk = (over: Partial<Parameters<typeof parkQueue>[0]> = {}) => ({
-      lobby: fakeLobby(), mode: '1v1' as const, game: 'decode' as const, challenge: null,
+      lobby: fakeLobby(), mode: '1v1' as const, game: 'biobuzz' as const, challenge: null,
       since: 1000, size: 1, need: 2,
       assignedRoom: null, start: null, strategy: null, found: false, joined: false, error: null, ...over,
     });
@@ -9838,8 +5034,8 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
     // THE GAME TRAVELS WITH THE SEARCH. Parking exists so the player can go and do
     // something else, and "something else" can be the OTHER game — which moves
     // `settings.game`. A queue that does not remember its own game gets adopted as
-    // whatever the player wandered into: queue Chain Reaction, start a DECODE run,
-    // and the match-found takeover came up as DECODE for a CR match. The parked
+    // whatever the player wandered into: queue Chain Reaction, start a BIOBUZZ run,
+    // and the match-found takeover came up as BIOBUZZ for a CR match. The parked
     // search is the authority, not the live setting.
     check('queue keeper: nothing parked to begin with', peekQueue() === null);
     parkQueue(mk({ game: 'chain' }));
@@ -9849,7 +5045,7 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
       (updateQueue({ size: 3 }), peekQueue()?.game === 'chain'),
     );
     check('queue keeper: ...and hands it back on adopt', takeQueue()?.game === 'chain');
-    check('queue keeper: DECODE searches carry their own game too', (parkQueue(mk()), peekQueue()?.game === 'decode'));
+    check('queue keeper: BIOBUZZ searches carry their own game too', (parkQueue(mk()), peekQueue()?.game === 'biobuzz'));
     takeQueue();
 
     let seen = 0;
@@ -10145,7 +5341,8 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   }];
   const w = createWorld('match', 1, setups);
   const rspec = w.robots[0].spec;
-  check('createWorld sanitizes a spoofed setup spec (length)', rspec.length <= INTAKE_PRESETS[rspec.intake].maxLength, `${rspec.length}`);
+  // a Chain Reaction world bounds length by the BUILD (chassis + deployed sweepers inside the prism)
+  check('createWorld sanitizes a spoofed setup spec (length)', rspec.length <= chainSizeLimits(rspec).maxLength, `${rspec.length}`);
   check('createWorld sanitizes a spoofed setup spec (width)', rspec.width <= ROBOT_MAX_SIZE, `${rspec.width}`);
   check('createWorld clamps an out-of-range startIndex (no crash, robot spawned)', w.robots.length === 1);
 
@@ -10155,45 +5352,6 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   const patched = sanitizePlayerPatch({ spec: { width: 999, massLb: 9999 } }, { ...player, clientId: 'x' });
   check('sanitizePlayerPatch clamps a spoofed spec patch', (patched.spec?.width ?? 0) <= ROBOT_MAX_SIZE, `${patched.spec?.width}`);
   check('sanitizePlayerPatch ignores unknown/absent fields (empty patch is a no-op)', Object.keys(sanitizePlayerPatch({ bogus: 1 }, { ...player, clientId: 'x' })).length === 0);
-
-  // AUTO-PATH BOUNDS. A path arrives from a hand-editable file picker AND from the wire, is
-  // stored on `RobotState`, and rides every snapshot and replay — `lines` was the only array
-  // that was bounded. ⚠️ EQUALITIES, not `<=`: a `<=` bound also passes when the field is
-  // DELETED, which is exactly what this same change does to `shapes`.
-  {
-    const fat = coerceAutoPath({
-      fileName: 'x'.repeat(500),
-      startPoint: { x: 0, y: 0, heading: 'constant', degrees: 0 },
-      lines: Array.from({ length: 500 }, (_, i) => ({
-        id: `l${i}`,
-        endPoint: { x: 1, y: 1, heading: 'constant', degrees: 0 },
-        controlPoints: Array.from({ length: 50 }, () => ({ x: 1, y: 1 })),
-        waitBeforeMs: 1e9,
-        waitAfterMs: -5,
-        waitBeforeName: 'nope',
-        waitAfterName: 'nope',
-      })),
-      shapes: Array.from({ length: 5000 }, (_, i) => ({ id: `s${i}`, type: 'rect' })),
-      sequence: Array.from({ length: 5000 }, () => ({ kind: 'wait', durationMs: 1e9 })),
-      version: 'v'.repeat(500),
-      timestamp: 't'.repeat(500),
-    })!;
-    check('coerceAutoPath bounds `lines`', fat.lines.length === 200, `${fat.lines.length}`);
-    check('coerceAutoPath bounds `sequence` (read every tick by pathTraversal)', (fat.sequence ?? []).length === 400, `${fat.sequence?.length}`);
-    check(
-      'coerceAutoPath bounds `controlPoints` — and NEVER to 2, which would turn a linear segment into a cubic',
-      fat.lines[0].controlPoints?.length === 8,
-      `${fat.lines[0].controlPoints?.length}`,
-    );
-    check(
-      'coerceAutoPath clamps ALL THREE waits that reach robot.pathWaitTimer',
-      fat.lines[0].waitBeforeMs === 30000 && fat.lines[0].waitAfterMs === 0 && fat.sequence?.[0].durationMs === 30000,
-      `${fat.lines[0].waitBeforeMs}/${fat.lines[0].waitAfterMs}/${fat.sequence?.[0].durationMs}`,
-    );
-    check('coerceAutoPath DROPS `shapes` outright (nothing reads it)', !('shapes' in fat));
-    check('coerceAutoPath drops the unread wait NAMES', !('waitBeforeName' in fat.lines[0]) && !('waitAfterName' in fat.lines[0]));
-    check('coerceAutoPath bounds the free-text fields', fat.fileName.length === 120 && fat.version?.length === 40 && fat.timestamp?.length === 40);
-  }
 
   // ...and the roster never carries one at all. Autonomous does not run in a
   // server-authoritative match (`beginMatch` strips it), so a whole path on every `roster`
@@ -10274,513 +5432,6 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   check('sanitizePlayer(no game) still clamps to the DECODE intake range', decodeClamp.spec.length >= INTAKE_PRESETS.sloped.minLength, `${decodeClamp.spec.length}`);
 }
 
-// ---- vector intake: WHERE the ball enters decides the swallow time -----------
-{
-  // one ball at the mouth, capture cadence started (lastIntakeAt = now) so the
-  // first swallow must wait the position-dependent interval
-  const capTicks = (localY: number) => {
-    const w = mkWorld('free', 'blue', 6, { length: 12, width: 14, intake: 'vector' });
-    const r = w.robots[0];
-    r.hopper = []; r.pos = { x: 0, y: 0 }; r.heading = Math.PI / 2; r.fieldCentric = false; r.vel = { x: 0, y: 0 };
-    r.lastIntakeAt = w.time;
-    const wheelLine = r.spec.length / 2 + INTAKE_PRESETS.vector.reach; // 6 + 3.5
-    const b = w.balls[0]; w.balls.splice(1);
-    b.state = { kind: 'ground' };
-    // shallow contact just ahead of the face (placing dead-on the OBB face
-    // triggers the deep-push eviction); at heading π/2 world = (−localY, localX)
-    // +1, not +2: `intakeSuction`'s reach is the landing bound `tip + BALL_RADIUS −
-    // INTAKE_CATCH_LENIENCE` (= wheelLine + 1.3) since the grab became the roller nip, and a
-    // ball parked outside it is never taken at all — both ends of the ratio read the 120-tick
-    // cap and the check silently compared two misses. The ratio is what is being asserted, so
-    // the scene moves inside the reach rather than the reach moving out to the scene.
-    b.pos = { x: -localY, y: wheelLine + 1 }; b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0;
-    const commands = new Map([[0, cmd({ intake: true })]]);
-    let ticks = 0;
-    while (r.hopper.length === 0 && ticks < 120) { step(w, SIM_DT, commands); ticks++; }
-    return ticks;
-  };
-  // width 14 → vector mouth half-width 7, so an edge entry sits at localY 6 (inside
-  // the mouth); the vectoring travel to center makes it slower than a center entry
-  const center = capTicks(0), edge = capTicks(6);
-  // a RATIO rather than a fixed margin of ticks: the vectoring cost is proportional to the
-  // travel, so speeding `drawIn` up compresses the absolute gap without changing the fact.
-  check(
-    'vector intake swallows a CENTER ball faster than an EDGE ball',
-    edge >= center * 1.3,
-    `center ${center}t vs edge ${edge}t (${(edge / center).toFixed(2)}x — the vectoring travel)`,
-  );
-}
-
-// ---- sloped: driving into an OFF-CENTER ball, the slopes funnel it to center ----
-{
-  const w = mkWorld('free', 'blue', 6, { intake: 'sloped' }); // default 18-wide chassis
-  const r = w.robots[0];
-  r.hopper = []; r.pos = { x: 0, y: -12 }; r.heading = Math.PI / 2; r.fieldCentric = false; r.vel = { x: 0, y: 0 };
-  const b = w.balls[0]; w.balls.splice(1);
-  b.state = { kind: 'ground' };
-  // off-center ball ahead (on the slope path); only the physical slope + drive can
-  // bring it to the center wheels — the edge of the intake can't grab it
-  b.pos = { x: 4, y: -12 + r.spec.length / 2 + 4 }; b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0;
-  run(w, cmd({ driveY: 0.3, intake: true }), 1.3);
-  check('sloped slopes funnel an off-center ball to the center wheels', r.hopper.length === 1, `hopper=${r.hopper.length}`);
-}
-
-// ---- triangle intake devours TWO from a clump per cycle ---------------------
-{
-  const w = mkWorld('free', 'blue', 6, { length: 12, width: 14, intake: 'triangle' });
-  const r = w.robots[0];
-  r.hopper = []; r.pos = { x: 0, y: 0 }; r.heading = Math.PI / 2; r.fieldCentric = false; r.vel = { x: 0, y: 0 };
-  const throat = r.spec.length / 2 + BALL_RADIUS; // where the compliant wheels grab
-  w.balls.splice(2);
-  // two balls side by side at the throat: local (throat, ±2.5) → world (∓2.5, throat)
-  [2.5, -2.5].forEach((ly, i) => {
-    const b = w.balls[i];
-    b.state = { kind: 'ground' };
-    b.pos = { x: -ly, y: throat }; b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0;
-  });
-  run(w, cmd({ intake: true }), 0.03); // one cycle
-  check('triangle intake devours two clumped balls in one cycle', r.hopper.length === 2, `hopper=${r.hopper.length}`);
-}
-
-// ---- THE ROLLER NIP: the grab is at the wheel, and only at the wheel ---------
-/**
- * "The intake is a circular compliant wheel spinning. This means that the ball that I am
- * intaking should be directly below or very slightly in front of the center of the wheel for
- * it to be properly intook. Right now, the range is way too big."
- *
- * It was: every capture branch's forward bound was `tip + BALL_RADIUS` — an artifact's SKIN
- * merely touching the roller's FRONT FACE, its centre a full radius out in front of the wheel
- * — and the rear bound was `hl − 1`, inside the chassis. `intakeNip` replaces all three
- * fore-aft ranges with one band about `intakeAxleX`, derived from the roller's own geometry.
- * These checks pin the band, the arithmetic under it, and the hard constraint that floors it.
- */
-{
-  const PRESETS = ['sloped', 'vector', 'triangle'] as const;
-  const specOf = (intake: (typeof PRESETS)[number], length?: number): RobotSpec => ({
-    ...DEFAULT_SPEC,
-    intake,
-    length: length ?? INTAKE_PRESETS[intake].maxLength,
-    width: Math.max(DEFAULT_SPEC.width, INTAKE_PRESETS[intake].minWidth),
-  });
-
-  // ---- one geometry authority ----------------------------------------------
-  {
-    let worst = 0;
-    for (const intake of PRESETS)
-      for (const length of [INTAKE_PRESETS[intake].minLength, INTAKE_PRESETS[intake].maxLength]) {
-        const sp = specOf(intake, length);
-        const raw = sp.length / 2 + INTAKE_PRESETS[intake].reach - intakeRollerDia(sp) / 2;
-        worst = Math.max(worst, Math.abs(intakeAxleX(sp) - raw));
-      }
-    check(
-      'nip: intakeAxleX IS the drawn roller axle, at both chassis extremes of all three presets',
-      worst < 1e-9,
-      `worst disagreement ${worst.toExponential(2)}in — drawRobot's wedgeTip/axis and artifactSolids' wedgeFront both call it, so a fourth copy is how the drawn wheel and the grab drift apart`,
-    );
-  }
-
-  // ---- THE HARD CONSTRAINT -------------------------------------------------
-  /**
-   * A free ground artifact's centre can never get behind `hl + BALL_RADIUS`: the chassis is a
-   * LIVE collider against a claimed artifact, and `intakeSuction` pulls toward `(hl, 0)`, so
-   * anything the intake has hold of comes to rest with its skin flush on the front face. That
-   * rest point is `BALL_RADIUS − reach + intakeRollerDia/2` from the axle — CHASSIS-INDEPENDENT
-   * — and the band MUST contain it or the preset captures nothing at all. This is the check
-   * that catches a naive tight band, and the one that fires if INTAKE_TREAD_FRAC is lowered
-   * past its ~0.135 floor.
-   */
-  {
-    const rows = PRESETS.map((intake) => {
-      const sp = specOf(intake);
-      const nip = intakeNip(sp);
-      const face = BALL_RADIUS - INTAKE_PRESETS[intake].reach + intakeRollerDia(sp) / 2;
-      return { intake, face, nip, ok: face > -nip.back && face < nip.front };
-    });
-    check(
-      'nip: the band contains the seat an artifact actually rests at (the floor under INTAKE_TREAD_FRAC)',
-      rows.every((x) => x.ok),
-      rows
-        .map((x) => `${x.intake} seat ${x.face >= 0 ? '+' : ''}${x.face.toFixed(3)} in [-${x.nip.back.toFixed(3)}, +${x.nip.front.toFixed(3)}]`)
-        .join(' · ') + ` — at INTAKE_TREAD_FRAC ${INTAKE_TREAD_FRAC}; below ~0.135 back drops under 1.083 and TRIANGLE stops capturing entirely`,
-    );
-  }
-
-  // ---- the half-tick grid ---------------------------------------------------
-  {
-    const offGrid = PRESETS.flatMap((intake) => {
-      const m = INTAKE_PRESETS[intake].mouth;
-      return ([['capMin', m.capMin], ['capMax', m.capMax], ['clumpInterval', m.clumpInterval]] as const)
-        .filter(([, v]) => Math.abs(v / SIM_DT - Math.round(v / SIM_DT)) * SIM_DT < 0.002)
-        .map(([k, v]) => `${intake}.${k}=${v}`);
-    });
-    check(
-      'nip: every swallow interval sits off the tick boundary (the gate reads an ACCUMULATED clock)',
-      offGrid.length === 0,
-      offGrid.length ? offGrid.join(', ') : 'all on the (n − 0.5)/60 half-tick grid',
-    );
-  }
-
-  // ---- a scene helper: one robot, cleared field, artifacts placed in ROBOT frame ----
-  const nipScene = (intake: (typeof PRESETS)[number], at: [number, number][]) => {
-    const w = mkWorld('free', 'blue', 6, specOf(intake));
-    const r = w.robots[0];
-    r.hopper = [];
-    r.pos = { x: 0, y: -20 };
-    r.heading = Math.PI / 2; // +local.x is world +y
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    w.balls.length = 0;
-    for (const [lx, ly] of at) {
-      w.balls.push({
-        id: w.balls.length + 1,
-        color: 'purple',
-        pos: { x: r.pos.x - ly, y: r.pos.y + lx },
-        vel: { x: 0, y: 0 },
-        z: 0,
-        vz: 0,
-        state: { kind: 'ground' },
-      });
-    }
-    return { w, r, local: (b: (typeof w.balls)[number]) => ({ x: b.pos.y - r.pos.y, y: r.pos.x - b.pos.x }) };
-  };
-
-  // ---- THE SWALLOW HAPPENS AT THE WHEEL ------------------------------------
-  {
-    const rows = PRESETS.map((intake) => {
-      const sp = specOf(intake);
-      const hl = sp.length / 2;
-      const tip = hl + INTAKE_PRESETS[intake].reach;
-      const axle = intakeAxleX(sp);
-      const nip = intakeNip(sp);
-      const m = intakeMouth(sp);
-      const { w, r, local } = nipScene(intake, [[tip + 1, 0]]);
-      const b = w.balls[0];
-      let at = NaN;
-      // ⚠️ read the PRE-step position. `positionHeldBalls` slides a held artifact toward its
-      // slot at HELD_SLIDE_SPEED inside the very tick it is captured, so a post-step reading
-      // reports where the slide left it (2.5in further in at 150 in/s), not where the intake
-      // took it. The robot is stationary here, so the pre-step reading is exact.
-      for (let i = 0; i < Math.round(3 / SIM_DT) && Number.isNaN(at); i++) {
-        const before = b.state.kind === 'ground' ? local(b).x : NaN;
-        step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-        if (b.state.kind === 'held') at = before;
-      }
-      const d = at - axle;
-      /**
-       * ⚠️ THE CAPTURE INSTANT IS NOT OBSERVABLE FROM OUTSIDE A TICK, so the bound allows for
-       * one tick of travel. Within a single `step` the order is suction (a velocity) → the
-       * solve (which moves the artifact) → `updateIntake` (which tests the nip), so the
-       * PRE-step reading is up to `drawIn * SIM_DT` further out than the position the
-       * predicate actually saw, and the POST-step reading is further IN by a full
-       * `HELD_SLIDE_SPEED * SIM_DT` because the artifact is already sliding to its slot.
-       * Neither is the capture point; the pre-step reading plus the suction's own travel is
-       * the honest ceiling.
-       */
-      const slack = m.drawIn * SIM_DT;
-      return { intake, at, d, slack, ok: d > -nip.back - 1e-6 && d < nip.front + slack + 1e-6, took: r.hopper.length === 1 };
-    });
-    check(
-      'nip: an artifact is swallowed AT the roller, not from a radius in front of it',
-      rows.every((x) => x.took && x.ok),
-      rows.map((x) => `${x.intake} took it ${x.d >= 0 ? '+' : ''}${x.d.toFixed(2)}in from its axle (band +${intakeNip(specOf(x.intake)).front.toFixed(2)}, plus ${x.slack.toFixed(2)}in of suction travel inside the capture tick)`).join(' · ') +
-        ' — triangle used to swallow 1.08in BEHIND its own roller, its window never reaching it',
-    );
-  }
-
-  // ---- THE EFFECTIVE RANGE, which is the SUCTION's reach and not the nip's --
-  /**
-   * ⚠️ THE NIP IS NOT THE INTAKE'S RANGE, and the first pass at this got it backwards.
-   * Shrinking the GRAB to the roller changed where an artifact is swallowed and NOT where one
-   * can be taken from: measured on a stationary robot, every preset still captured out to
-   * `tip + BALL_RADIUS` afterwards, because `intakeSuction` reaches that far and walks
-   * anything it touches into the nip in 1-4 ticks — faster than before, since `drawIn` rose.
-   * "The range is way too big" is a statement about `ahead` in intakeSuction, so that is what
-   * these two checks pin: the reach itself, and that nothing past it is touched at all.
-   */
-  {
-    const reachOf = (intake: (typeof PRESETS)[number]) => {
-      const sp = specOf(intake);
-      return sp.length / 2 + INTAKE_PRESETS[intake].reach + BALL_RADIUS - INTAKE_CATCH_LENIENCE;
-    };
-    // the furthest an artifact can be taken from, swept on the centreline
-    const rows = PRESETS.map((intake) => {
-      const sp = specOf(intake);
-      const tip = sp.length / 2 + INTAKE_PRESETS[intake].reach;
-      let far = -Infinity;
-      for (let lx = tip; lx <= tip + 4; lx += 0.25) {
-        const { w, r } = nipScene(intake, [[lx, 0]]);
-        run(w, cmd({ intake: true }), 2);
-        if (r.hopper.length === 1) far = lx;
-      }
-      return { intake, far: far - tip, want: reachOf(intake) - tip };
-    });
-    check(
-      'nip: the intake takes what has LANDED on its roller, not what merely grazes the front of it',
-      rows.every((x) => x.far <= x.want + 1e-9 && x.far > x.want - 0.3),
-      rows.map((x) => `${x.intake} reaches tip + ${x.far.toFixed(2)} (bound tip + ${x.want.toFixed(2)})`).join(' · ') +
-        ' — it was tip + 2.50 on every preset, and tip + 3.60 on a wedge before the roof trim',
-    );
-    // ...and nothing past it is even disturbed
-    const past = PRESETS.map((intake) => {
-      const beyond = reachOf(intake) + 0.75;
-      const { w, r, local } = nipScene(intake, [[beyond, 0]]);
-      const b = w.balls[0];
-      const x0 = local(b).x;
-      run(w, cmd({ intake: true }), 3);
-      return { intake, took: r.hopper.length, moved: b.state.kind === 'held' ? Infinity : Math.abs(local(b).x - x0) };
-    });
-    check(
-      'nip: an artifact three quarters of an inch past that reach is neither swallowed nor sucked',
-      past.every((x) => x.took === 0 && x.moved < 0.25),
-      past.map((x) => `${x.intake}: hopper ${x.took}, moved ${x.moved.toFixed(3)}in`).join(' · ') +
-        ' — no vacuuming from a distance; an artifact must actually be on the wheel',
-    );
-  }
-
-  // ---- THE SEAT IS INSIDE THE BAND (suction runs, swallow blocked) ----------
-  {
-    const rows = PRESETS.flatMap((intake) => {
-      const sp = specOf(intake);
-      const hl = sp.length / 2;
-      const tip = hl + INTAKE_PRESETS[intake].reach;
-      return [0, 3, 5, 6.5].map((ly) => {
-        const { w, r, local } = nipScene(intake, [[tip + 1, ly]]);
-        r.lastIntakeAt = 1e9; // suction runs; the swallow can never fire
-        run(w, cmd({ intake: true }), 3);
-        const b = w.balls[0];
-        return { intake, ly, x: local(b).x, want: hl + BALL_RADIUS };
-      });
-    });
-    const worst = Math.max(...rows.map((x) => Math.abs(x.x - x.want)));
-    check(
-      'nip: a blocked artifact settles flush on the chassis face, which is the seat the band is floored to contain',
-      worst < 0.05,
-      `worst ${worst.toFixed(3)}in off hl + BALL_RADIUS over 12 entries — this fixed point is why the suction target must stay at (hl, 0) and not move to the axle`,
-    );
-  }
-
-  // ---- NO TUNNELLING: a full-throttle ram, and a fast head-on artifact ------
-  {
-    const rows = PRESETS.flatMap((intake) => {
-      const sp = specOf(intake);
-      const tip = sp.length / 2 + INTAKE_PRESETS[intake].reach;
-      // (a) robot drives 40in into a parked artifact at full throttle
-      const a = nipScene(intake, [[40, 0]]);
-      run(a.w, cmd({ driveY: 1, intake: true }), 2.5);
-      // (b) artifact fired head-on at 60 in/s into a parked mouth
-      const b = nipScene(intake, [[tip + 25, 0]]);
-      b.w.balls[0].vel = { x: 0, y: -60 }; // toward the robot (robot faces world +y)
-      run(b.w, cmd({ intake: true }), 2.5);
-      return [
-        { intake, how: 'ram', got: a.r.hopper.length },
-        { intake, how: 'head-on 60 in/s', got: b.r.hopper.length },
-      ];
-    });
-    check(
-      'nip: the band cannot be tunnelled — a full-throttle ram and a 60 in/s head-on both capture',
-      rows.every((x) => x.got >= 1),
-      rows.map((x) => `${x.intake} ${x.how}: ${x.got}`).join(' · ') +
-        ' — the band is 2.5-3.3in and the chassis face is a hard stop inside it, so a closing artifact cannot cross it unseen',
-    );
-  }
-
-  // ---- A HELD ARTIFACT MAY NEVER ADVANCE THROUGH THE WORLD -----------------
-  /**
-   * THE FIX FOR "the third ball is still being deflected too far", as an invariant rather than
-   * a number. A held artifact is SOLID to ground artifacts and is still out in FRONT of the
-   * chassis face while it slides to its slot, so if the slide is slower than the chassis the
-   * robot carries the artifact it has just swallowed FORWARD through the world and into the
-   * next one in the line — which, still touching the one behind it, chains the impulse on.
-   * Measured at HELD_SLIDE_SPEED 45 on a touching file at full throttle: the first artifact
-   * went in clean and balls two and three BOTH left at 73 in/s two ticks later, shoved 32in.
-   *
-   * So the slide must beat the FASTEST LEGAL CHASSIS, not the default one — the margin at 85
-   * in/s says nothing about a 600 rpm tank.
-   */
-  {
-    let top = 0;
-    let at = '';
-    for (const drivetrain of ['tank', 'mecanum', 'swerve', 'xdrive', 'butterfly'] as const)
-      for (const driveRpm of [200, 300, 435, 500, 600])
-        for (const massLb of [20, 30, 42])
-          for (const intake of PRESETS) {
-            const sp = coerceSpec({ ...DEFAULT_SPEC, drivetrain, driveRpm, massLb, intake });
-            const v = driveParams(sp).maxSpeed;
-            if (v > top) {
-              top = v;
-              at = `${drivetrain} ${sp.driveRpm}rpm ${sp.massLb}lb`;
-            }
-          }
-    check(
-      'nip: a held artifact is pulled in faster than any legal chassis can drive',
-      HELD_SLIDE_SPEED > top,
-      `HELD_SLIDE_SPEED ${HELD_SLIDE_SPEED} against a top speed of ${top.toFixed(1)} in/s (${at}) — at 45 the robot carried the artifact it had just swallowed forward at 40 in/s into the next one in the line`,
-    );
-  }
-
-  // ---- THE STRAIGHT-LINE FILE OF THREE, at full throttle -------------------
-  /**
-   * The shape of the standing report ("if I drive in full speed, third ball bumps with the
-   * second ball and doesn't get intaked"). The COUNT has been 3/3 through every configuration
-   * tried, so what this pins is the regression-sensitive quantity: how far the file is shoved
-   * before it is all taken. Shrinking the grab makes the robot chase each punted artifact
-   * slightly further; this is the ceiling on that.
-   */
-  {
-    const rows = PRESETS.map((intake) => {
-      const sp = specOf(intake);
-      const tip = sp.length / 2 + INTAKE_PRESETS[intake].reach;
-      const pitch = 2 * BALL_RADIUS + 0.02;
-      const { w, r } = nipScene(intake, [0, 1, 2].map((i) => [40 + tip + i * pitch, 0] as [number, number]));
-      // keyed on ball ID, never on index: `free` mode RESTOCKS, so `w.balls` grows mid-scene
-      // and an index-keyed baseline reads `undefined` for a fresh artifact — silently NaN.
-      const y0 = new Map(w.balls.map((b) => [b.id, b.pos.y]));
-      let shove = 0;
-      let peak = 0;
-      for (let i = 0; i < Math.round(4 / SIM_DT); i++) {
-        step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, intake: true })]]));
-        for (const b of w.balls) {
-          const start = y0.get(b.id);
-          if (start === undefined || b.state.kind !== 'ground') continue;
-          shove = Math.max(shove, b.pos.y - start); // how far up-field the file was driven
-          peak = Math.max(peak, hyp(b.vel.x, b.vel.y)); // ...and how hard it was struck
-        }
-        if (r.hopper.length >= 3) break;
-      }
-      return { intake, took: r.hopper.length, shove, peak };
-    });
-    check(
-      'nip: a touching file of THREE goes in 3/3 without the file being punted down the field',
-      rows.every((x) => x.took === 3 && x.shove < 1 && x.peak < 5),
-      rows.map((x) => `${x.intake} ${x.took}/3, worst shove ${x.shove.toFixed(1)}in, peak artifact speed ${x.peak.toFixed(0)} in/s`).join(' · ') +
-        ' — at HELD_SLIDE_SPEED 45 the second and third left together at 73 in/s and were shoved 32in,' +
-        ' and triangle still clipped the third at 74 in/s until its storage slots moved 2in further into the chassis (heldSlotPos). No preset moves an artifact at all now.',
-    );
-  }
-
-  // ---- EXTREMELY FAST, and the presets still ordered ------------------------
-  {
-    const ticksToThree = (intake: (typeof PRESETS)[number]) => {
-      const sp = specOf(intake);
-      const seat = sp.length / 2 + BALL_RADIUS;
-      const { w, r } = nipScene(intake, [[seat, 0], [seat, 2], [seat, -2]]);
-      r.lastIntakeAt = w.time; // no free first take
-      for (let i = 1; i <= Math.round(2 / SIM_DT); i++) {
-        step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-        if (r.hopper.length >= 3) return i;
-      }
-      return Infinity;
-    };
-    const t = Object.fromEntries(PRESETS.map((p) => [p, ticksToThree(p)])) as Record<string, number>;
-    check(
-      'nip: a full hopper off the seat takes a handful of TICKS, not a third of a second',
-      t.sloped <= 8 && t.triangle <= 5 && t.vector <= 18,
-      `ticks to fill 3: triangle ${t.triangle} · sloped ${t.sloped} · vector ${t.vector}`,
-    );
-    check(
-      'nip: triangle is still the strongest grab and vector still the slowest',
-      t.triangle <= t.sloped && t.sloped < t.vector,
-      `triangle ${t.triangle} <= sloped ${t.sloped} < vector ${t.vector} — dual take, clump bonus, and no clump bonus on a flat front`,
-    );
-  }
-
-  // ---- capMax IS STILL REACHABLE (why `t`'s denominator stays throatHalf) ---
-  {
-    const m = intakeMouth(specOf('vector'));
-    const wide = clamp((m.mouthHalf - 0.5) / m.throatHalf, 0, 1);
-    const cornerT = clamp(6.5 / intakeMouth(specOf('sloped')).throatHalf, 0, 1);
-    check(
-      'nip: an off-centre grab still pays capMax (the ramp did not flatten when the grab moved to the wheel)',
-      wide === 1 && cornerT === 1,
-      `vector at mouthHalf − 0.5 → t=${wide}, sloped cornered at 6.5in → t=${cornerT} — re-normalising t onto the wheel row would silently make capMax unreachable`,
-    );
-  }
-
-  // ---- capture ⊆ suction ⊆ claim, over both chassis extremes ---------------
-  /**
-   * Structural, not a comment. A CAPTURE set reaching outside the claim set stalls the robot on
-   * the artifact it is about to eat (the claim is what excuses it from the chassis in
-   * `pinnedArtifacts`); a claim set narrower than the SUCTION leaves the chassis fighting an
-   * artifact the rollers are already pulling — the oscillation `intakeClaims` exists to kill.
-   *
-   * ⚠️ `capture ⊆ suction` is NOT an invariant and asserting it was wrong. `onRollerRow` grabs
-   * a flat preset's artifact WHERE IT LIES, out to `mouthHalf + BALL_RADIUS * 0.25`, while the
-   * suction pulls only within `wheelSpan = mouthHalf` — the preset "grabs where it lies and the
-   * timing does the vectoring", which is the whole point of that branch. The claim is the set
-   * that has to contain both, and it does.
-   */
-  {
-    const bad: string[] = [];
-    let tightest = Infinity;
-    let tightestAt = '';
-    for (const intake of PRESETS)
-      for (const length of [INTAKE_PRESETS[intake].minLength, INTAKE_PRESETS[intake].maxLength])
-        for (const width of [INTAKE_PRESETS[intake].minWidth, ROBOT_MAX_SIZE]) {
-          const sp = coerceSpec({ ...DEFAULT_SPEC, intake, length, width });
-          const m = intakeMouth(sp);
-          const hl = sp.length / 2;
-          const tip = hl + INTAKE_PRESETS[intake].reach;
-          const axle = intakeAxleX(sp);
-          const nip = intakeNip(sp);
-          // the three regions, each written the way its own code writes it
-          const wide = m.mouthHalf + BALL_RADIUS * 0.25; // cornered / onRollerRow lateral
-          const wheelSpan = m.wedge ? m.throatHalf : m.mouthHalf;
-          const inCapture = (x: number, y: number) =>
-            x > axle - nip.back && x < axle + nip.front && Math.abs(y) < wide;
-          const inSuction = (x: number, y: number) =>
-            x > hl - BALL_RADIUS &&
-            x < tip + BALL_RADIUS &&
-            (Math.abs(y) < wheelSpan ||
-              (m.wedge && x > tip - BALL_RADIUS - INTAKE_CAPTURE_BAND && Math.abs(y) < wide));
-          const inClaim = (x: number, y: number) =>
-            x > hl - BALL_RADIUS && x < tip + BALL_RADIUS && Math.abs(y) < wide;
-          for (let x = axle - nip.back; x <= axle + nip.front + 1; x += 0.05)
-            for (let y = 0; y <= wide + 1; y += 0.05) {
-              if (inCapture(x, y) && !inClaim(x, y))
-                bad.push(`${intake} ${length}x${width}: capture (${x.toFixed(2)}, ${y.toFixed(2)}) is outside the claim`);
-              if (inSuction(x, y) && !inClaim(x, y))
-                bad.push(`${intake} ${length}x${width}: suction (${x.toFixed(2)}, ${y.toFixed(2)}) is outside the claim`);
-            }
-          // the binding margin: on a WEDGE the outer laterals are only sucked past
-          // `tip − R − INTAKE_CAPTURE_BAND`, and the band's rear edge sits just inside it
-          if (m.wedge) {
-            const margin = axle - nip.back - (tip - BALL_RADIUS - INTAKE_CAPTURE_BAND);
-            if (margin < tightest) {
-              tightest = margin;
-              tightestAt = `${intake} ${sp.length}x${sp.width}`;
-            }
-          }
-        }
-    check(
-      'nip: capture ⊆ suction ⊆ claim, at both chassis extremes of all three presets',
-      bad.length === 0,
-      bad.length
-        ? bad.slice(0, 3).join(' · ')
-        : `capture and suction both lie inside the claim, everywhere; the wedge's tightest fore-aft margin is at ${tightestAt}, the band's rear edge ${tightest.toFixed(3)}in inside the suction's onRoller edge`,
-    );
-  }
-
-  // ---- the gate-drain landing point is still inside the suction -------------
-  {
-    const rows = PRESETS.map((intake) => {
-      const sp = specOf(intake);
-      const tip = sp.length / 2 + INTAKE_PRESETS[intake].reach;
-      // the closest an artifact may legally land, a hair inside: this IS `intakeSuction`'s
-      // `ahead` now, and that bound is strict on both sides of the same expression
-      const drop = tip + BALL_RADIUS - INTAKE_CATCH_LENIENCE - 0.05;
-      const { w, r } = nipScene(intake, [[drop, 0]]);
-      run(w, cmd({ intake: true }), 1);
-      return { intake, drop, took: r.hopper.length };
-    });
-    check(
-      'nip: an artifact landing at the drop lenience is still taken (gate-drain intaking)',
-      rows.every((x) => x.took === 1),
-      rows.map((x) => `${x.intake} at tip + ${(x.drop - (specOf(x.intake).length / 2 + INTAKE_PRESETS[x.intake].reach)).toFixed(2)}: hopper ${x.took}`).join(' · ') +
-        ' — INTAKE_CATCH_LENIENCE and the suction reach are coupled; this is the whole basis of intaking off the outflow',
-    );
-  }
-}
-
 // ---- a robot squeezed by an opponent against a wall stays in-field ----------
 {
   const w = createWorld('free', 3, [setup(0, 'blue', {}, 0), setup(1, 'blue', { massLb: 42 }, 1)]);
@@ -10815,1660 +5466,6 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
   const w1 = build(123); startMatch(w1); runTicks(w1);
   const w2 = build(123); startMatch(w2); runTicks(w2);
   check('4-robot 1200-tick sim is bit-for-bit deterministic', JSON.stringify(w1) === JSON.stringify(w2));
-}
-
-// ---- flywheel recovery: low inertia slows far shots, not close ones ---------
-{
-  // gap between the first two shots, fired continuously from `pos` (free mode
-  // ignores launch-zone gating so we can place the robot anywhere)
-  const firstGap = (spec: Partial<RobotSpec>, pos: { x: number; y: number }): number => {
-    const w = mkWorld('free', 'blue', 5, spec);
-    const r = w.robots[0];
-    r.pos = { ...pos };
-    r.vel = { x: 0, y: 0 };
-    r.hopper = ['purple', 'green', 'purple'];
-    const times: number[] = [];
-    let prev = r.lastFireAt;
-    const commands = new Map([[0, cmd({ fire: true })]]);
-    for (let i = 0; i < Math.round(3 / SIM_DT) && times.length < 2; i++) {
-      step(w, SIM_DT, commands);
-      if (r.lastFireAt !== prev) { times.push(r.lastFireAt); prev = r.lastFireAt; }
-    }
-    return times.length >= 2 ? times[1] - times[0] : Infinity;
-  };
-  const near = { x: -50, y: 60 }; // point-blank on the blue goal
-  const far = { x: 58, y: -30 };  // long cross-court shot
-  const closeGap = firstGap({ flywheelInertia: 0 }, near);
-  const farGap = firstGap({ flywheelInertia: 0 }, far);
-  check('low-inertia flywheel fires rapidly up close', closeGap < 0.15, `gap=${closeGap.toFixed(3)}s`);
-  check('low-inertia flywheel is slowed by a far shot (>3× the close gap)', farGap > 3 * closeGap, `far=${farGap.toFixed(3)}s close=${closeGap.toFixed(3)}s`);
-  const hiFar = firstGap({ flywheelInertia: 1 }, far);
-  check('high-inertia flywheel keeps rapid fire at range', Math.abs(hiFar - 0.1) < 0.03, `gap=${hiFar.toFixed(3)}s`);
-
-  // the very first shot is always immediate (no spin-up before shot one)
-  const w = mkWorld('free', 'blue', 5, { flywheelInertia: 0 });
-  const r = w.robots[0];
-  r.pos = { x: 58, y: -30 };
-  r.hopper = ['purple', 'green', 'purple'];
-  run(w, cmd({ fire: true }), SIM_DT * 2);
-  check('first shot fires immediately even for a far low-inertia shot', r.lastFireAt <= SIM_DT * 2 + 1e-9, `t=${r.lastFireAt.toFixed(4)}`);
-}
-
-// ---- canSort fires the color the motif wants next ---------------------------
-{
-  const w = mkWorld('free', 'blue', 42, { canSort: true });
-  const r = w.robots[0];
-  r.pos = { x: -50, y: 60 };
-  r.vel = { x: 0, y: 0 };
-  const want = w.motif[0];
-  const other: 'purple' | 'green' = want === 'purple' ? 'green' : 'purple';
-  r.hopper = [other, want, other]; // FIFO would fire `other` first; sorter must skip to `want`
-  run(w, cmd({ fire: true }), SIM_DT * 2); // exactly one shot
-  const shot = w.balls[w.balls.length - 1];
-  check('canSort robot fires the motif color first (skips FIFO)', shot.color === want, `shot=${shot.color} want=${want}`);
-}
-
-// ---- 4-robot spawn: distinct poses, preload split, HP stock drained ---------
-{
-  const w = createWorld('match', 77, [
-    setup(0, 'blue', {}, 0),
-    setup(1, 'blue', {}, 1),
-    setup(2, 'red', {}, 0),
-    setup(3, 'red', {}, 1),
-  ]);
-  const blue0 = w.robots.find((r) => r.id === 0)!;
-  const blue1 = w.robots.find((r) => r.id === 1)!;
-  check('4 robots spawn (2 per alliance)', w.robots.length === 4);
-  check('first robot per alliance gets the 3-ball preload', blue0.hopper.length === 3, `${blue0.hopper.length}`);
-  check(
-    'second robot per alliance takes the HP stock as its preload',
-    JSON.stringify(blue1.hopper) === JSON.stringify([...HP_INITIAL_STOCK]),
-    `${blue1.hopper.join(',')}`,
-  );
-  check(
-    'HP box is empty when two robots fill an alliance',
-    w.humanPlayers.blue.box.length === 0 && w.humanPlayers.red.box.length === 0,
-    `blue=${w.humanPlayers.blue.box.length} red=${w.humanPlayers.red.box.length}`,
-  );
-  const gap = Math.hypot(blue0.pos.x - blue1.pos.x, blue0.pos.y - blue1.pos.y);
-  check('two robots on an alliance spawn at distinct, non-overlapping poses', gap > 20, `${gap.toFixed(1)} in apart`);
-}
-
-// ---- HP box = missing-robot leftovers only; pre-stage sits in the corner -----
-{
-  // full 2v2 -> box empty (both robots preloaded)
-  const w2r = createWorld('match', 77, [setup(0, 'blue', {}, 0), setup(1, 'blue', {}, 1), setup(2, 'red', {}, 0), setup(3, 'red', {}, 1)]);
-  check(
-    'full 2v2 -> HP box is empty',
-    w2r.humanPlayers.blue.box.length === 0 && w2r.humanPlayers.red.box.length === 0,
-    `blue=${w2r.humanPlayers.blue.box.length}`,
-  );
-  // one robot -> box holds only the missing robot's set (3, PPG) — NOT full
-  const w1 = createWorld('match', 77, [setup(0, 'blue', {}, 0), setup(1, 'red', {}, 0)]);
-  check(
-    'one-robot alliance -> box holds only the missing set (3, PPG)',
-    JSON.stringify(w1.humanPlayers.blue.box) === JSON.stringify([...HP_INITIAL_STOCK]),
-    `box=${w1.humanPlayers.blue.box.join(',')}`,
-  );
-  // empty alliance -> both leftover sets (6, 4P+2G), at the cap
-  const w0 = createWorld('match', 77, [setup(0, 'blue', {}, 0)]);
-  const redBox = w0.humanPlayers.red.box;
-  check(
-    'empty alliance -> box holds both leftover sets (6, 4P+2G)',
-    redBox.length === 6 && redBox.filter((c) => c === 'purple').length === 4 && redBox.filter((c) => c === 'green').length === 2,
-    `box=${redBox.join(',')}`,
-  );
-  // grab-row geometry: 3 slots in a row along x
-  const slots = loadSlots('blue');
-  check('grab row is 3 slots', slots.length === 3);
-  check('grab row shares one y (a row along x)', slots.every((s) => s.y === slots[0].y));
-  check(
-    'grab row spans a range of x (robot sweeps along x)',
-    Math.abs(slots[2].x - slots[0].x) > 2 * BALL_RADIUS,
-    `dx=${(slots[2].x - slots[0].x).toFixed(1)}`,
-  );
-  // the 3 pre-staged artifacts (PGP) sit ON the field in the loading-zone corner,
-  // against the alliance wall, touching, and NOT at the grab-row slots
-  const pre = loadPreStage('blue');
-  check('pre-stage is 3 PGP artifacts', pre.length === 3 && pre.map((p) => p.color).join(',') === 'purple,green,purple');
-  check('pre-stage is flush against the alliance (side) wall', pre.every((p) => Math.abs(Math.abs(p.pos.x) - (FIELD_HALF - BALL_RADIUS)) < 1e-9));
-  check('pre-stage balls are touching each other', Math.abs(Math.abs(pre[1].pos.y - pre[0].pos.y) - 2 * BALL_RADIUS) < 1e-9);
-  check(
-    'pre-stage is NOT at the grab-row slots',
-    pre.every((p) => slots.every((s) => Math.hypot(p.pos.x - s.x, p.pos.y - s.y) > BALL_RADIUS * 1.5)),
-  );
-  const inZoneAtSetup = w0.balls.filter((b) => b.state.kind === 'ground' && inRect(b.pos, loadZone('blue')));
-  check('the 3 pre-stage artifacts are on the field in the loading zone at setup', inZoneAtSetup.length === 3, `${inZoneAtSetup.length}`);
-  // the 2x3 box has 6 cells OFF the field, just beyond the audience wall
-  const cells = loadBoxSlots('blue');
-  check(
-    'the 2x3 box has 6 cells off the field (beyond the audience wall)',
-    cells.length === 6 && cells.every((c) => c.y < -FIELD_HALF),
-  );
-}
-
-// ---- HP is idle until teleop; then moves the corner pre-stage to the grab row -
-{
-  const w = createWorld('match', 5, [setup(0, 'blue', {}, 0)]); // starts in 'pre'
-  w.robots[0].pos = { x: 0, y: 40 };
-  const box0 = JSON.stringify(w.humanPlayers.blue.box);
-  const preStageStill = () => loadPreStage('blue').every((p) => w.balls.some((b) => b.state.kind === 'ground' && Math.hypot(b.pos.x - p.pos.x, b.pos.y - p.pos.y) < 0.1));
-  // pre / auto / transition: HP does nothing — box untouched, pre-stage untouched
-  for (const ph of ['pre', 'auto', 'transition'] as const) {
-    w.match.phase = ph;
-    updateHumanPlayers(w);
-  }
-  check(
-    'HP does nothing before teleop (box + corner pre-stage untouched)',
-    JSON.stringify(w.humanPlayers.blue.box) === box0 && preStageStill(),
-    `boxMoved=${JSON.stringify(w.humanPlayers.blue.box) !== box0} preStage=${preStageStill()}`,
-  );
-  // teleop: over a couple seconds the HP moves the 3 pre-stage balls into the grab row
-  w.match.phase = 'teleop';
-  for (let k = 0; k < 40; k++) {
-    updateHumanPlayers(w);
-    w.time += HP_PLACE_DELAY + 0.02;
-  }
-  const slots = loadSlots('blue');
-  const inGrabRow = slots.filter((s) => w.balls.some((b) => b.state.kind === 'ground' && Math.hypot(b.pos.x - s.x, b.pos.y - s.y) < 0.2)).length;
-  check(
-    'HP moves the pre-stage into the grab row once teleop begins',
-    inGrabRow === 3 && !preStageStill(),
-    `grabRow=${inGrabRow}`,
-  );
-}
-
-// ---- HP recycles loose balls in teleop (grabs them into the box), capped ------
-{
-  const setups4 = [setup(0, 'blue', {}, 0), setup(1, 'blue', {}, 1), setup(2, 'red', {}, 0), setup(3, 'red', {}, 1)];
-  const slots = loadSlots('blue');
-  const lz = loadZone('blue');
-
-  // 2v2 -> box empty; fill the grab row so STAGING is a no-op, isolating COLLECT
-  const w = createWorld('match', 5, setups4);
-  w.match.phase = 'teleop';
-  for (const r of w.robots) r.pos = { x: 0, y: 40 };
-  // remove the corner pre-stage so only our injected loose ball is collectable
-  w.balls = w.balls.filter((b) => !(b.state.kind === 'ground' && inRect(b.pos, lz)));
-  slots.forEach((s, i) => w.balls.push({ id: 5000 + i, color: 'purple', state: { kind: 'ground' }, pos: { x: s.x, y: s.y }, vel: { x: 0, y: 0 }, z: 0, vz: 0 }));
-  w.balls.push({ id: 4242, color: 'green', state: { kind: 'ground' }, pos: { x: (lz.x0 + lz.x1) / 2, y: lz.y1 - 3 }, vel: { x: 0, y: 0 }, z: 0, vz: 0 });
-  const before = w.humanPlayers.blue.box.length;
-  updateHumanPlayers(w);
-  check(
-    'HP grabs a loose ball out of the loading zone into the box',
-    !w.balls.some((b) => b.id === 4242) && w.humanPlayers.blue.box.length === before + 1,
-    `box ${before}->${w.humanPlayers.blue.box.length}`,
-  );
-  check(
-    'HP does not grab the balls staged at the grab slots',
-    [5000, 5001, 5002].every((id) => w.balls.some((b) => b.id === id)),
-  );
-
-  // at the 6-out-of-play cap the HP grabs nothing more
-  const w3 = createWorld('match', 5, []); // no robots -> box = 6 (capped)
-  w3.match.phase = 'teleop';
-  w3.balls = w3.balls.filter((b) => !(b.state.kind === 'ground' && inRect(b.pos, lz)));
-  slots.forEach((s, i) => w3.balls.push({ id: 5200 + i, color: 'purple', state: { kind: 'ground' }, pos: { x: s.x, y: s.y }, vel: { x: 0, y: 0 }, z: 0, vz: 0 }));
-  w3.balls.push({ id: 4243, color: 'green', state: { kind: 'ground' }, pos: { x: (lz.x0 + lz.x1) / 2, y: lz.y1 - 3 }, vel: { x: 0, y: 0 }, z: 0, vz: 0 });
-  updateHumanPlayers(w3);
-  check(
-    'HP does not grab when the box is already at the 6-out-of-play cap',
-    w3.balls.some((b) => b.id === 4243) && w3.humanPlayers.blue.box.length === 6,
-  );
-}
-
-// ============================================================================
-// Phase C: penalty engine (Section 11 fouls)
-// ============================================================================
-
-/** two cross-alliance robots (blue id0, red id1) forced into teleop */
-function foulWorld(timeLeft = 60): World {
-  const w = createWorld('match', 55, [setup(0, 'blue', {}, 0), setup(1, 'red', {}, 0)]);
-  w.match.phase = 'teleop';
-  w.match.phaseTimeLeft = timeLeft;
-  // park both well away from every foul zone until each test places them
-  w.robots[0].pos = { x: 0, y: -8 };
-  w.robots[1].pos = { x: 0, y: 20 };
-  for (const r of w.robots) { r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-  return w;
-}
-
-function runCmds(w: World, cmds: Map<number, RobotCommand>, seconds: number): void {
-  const n = Math.round(seconds / SIM_DT);
-  for (let i = 0; i < n; i++) step(w, SIM_DT, cmds);
-}
-
-/** drop a robot into an opposing gate zone and press it in for `secs` */
-function inGate(w: World, robotIdx: number, gate: 'red' | 'blue'): void {
-  const gz = gateZone(gate);
-  w.robots[robotIdx].pos = { x: (gz.x0 + gz.x1) / 2, y: (gz.y0 + gz.y1) / 2 };
-}
-
-// ---- G417 operating an OPPONENT's gate (MAJOR) -----------------------------
-// Rules driven directly through updatePenalties (world.time advanced by hand) so
-// the episode debounce can be exercised without physics moving the robot.
-{
-  const w = foulWorld();
-  const gz = gateZone('red');
-  const gcx = (gz.x0 + gz.x1) / 2;
-  const gcy = (gz.y0 + gz.y1) / 2;
-  w.time = 0;
-  w.robots[0].pos = { x: gcx, y: gcy }; // blue TOUCHING red's gate arm (no push, idle)
-  w.robots[0].vel = { x: 0, y: 0 };
-  w.robots[1].pos = { x: 0, y: 20 };    // red elsewhere
-  updatePenalties(w, 1 / 60, new Map());
-  check(
-    'TOUCHING the opponent gate (even without opening it) is an immediate MAJOR (G417)',
-    w.match.fouls.blue.major === 1 && w.match.scores.red.foulPoints === 15,
-    `blueMajor=${w.match.fouls.blue.major} redFoulPts=${w.match.scores.red.foulPoints}`,
-  );
-  // holding at the gate is ONE foul (episode-debounced)
-  w.time = 0.5;
-  updatePenalties(w, 1 / 60, new Map());
-  check('holding at the opponent gate is a single G417 foul', w.match.fouls.blue.major === 1, `blueMajor=${w.match.fouls.blue.major}`);
-  // leave past the clear window, then return -> a fresh foul
-  w.robots[0].pos = { x: 0, y: -8 };
-  w.time = 2.0;
-  updatePenalties(w, 1 / 60, new Map());
-  check('leaving the gate does not add a foul', w.match.fouls.blue.major === 1);
-  w.robots[0].pos = { x: gcx, y: gcy };
-  w.time = 2.1;
-  updatePenalties(w, 1 / 60, new Map());
-  check('re-entering the opponent gate after the clear window fouls again', w.match.fouls.blue.major === 2, `blueMajor=${w.match.fouls.blue.major}`);
-
-  // operating your OWN gate is legal
-  const w2 = foulWorld();
-  w2.robots[1].pos = { x: gcx, y: gcy }; // red on red's own gate
-  updatePenalties(w2, 1 / 60, new Map());
-  check(
-    'operating your OWN gate is not a foul',
-    w2.match.scores.red.foulPoints === 0 && w2.match.fouls.red.major === 0,
-    `redFoulPts=${w2.match.scores.red.foulPoints} redMajor=${w2.match.fouls.red.major}`,
-  );
-}
-
-/**
- * How long a HAND-DRIVEN G408 scene has to run for one artifact to clear every acquisition
- * gate, given the speed the scene is carrying it at: the artifact must first be carried
- * POSSESSION_CARRY_DIST in the push direction, then held for POSSESSION_CONFIRM, and only then
- * does the per-robot POSSESSION_GRACE start. Derived rather than hard-coded so that tuning any
- * of the three does not silently turn these checks into assertions about the clock.
- */
-const acquireSecs = (speed: number): number =>
-  POSSESSION_CARRY_DIST / speed + POSSESSION_CONFIRM + POSSESSION_GRACE;
-const acquireTicks = (speed: number): number => Math.round(acquireSecs(speed) / (1 / 60)) + 4;
-
-// ---- G408 over-possession / plowing (MINOR) --------------------------------
-// A robot CONTROLLING more than POSSESSION_LIMIT artifacts (hopper + herded
-// loose balls) past POSSESSION_GRACE draws a MINOR foul on its own alliance.
-{
-  const w = foulWorld();
-  const r = w.robots[0]; // blue
-  r.pos = { x: 0, y: -8 };
-  r.heading = 0;
-  r.hopper = ['green', 'green', 'green']; // full hopper = 3 stored (at the limit)
-  r.vel = { x: POSSESSION_HERD_SPEED + 5, y: 0 }; // driving = herding
-  // a loose ground ball being BULLDOZED: touching, ahead along the direction of
-  // travel, and carried along at the robot's own speed -> 4 controlled, over the limit
-  w.balls.push({ id: 9001, color: 'purple', state: { kind: 'ground' }, pos: { x: 2, y: 0 }, vel: { x: POSSESSION_HERD_SPEED + 5, y: 0 }, z: 0, vz: 0 });
-  // hold the over-possession just past the grace window
-  for (let i = 0; i < acquireTicks(POSSESSION_HERD_SPEED + 5); i++) {
-    w.time = i / 60;
-    updatePenalties(w, 1 / 60, new Map());
-  }
-  check(
-    'controlling a 4th artifact (full hopper + a plowed loose ball) past the grace is a MINOR G408',
-    w.match.fouls.blue.minor === 1 && w.match.scores.red.foulPoints === 5,
-    `blueMinor=${w.match.fouls.blue.minor} redFoulPts=${w.match.scores.red.foulPoints}`,
-  );
-
-  // ---- world.events STAYS BOUNDED UNDER A SUSTAINED VIOLATION ----------------
-  // `world.events` is plain JSON on the WORLD, so every entry rides every 30 Hz snapshot to
-  // every client AND is stored in the replay. Its 25 push sites are all edge-triggered or
-  // rate-limited, and that is the ONLY thing bounding it — there is no cap, deliberately (a
-  // ring buffer would be silently LOSSY: `collectNetEvents` diffs by absolute index, so a
-  // saturating length never trips its shrink guard. See the comment there.)
-  //
-  // So the thing worth pinning is the edge-triggering itself. Hold ONE violation for half a
-  // match: the log must grow at the re-bill cadence, not per tick. Measured, a cap at 64 would
-  // have saved 0 bytes in three of four scenarios, which is why there is no cap to test.
-  {
-    const before = w.events.length;
-    const hold = 1800; // 30 s of an UNINTERRUPTED, uncorrected over-possession
-    for (let i = 0; i < hold; i++) {
-      w.time = (acquireTicks(POSSESSION_HERD_SPEED + 5) + i) / 60;
-      updatePenalties(w, 1 / 60, new Map());
-    }
-    const grew = w.events.length - before;
-    check(
-      'world.events keeps growing while a violation is uncorrected (so the bound below is not vacuous)',
-      grew > 0,
-      `+${grew} entries over ${hold} ticks`,
-    );
-    check(
-      'world.events is EDGE-triggered, not per-tick — a 30 s held foul logs a handful of lines, not 1,800',
-      grew < 40,
-      `+${grew} over ${hold} ticks (re-bill cadence, not tick cadence)`,
-    );
-  }
-
-  // a PARKED robot merely resting against the same ball is not controlling it
-  const w2 = foulWorld();
-  const r2 = w2.robots[0];
-  r2.pos = { x: 0, y: -8 };
-  r2.heading = 0;
-  r2.hopper = ['green', 'green', 'green'];
-  r2.vel = { x: 0, y: 0 }; // stationary
-  w2.balls.push({ id: 9002, color: 'purple', state: { kind: 'ground' }, pos: { x: 2, y: 0 }, vel: { x: 0, y: 0 }, z: 0, vz: 0 });
-  for (let i = 0; i < acquireTicks(POSSESSION_HERD_SPEED + 5); i++) {
-    w2.time = i / 60;
-    updatePenalties(w2, 1 / 60, new Map());
-  }
-  check(
-    'a stationary robot resting against a loose ball is not over-possession (no G408)',
-    w2.match.fouls.blue.minor === 0 && w2.match.scores.red.foulPoints === 0,
-    `blueMinor=${w2.match.fouls.blue.minor} redFoulPts=${w2.match.scores.red.foulPoints}`,
-  );
-
-  // a full hopper with NO plowed ball is exactly at the limit — no foul
-  const w3 = foulWorld();
-  const r3 = w3.robots[0];
-  r3.pos = { x: 0, y: -8 };
-  r3.hopper = ['green', 'green', 'green'];
-  r3.vel = { x: POSSESSION_HERD_SPEED + 5, y: 0 };
-  for (let i = 0; i < acquireTicks(POSSESSION_HERD_SPEED + 5); i++) {
-    w3.time = i / 60;
-    updatePenalties(w3, 1 / 60, new Map());
-  }
-  check(
-    'a full hopper at the possession limit (no plowed ball) is legal (no G408)',
-    w3.match.fouls.blue.minor === 0,
-    `blueMinor=${w3.match.fouls.blue.minor}`,
-  );
-
-  // brief contact under the grace window does not foul (normal intake pass)
-  const w4 = foulWorld();
-  const r4 = w4.robots[0];
-  r4.pos = { x: 0, y: -8 };
-  r4.heading = 0;
-  r4.hopper = ['green', 'green', 'green'];
-  r4.vel = { x: POSSESSION_HERD_SPEED + 5, y: 0 };
-  w4.balls.push({ id: 9003, color: 'purple', state: { kind: 'ground' }, pos: { x: 2, y: 0 }, vel: { x: POSSESSION_HERD_SPEED + 5, y: 0 }, z: 0, vz: 0 });
-  for (let i = 0; i < Math.floor((POSSESSION_GRACE / 2) / (1 / 60)); i++) { // well under confirm+grace
-    w4.time = i / 60;
-    updatePenalties(w4, 1 / 60, new Map());
-  }
-  check(
-    'over-possession briefer than the grace window does not foul',
-    w4.match.fouls.blue.minor === 0,
-    `blueMinor=${w4.match.fouls.blue.minor}`,
-  );
-}
-
-// ---- G424 GATE ZONE off limits (MINOR): robot-robot contact at the gate -----
-// Isolated from G417: the OWNER (red) sits in its own gate zone and the opponent
-// (blue) contacts from the field side, clear of the gate zone (so blue is not
-// operating the gate). Only G424 should fire.
-{
-  const w = foulWorld();
-  for (const r of w.robots) r.heading = 0;
-  w.robots[1].pos = { x: 52, y: 0 };  // red (owner) in its own gate zone, clear of the tunnel corner
-  w.robots[0].pos = { x: 30, y: 0 };  // blue contacts from the field side, clear of the gate zone
-  w.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w, 1 / 60, new Map());
-  check(
-    'robot contact with the gate owner in its own gate is a MINOR G424 on the opponent (and NOT G417)',
-    w.match.fouls.blue.minor === 1 && w.match.fouls.blue.major === 0 && w.match.scores.red.foulPoints === 5,
-    `blueMinor=${w.match.fouls.blue.minor} blueMajor=${w.match.fouls.blue.major} redFoulPts=${w.match.scores.red.foulPoints}`,
-  );
-}
-
-// ---- G418.B artifacts off the opponent's ramp (MAJOR per artifact) ----------
-// Manual Example 3: open the opponent gate, N artifacts drain off their ramp ->
-// 1 MAJOR (G417) + N MAJOR (G418.B, one per artifact).
-{
-  const w = foulWorld();
-  const N = 3;
-  for (let i = 0; i < N; i++) {
-    const b = w.balls[i];
-    b.state = { kind: 'rail', goal: 'red', s: GATE_STOP_S + i * RAIL_PITCH, v: 0, overflow: false };
-    b.pos = railPos('red', GATE_STOP_S + i * RAIL_PITCH);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-  }
-  const gz = gateZone('red');
-  w.robots[0].pos = { x: gz.x0 - 7, y: (gz.y0 + gz.y1) / 2 }; // blue field-side of red's gate
-  w.robots[0].heading = 0; // face the +x (red) wall
-  w.robots[0].fieldCentric = false;
-  w.robots[1].pos = { x: 0, y: 30 };
-  // blue drives INTO red's gate arm (push-to-open) — the column drains off red's ramp
-  runCmds(w, new Map([[0, cmd({ driveY: 1 })]]), 2.5);
-  const drained = w.balls.filter((b) => !(b.state.kind === 'rail' && b.state.goal === 'red')).length;
-  check(
-    'opening the opponent gate: 1 G417 + one G418 per artifact that drains off their ramp',
-    w.match.fouls.blue.major === N + 1,
-    `blueMajor=${w.match.fouls.blue.major} (expected ${N + 1})  redFoulPts=${w.match.scores.red.foulPoints}`,
-  );
-  check(
-    'HudSnapshot.gateForced: an opponent forcing the gate open pins gateCulprit to them',
-    w.penalties.gateCulprit.red === 'blue',
-    `gateCulprit.red=${w.penalties.gateCulprit.red}`,
-  );
-
-  // the OWNER (red) pushing its own gate open must never set gateCulprit — HudSnapshot.gateForced
-  // is a straight read of it, and it drives the gate icon's red "forced" state vs. green
-  // "own alliance opened it" (game.ts).
-  const w2 = foulWorld();
-  w2.robots[1].pos = { x: gz.x0 - 7, y: (gz.y0 + gz.y1) / 2 }; // red field-side of its OWN gate
-  w2.robots[1].heading = 0;
-  w2.robots[1].fieldCentric = false;
-  w2.robots[0].pos = { x: 0, y: 30 };
-  runCmds(w2, new Map([[1, cmd({ driveY: 1 })]]), 2.5);
-  check(
-    'HudSnapshot.gateForced: the owner opening its own gate never sets gateCulprit',
-    w2.penalties.gateCulprit.red === null && w2.goals.red.gateOpen,
-    `gateCulprit.red=${w2.penalties.gateCulprit.red} gateOpen=${w2.goals.red.gateOpen}`,
-  );
-}
-
-// ---- G418.B is billed on the DRAIN, not on the touch -------------------------
-// TAPPING an opponent's gate arm without ever lifting it is G417 alone: nothing
-// leaves their ramp, so nothing is billed. (This used to charge a MAJOR for every
-// artifact standing on the ramp at the moment of contact.)
-{
-  const w = foulWorld();
-  const N = 3;
-  for (let i = 0; i < N; i++) {
-    const b = w.balls[i];
-    b.state = { kind: 'rail', goal: 'red', s: GATE_STOP_S + i * RAIL_PITCH, v: 0, overflow: false };
-    b.pos = railPos('red', GATE_STOP_S + i * RAIL_PITCH);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-  }
-  const ar = gateArmRect('red');
-  w.robots[0].pos = { x: (ar.x0 + ar.x1) / 2, y: (ar.y0 + ar.y1) / 2 }; // blue ON red's arm
-  w.robots[0].heading = 0;
-  w.robots[0].vel = { x: 0, y: 0 };
-  w.robots[1].pos = { x: 0, y: 30 };
-  // penalties only (no world step): the arm is touched but never pushed, so it
-  // stays shut and the column stays put
-  for (let i = 0; i < 30; i++) updatePenalties(w, 1 / 60, new Map());
-  check(
-    'touching the opponent gate WITHOUT opening it is G417 only — no G418 for the standing column',
-    w.match.fouls.blue.major === 1 && w.match.scores.red.foulPoints === 15,
-    `blueMajor=${w.match.fouls.blue.major} (expected 1) redFoulPts=${w.match.scores.red.foulPoints}`,
-  );
-  check('a tap leaves the ramp column untouched', w.balls.filter((b) => b.state.kind === 'rail').length === N);
-}
-
-// ---- G418.B blames the opponent who OPENED the gate, not one merely leaning ---
-// The owner drains their OWN ramp while an opponent rests against the lever: the
-// opponent owes G417 for the contact, but the artifacts are the owner's own doing.
-{
-  const w = foulWorld();
-  const b = w.balls[0];
-  b.state = { kind: 'rail', goal: 'red', s: GATE_STOP_S, v: 0, overflow: false };
-  b.pos = railPos('red', GATE_STOP_S);
-  b.z = RAMP_SURFACE_Z;
-  const ar = gateArmRect('red');
-  w.robots[0].pos = { x: (ar.x0 + ar.x1) / 2, y: (ar.y0 + ar.y1) / 2 }; // blue touching, not pushing
-  w.robots[0].vel = { x: 0, y: 0 };
-  w.robots[1].pos = { x: 0, y: 30 };
-  w.goals.red.gatePos = 1; // the OWNER has it open
-  w.goals.red.gateOpen = true;
-  updatePenalties(w, 1 / 60, new Map()); // records the ball on the ramp
-  b.state = { kind: 'ground' }; // ...and it drains out
-  updatePenalties(w, 1 / 60, new Map());
-  check(
-    'an artifact off a ramp the OWNER opened is not billed to an opponent touching the lever',
-    w.match.fouls.blue.major === 1 && w.match.scores.red.foulPoints === 15,
-    `blueMajor=${w.match.fouls.blue.major} (expected 1, G417 only)`,
-  );
-}
-
-// ---- G425 secret tunnel (MINOR) --------------------------------------------
-{
-  const w = foulWorld();
-  const ts = tunnelStrip('red'); // the strip under RED's goal, owned by BLUE
-  const cx = (ts.x0 + ts.x1) / 2;
-  w.robots[0].pos = { x: cx, y: -25 };
-  w.robots[1].pos = { x: cx, y: -24 }; // overlapping -> contact
-  runCmds(w, new Map(), 0.3);
-  check(
-    'contact in the secret tunnel draws a MINOR foul on the intruder',
-    w.match.scores.blue.foulPoints === 5 && w.match.fouls.red.minor === 1,
-    `blueFoulPts=${w.match.scores.blue.foulPoints} redMinor=${w.match.fouls.red.minor}`,
-  );
-}
-
-// ---- G424 x G425 exception: gate zone and secret tunnel are mutually exclusive
-// The LEFT wall holds BLUE's gate zone AND RED's secret tunnel (they overlap in
-// the classifier corner). Rules are hand-driven through updatePenalties with a
-// forced contact pair so the exact overlap geometry isn't perturbed by physics.
-{
-  // Scenario 1: blue is in its OWN gate zone AND in red's (opponent's) tunnel,
-  // red is in its own tunnel -> ONLY a secret-tunnel foul (on blue), no gate foul.
-  const w = foulWorld();
-  for (const r of w.robots) r.heading = 0; // pin the footprint: forward = +x
-  w.robots[0].pos = { x: -68, y: -3 };  // blue: overlaps gate zone + red's tunnel
-  w.robots[1].pos = { x: -68, y: -6 };  // red: in its own tunnel
-  w.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w, 1 / 60, new Map());
-  check(
-    'gate robot ALSO in the opponent tunnel: only a secret-tunnel foul (on blue), no gate foul',
-    w.match.fouls.blue.minor === 1 && w.match.fouls.red.minor === 0,
-    `blueMinor=${w.match.fouls.blue.minor} redMinor=${w.match.fouls.red.minor}`,
-  );
-
-  // Scenario 2: blue is in its OWN gate zone but NOT in red's tunnel, red is in
-  // its own tunnel -> ONLY a gate foul (on red), no secret-tunnel foul.
-  // "Clear of the tunnel" has to mean clear of it: the gate zone runs 10in INTO
-  // the field from the classifier edge, so a robot clear of the 6.125in tunnel
-  // strip stands at the INNER end of it. At x=-64 the chassis still reached the
-  // wall and overlapped the strip — the corner test just could not see that.
-  const w2 = foulWorld();
-  for (const r of w2.robots) r.heading = 0; // pin the footprint: forward = +x
-  w2.robots[0].pos = { x: -55, y: 0 };  // blue: in its gate zone, clear of the tunnel
-  w2.robots[1].pos = { x: -68, y: -12 }; // red: in its own tunnel
-  w2.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w2, 1 / 60, new Map());
-  check(
-    'gate robot clear of the opponent tunnel: only a gate foul (on red), no secret-tunnel foul',
-    w2.match.fouls.red.minor === 1 && w2.match.fouls.blue.minor === 0,
-    `redMinor=${w2.match.fouls.red.minor} blueMinor=${w2.match.fouls.blue.minor}`,
-  );
-}
-
-// ---- G426 loading zone (MINOR): opponent contacts you in your own zone ------
-{
-  const w = foulWorld();
-  // sit well inside the loading zone AND clear of the side-wall tunnel strip
-  // (a wide chassis near the +x wall would straddle both zones)
-  const cx = loadZone('blue').x0 + 5;
-  for (const r of w.robots) r.heading = Math.PI / 2; // forward = +y
-  w.robots[0].pos = { x: cx, y: -58 }; // victim (blue) in its own loading zone
-  w.robots[1].pos = { x: cx, y: -42 }; // opponent (red) overlapping slightly -> one contact
-  runCmds(w, new Map(), 0.3);
-  check(
-    'opponent contact in your loading zone fouls the opponent (MINOR)',
-    w.match.scores.blue.foulPoints === 5 && w.match.fouls.red.minor === 1,
-    `blueFoulPts=${w.match.scores.blue.foulPoints} redMinor=${w.match.fouls.red.minor}`,
-  );
-}
-
-// ---- G427 base zone (MAJOR + counts the victim fully returned) --------------
-{
-  const w = foulWorld(15); // endgame (<= ENDGAME_START)
-  const bz = baseZone('blue');
-  const cx = (bz.x0 + bz.x1) / 2;
-  const cy = (bz.y0 + bz.y1) / 2;
-  w.robots[0].pos = { x: cx, y: cy }; // blue in its base
-  w.robots[1].pos = { x: cx, y: cy + 1 }; // red contacts it
-  runCmds(w, new Map(), 0.3);
-  check(
-    'base contact in endgame draws a MAJOR foul + marks the victim base-awarded',
-    w.match.scores.blue.foulPoints === 15 &&
-      w.match.fouls.red.major === 1 &&
-      w.robots[0].baseAwarded === true,
-    `blueFoulPts=${w.match.scores.blue.foulPoints} redMajor=${w.match.fouls.red.major} awarded=${w.robots[0].baseAwarded}`,
-  );
-  // drive the victim clear out of its base, then assess: baseAwarded => full
-  w.robots[0].pos = { x: 0, y: 0 };
-  w.robots[1].pos = { x: 0, y: 40 };
-  assessMatchEnd(w);
-  check(
-    'a base-awarded robot is credited a FULL base return even outside the base',
-    w.match.scores.blue.base === 10,
-    `base=${w.match.scores.blue.base}`,
-  );
-
-  // outside endgame the same contact is NOT a base foul
-  const w2 = foulWorld(60);
-  w2.robots[0].pos = { x: cx, y: cy };
-  w2.robots[1].pos = { x: cx, y: cy + 1 };
-  runCmds(w2, new Map(), 0.3);
-  check(
-    'base contact BEFORE endgame is not a G427 foul',
-    w2.match.scores.blue.foulPoints === 0 && !w2.robots[0].baseAwarded,
-  );
-}
-
-// ---- ZONE HITBOXES: the rules test the manual's zone, and test it as OVERLAP -
-// Two separate claims, both about geometry rather than about which rule fires:
-//   (a) G424's rect is the RULEBOOK's GATE ZONE (2.75x10 between the tape lines),
-//       not the deliberately-generous rect that decides whether a robot can WORK
-//       the gate. Those are different shapes in BOTH axes.
-//   (b) "a ROBOT is in a ZONE" means any part of it is. Every DECODE zone is an
-//       "infinitely tall volume" (Section 9), so the test is overlap against the
-//       top-down silhouette — not "a corner or the center is inside", which is
-//       strictly weaker and misses a body lying across a zone.
-{
-  const tape = gateZoneTape('blue');
-  const interact = gateZone('blue');
-  check(
-    'GATE ZONE is the manual 2.75in x 10in strip',
-    Math.abs((tape.y1 - tape.y0) - GATE_TAPE_W) < 1e-9 &&
-      Math.abs((tape.x1 - tape.x0) - GATE_TAPE_LEN) < 1e-9,
-    `w=${(tape.y1 - tape.y0).toFixed(3)} len=${(tape.x1 - tape.x0).toFixed(3)}`,
-  );
-  // sideRect normalizes x0<x1, so the wall-ward end is whichever has the larger |x|
-  const tapeOuter = Math.max(Math.abs(tape.x0), Math.abs(tape.x1));
-  check(
-    'GATE ZONE starts at the CLASSIFIER edge and runs INTO the field (like its tape)',
-    Math.abs(tapeOuter - (FIELD_HALF - CLASSIFIER_W)) < 1e-9,
-    `outer=${tapeOuter} classifierEdge=${FIELD_HALF - CLASSIFIER_W}`,
-  );
-  check(
-    'the rulebook gate zone and the gate INTERACTION rect are different rects',
-    tape.x0 !== interact.x0 || tape.x1 !== interact.x1 || tape.y0 !== interact.y0 || tape.y1 !== interact.y1,
-  );
-
-  // (a) the outer 6in of the real zone: inside the tape, OUTSIDE the interaction
-  // rect. This contact was not a foul at all before.
-  const w = foulWorld();
-  for (const r of w.robots) r.heading = 0;
-  w.robots[0].pos = { x: -55, y: 0 }; // blue at the INNER end of its own gate zone
-  w.robots[1].pos = { x: -50, y: 0 }; // red, clear of the zone itself
-  w.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w, 1 / 60, new Map());
-  check(
-    'contact at the field-side end of the GATE ZONE is a G424 (the interaction rect never reached it)',
-    w.match.fouls.red.minor === 1 && !inRect(w.robots[0].pos, gateZone('blue')),
-    `redMinor=${w.match.fouls.red.minor}`,
-  );
-
-  // ...and the other direction: the interaction rect is 5in wide against the
-  // zone's 2.75in, so a robot cleanly outside the tape is NOT a G424.
-  const w2 = foulWorld();
-  for (const r of w2.robots) r.heading = 0;
-  // Sit the whole footprint clear of the 2.75in band but still inside the
-  // interaction rect's 5in y-span and its x-span. It has to be on the GOAL side
-  // of the gate: the other side of the band is the SECRET TUNNEL, and a robot
-  // there is correctly a G425 — which would pass this check for the wrong reason.
-  w2.robots[0].pos = { x: -64, y: 10.5 };
-  w2.robots[1].pos = { x: -50, y: 10.5 };
-  w2.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w2, 1 / 60, new Map());
-  check(
-    'contact beside the gate but OUTSIDE the 2.75in zone is not a G424',
-    w2.match.fouls.red.minor === 0 && w2.match.fouls.blue.minor === 0,
-    `redMinor=${w2.match.fouls.red.minor} blueMinor=${w2.match.fouls.blue.minor}`,
-  );
-
-  // (b) the overlap case, on the BASE ZONE: a robot lying across the zone's
-  // corner with every corner outside it and its center outside it too. The body
-  // is demonstrably in the zone; the old corner/center test said it was not.
-  const w3 = foulWorld(15); // endgame
-  const bz = baseZone('blue');
-  w3.robots[0].heading = Math.PI / 4;
-  w3.robots[0].pos = { x: bz.x0 - 2, y: bz.y1 + 2 };
-  w3.robots[1].heading = 0;
-  w3.robots[1].pos = { x: 0, y: 0 };
-  const noCornerIn = !robotCorners(w3.robots[0]).some((c) => inRect(c, bz));
-  const centerOut = !inRect(w3.robots[0].pos, bz);
-  w3.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w3, 1 / 60, new Map());
-  check(
-    'a robot covering a zone with NO corner inside and its center outside is still IN the zone (G427)',
-    noCornerIn && centerOut && w3.match.fouls.red.major === 1,
-    `noCornerIn=${noCornerIn} centerOut=${centerOut} redMajor=${w3.match.fouls.red.major}`,
-  );
-  // and the same robot, moved clear, is not in it — the test is overlap, not "near"
-  const w4 = foulWorld(15);
-  w4.robots[0].heading = Math.PI / 4;
-  w4.robots[0].pos = { x: bz.x0 - 16, y: bz.y1 + 16 };
-  w4.robots[1].heading = 0;
-  w4.robots[1].pos = { x: 0, y: 0 };
-  w4.rrContacts = [{ a: 0, b: 1 }];
-  updatePenalties(w4, 1 / 60, new Map());
-  check(
-    'overlap is still a real test — a robot clear of the base zone draws no G427',
-    w4.match.fouls.red.major === 0,
-    `redMajor=${w4.match.fouls.red.major}`,
-  );
-}
-
-// ---- G402 AUTO interference (MAJOR): fully on the opponent's side -----------
-// Each alliance BELONGS on its goal side (blue -x, red +x — robots stage near
-// their cross-court goal); crossing fully to the OPPONENT's side fouls the
-// crosser. (Regression: this used to key off driverSide and fired when a robot
-// sat on its OWN side, fouling the wrong alliance.)
-{
-  const w = createWorld('match', 55, [setup(0, 'blue', {}, 0), setup(1, 'red', {}, 0)]);
-  startMatch(w); // -> auto
-  for (const r of w.robots) { r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-  w.robots[0].pos = { x: 30, y: 0 }; // blue entirely on RED's (+x) side
-  w.robots[1].pos = { x: 30, y: 1 }; // contacting a red robot
-  runCmds(w, new Map(), 0.2);
-  check(
-    'crossing fully onto the opponent side and contacting in AUTO is a MAJOR foul on the crosser',
-    w.match.scores.red.foulPoints === 15 && w.match.fouls.blue.major === 1,
-    `redFoulPts=${w.match.scores.red.foulPoints} blueMajor=${w.match.fouls.blue.major}`,
-  );
-
-  // a robot fully on its OWN side (blue on -x) contacting an opponent is NOT G402
-  const w2 = createWorld('match', 55, [setup(0, 'blue', {}, 0), setup(1, 'red', {}, 0)]);
-  startMatch(w2);
-  for (const r of w2.robots) { r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-  w2.robots[0].pos = { x: -30, y: 0 }; // blue on its OWN (-x) side
-  w2.robots[1].pos = { x: -30, y: 1 }; // red has crossed onto blue's side
-  runCmds(w2, new Map(), 0.2);
-  check(
-    'G402 fouls the CROSSER, not the alliance sitting on its own side',
-    w2.match.fouls.blue.major === 0 && w2.match.fouls.red.major === 1,
-    `blueMajor=${w2.match.fouls.blue.major} redMajor=${w2.match.fouls.red.major}`,
-  );
-}
-
-// ---- same-alliance contact never fouls -------------------------------------
-{
-  const w = createWorld('match', 55, [setup(0, 'blue', {}, 0), setup(1, 'blue', {}, 1)]);
-  w.match.phase = 'teleop';
-  w.match.phaseTimeLeft = 60;
-  const ts = tunnelStrip('red');
-  const cx = (ts.x0 + ts.x1) / 2;
-  for (const r of w.robots) { r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-  w.robots[0].pos = { x: cx, y: -25 };
-  w.robots[1].pos = { x: cx, y: -24 };
-  runCmds(w, new Map(), 0.5);
-  check(
-    'same-alliance contact in a foul zone never fouls',
-    w.match.scores.red.foulPoints === 0 &&
-      w.match.scores.blue.foulPoints === 0 &&
-      w.match.fouls.blue.minor === 0 &&
-      w.match.fouls.blue.major === 0,
-  );
-}
-
-/** pin scenario: pinned robot flush against the far wall, pinner just below and
- * driving up into it (heading π/2 so robot-forward = +y). */
-/** make robot 0 the weakest legal build — an 18 lb x-drive at 200 rpm — for scenes where the
- * victim has to be able to get away (see the strafe-clear pair) */
-function weakHolder(w: World): void {
-  const r = w.robots[0];
-  r.spec = { ...r.spec, drivetrain: 'xdrive', massLb: 18, driveRpm: 200 };
-}
-
-function pinWorld(): World {
-  const w = foulWorld();
-  for (const r of w.robots) r.heading = Math.PI / 2;
-  // flush at the far wall — the INTAKE tip on it (63 put the footprint 1.25in inside the wall)
-  w.robots[1].pos = { x: 0, y: FIELD_HALF - DEFAULT_SPEC.length / 2 - INTAKE_PRESETS[DEFAULT_SPEC.intake].reach }; // pinned red
-  w.robots[0].pos = { x: 0, y: 44 }; // pinner blue, 1" gap, drives up into it
-  return w;
-}
-/**
- * The pinner drives INTO the victim; the VICTIM drives the other way, trying to get out.
- *
- * Both used to drive at the wall together, which is a different situation and not a pin: a robot
- * pressing itself into a wall satisfies every clause of G422 — contact, attempting to move,
- * going nowhere — while the opponent behind it prevents nothing, and the rule is explicit that
- * PINNING is "PREVENTING the movement". Under that scene the WEAKEST legal build "pinned" a
- * default chassis. `isPinning` now requires the pinner to be in the way of where the victim is
- * trying to go, so the victim has to actually be trying to leave.
- */
-const PIN_CMDS = new Map([[0, cmd({ driveY: 1 })], [1, cmd({ driveY: -1 })]]);
-
-// ---- G422 pinning: 3-count fires, then resets on separation -----------------
-{
-  const w = pinWorld();
-  runCmds(w, PIN_CMDS, 2.7);
-  check('no pin foul before the 3 s threshold', w.match.fouls.blue.minor === 0, `blueMinor=${w.match.fouls.blue.minor}`);
-  runCmds(w, PIN_CMDS, 0.5); // cross 3 s
-  check(
-    'a 3 s pin draws a MINOR foul on the pinner',
-    w.match.fouls.blue.minor === 1,
-    `blueMinor=${w.match.fouls.blue.minor}`,
-  );
-  // ONLY the pinner is fouled — the pinned victim's alliance (red) must not be
-  // (both robots are slow + commanding in a wall shove; the wall-trap test picks
-  // the real pinner)
-  check(
-    'the pinned victim alliance is NOT fouled (no wrong-alliance pin penalty)',
-    w.match.fouls.red.minor === 0 && w.match.fouls.red.major === 0,
-    `redMinor=${w.match.fouls.red.minor} redMajor=${w.match.fouls.red.major}`,
-  );
-  // separate: the accumulator must reset and stop fouling
-  w.robots[0].pos = { x: 0, y: -20 };
-  const before = w.match.fouls.blue.minor + w.match.fouls.blue.major;
-  runCmds(w, new Map(), 2);
-  check(
-    'breaking the pin resets the count (no further foul while separated)',
-    w.match.fouls.blue.minor + w.match.fouls.blue.major === before,
-    `after=${w.match.fouls.blue.minor + w.match.fouls.blue.major}`,
-  );
-}
-
-// ---- G422 pinning: it keeps billing, every 3 s, and it is never a MAJOR ------
-{
-  /**
-   * "Violation: MINOR FOUL and an additional MINOR FOUL for every 3 seconds in which the
-   * situation is not corrected."
-   *
-   * These two checks used to assert the opposite of the rule on BOTH counts: that a sustained
-   * pin is a single MINOR however long you hold it, and that a later repeat escalates to a
-   * MAJOR. Neither is in G422 — there is no escalation anywhere in it, and holding a pin is
-   * exactly the "situation not corrected" the additional MINORs are for. Letting a pinner buy
-   * an indefinite hold for one MINOR is the version that actually changes how you would play.
-   */
-  const w = pinWorld();
-  runCmds(w, PIN_CMDS, 3.2);
-  check('a pin bills its first MINOR at 3 s', w.match.fouls.blue.minor === 1 && w.match.fouls.blue.major === 0, `${w.match.fouls.blue.minor}/${w.match.fouls.blue.major}`);
-  runCmds(w, PIN_CMDS, 3);
-  check(
-    '...and another MINOR for every 3 s it is not corrected',
-    w.match.fouls.blue.minor === 2 && w.match.fouls.blue.major === 0,
-    `after 6.2 s: ${w.match.fouls.blue.minor}/${w.match.fouls.blue.major}`,
-  );
-  runCmds(w, PIN_CMDS, 3);
-  check(
-    '...and it keeps billing for as long as it is held',
-    w.match.fouls.blue.minor === 3 && w.match.fouls.blue.major === 0,
-    `after 9.2 s: ${w.match.fouls.blue.minor}/${w.match.fouls.blue.major}`,
-  );
-  // separate properly (criterion A: 2 ft apart for MORE than 3 s), then pin again
-  w.robots[0].pos = { x: 0, y: 20 };
-  runCmds(w, new Map(), 3.2);
-  const before = w.match.fouls.blue.minor;
-  w.robots[0].pos = { x: 0, y: 44 };
-  runCmds(w, PIN_CMDS, 3.2);
-  check(
-    'a repeat pin is another MINOR — G422 has no escalation',
-    w.match.fouls.blue.minor === before + 1 && w.match.fouls.blue.major === 0,
-    `${before} -> ${w.match.fouls.blue.minor}, majors ${w.match.fouls.blue.major}`,
-  );
-}
-
-// ---- G422 criterion A: separation PAUSES the count; only >3s of it ends the pin ----
-{
-  /**
-   * "For criteria A, the PIN count pauses once ROBOTS are separated by 2 ft. until either the
-   * PIN ends or the PINNING ROBOT moves back within 2 ft., at which point the PIN count is
-   * resumed." — and criterion A itself needs the separation to last MORE THAN 3 seconds.
-   *
-   * The sim used to end a pin after 0.6 s of the hold merely lapsing, for any reason, so a
-   * pinner could wipe a two-and-a-half-second count by easing off for seven tenths of a second.
-   */
-  const resumed = pinWorld();
-  runCmds(resumed, PIN_CMDS, 2.5);
-  resumed.robots[0].pos = { x: 0, y: 20 }; // >2ft clear
-  runCmds(resumed, new Map(), 2.0); // under 3s — pauses, does not end
-  const during = resumed.match.fouls.blue.minor;
-  resumed.robots[0].pos = { x: 0, y: 44 };
-  runCmds(resumed, PIN_CMDS, 0.7); // 2.5 + 0.7 crosses the 3-count
-  check(
-    'backing off briefly PAUSES the pin count — it resumes, it does not reset',
-    during === 0 && resumed.match.fouls.blue.minor === 1,
-    `during the pause ${during}, after resuming ${resumed.match.fouls.blue.minor}`,
-  );
-
-  const ended = pinWorld();
-  runCmds(ended, PIN_CMDS, 2.5);
-  ended.robots[0].pos = { x: 0, y: 20 };
-  runCmds(ended, new Map(), 3.4); // more than 3s apart — criterion A ends it
-  ended.robots[0].pos = { x: 0, y: 44 };
-  runCmds(ended, PIN_CMDS, 0.7);
-  check(
-    '...and separating for more than 3 s ENDS it, so the count starts over',
-    ended.match.fouls.blue.minor === 0,
-    `${ended.match.fouls.blue.minor} fouls after 2.5s + 3.4s apart + 0.7s`,
-  );
-}
-
-// ---- G422 criterion B: 2 ft from where the pin began ends it ----------------
-{
-  /**
-   * A robot being bulldozed ACROSS the field is not being pinned for the whole trip: once
-   * either robot is 2 ft from where the pin initiated, for more than 3 seconds, the count ends.
-   * So a long push bills the first MINOR and then stops, rather than billing forever.
-   *
-   * ⚠️ THE WALK IS APPLIED, NOT DRIVEN — the same way the criterion A scene above applies its
-   * separation by hand. This used to be staged as a SWERVE pinner strafing its victim sideways
-   * along the far wall, and no holder can do that any more: a contact that slides stops steering
-   * the robot on the other end of it, so measured, ten seconds of a 40 lb swerve pinner strafing
-   * at full throttle walked its victim 4.6in. A scene that tries to DRIVE the travel therefore
-   * silently asserts the stationary case and tests nothing. Criterion B is a clause about
-   * DISPLACEMENT FROM WHERE THE PIN BEGAN, so displacement is what the scene supplies; the hold
-   * either side of it is real physics, and the 12in case below is what keeps the 2 ft threshold
-   * honest rather than making this a test that any teleport clears the count.
-   *
-   * Counted as G422 EVENTS, not as `fouls.blue.minor` — a pin scene on the far wall can pick up
-   * G424/G425 of its own.
-   */
-  const walked = (walk: number): number => {
-    const w = pinWorld();
-    // park the artifacts: a pair on the far wall otherwise collects the spike-mark pile, which
-    // is a different scene (and G408's, not G422's)
-    for (const ball of w.balls) ball.state = { kind: 'held', robot: 99 };
-    runCmds(w, PIN_CMDS, 2.5); // a real hold, still under the 3 s threshold
-    for (const r of w.robots) r.pos = { x: r.pos.x + walk, y: r.pos.y };
-    runCmds(w, PIN_CMDS, 3.4); // >3 s spent 2 ft from where it began ⇒ criterion B ends it
-    runCmds(w, PIN_CMDS, 0.7); // ...so the 2.5 s already banked no longer crosses the 3-count
-    return pins(w).onBlue;
-  };
-  check(
-    'a pin that travels 2 ft from where it began stops billing (criterion B)',
-    walked(30) === 0,
-    `${walked(30)} G422 after 2.5 s of a hold, 30in of travel for 3.4 s, then 0.7 s more`,
-  );
-  check(
-    '...and the threshold is the rule’s own 2 ft: a pin that shuffles a FOOT keeps its count',
-    walked(12) === 2,
-    `${walked(12)} G422 for the same run walked only 12in`,
-  );
-  // ...and the same hold that does NOT travel keeps billing, which is the contrast that
-  // makes the criterion mean something
-  const still = pinWorld();
-  for (const ball of still.balls) ball.state = { kind: 'held', robot: 99 };
-  runCmds(still, PIN_CMDS, 10);
-  check(
-    '...while a hold that stays put bills every 3 s throughout',
-    pins(still).onBlue === 3,
-    `${pins(still).onBlue} G422 over 10 s`,
-  );
-}
-
-// ---- G422 "attempting to move": a TANK on separate sticks is protected too --
-{
-  /**
-   * "...and the opponent ROBOT is attempting to move." The test read only driveX/driveY/rotate,
-   * which a Traditional-tank driver on separate sticks never fills — so a tank robot was never
-   * attempting to move and could not be pinned AT ALL. G422 simply did not protect it.
-   */
-  const held = (victimCmd: Partial<RobotCommand>) => {
-    const w = pinWorld();
-    w.robots[1].spec.drivetrain = 'tank';
-    // a pinner strong enough to hold a tank, or the victim just drives off (correctly)
-    w.robots[0].spec.drivetrain = 'tank';
-    w.robots[0].spec.massLb = 42;
-    w.robots[0].spec.driveRpm = 200;
-    runCmds(w, new Map([[0, cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 })], [1, cmd(victimCmd)]]), 3.4);
-    return w.match.fouls.blue.minor;
-  };
-  const sideDriveOnly = held({ leftDrive: -1, rightDrive: -1 });
-  const arcade = held({ driveY: -1, leftDrive: -1, rightDrive: -1 });
-  check(
-    'a tank struggling on side-drive alone counts as attempting to move',
-    sideDriveOnly === 1 && sideDriveOnly === arcade,
-    `side-drive only ${sideDriveOnly}, arcade ${arcade} — the control style must not matter`,
-  );
-  /**
-   * A VICTIM COMMANDING NOTHING IS STILL PINNED — this asserted the opposite until it was
-   * reported that "pinning penalties still don't happen often enough; the victim needs to be
-   * trying to escape for them to get a penalty, and that shouldn't be the case."
-   *
-   * Reading the rule's "attempting to move" as "the stick is deflected this tick" is what kept
-   * the foul rare. Somebody held against a wall stops working the stick long before they stop
-   * being held — they line up a shot, they wait, they give up — and a referee cannot see a
-   * stick anyway. A DEVIATION from the letter of G422, in the same class as
-   * `POSSESSION_REBILL_S`; the guard that replaces it is on the PINNER (below).
-   */
-  check(
-    'a victim commanding nothing at all is STILL being pinned',
-    held({}) >= 1,
-    `${held({})} MINORs`,
-  );
-}
-
-// ---- G422: ...but the PINNER has to be doing the holding ---------------------
-{
-  /**
-   * The guard that took over from "the victim must be struggling". `rrContacts` is recorded on
-   * geometric OVERLAP ALONE (physics.ts), so without this any robot resting near an idle
-   * opponent by a wall would bill a MINOR every 3 s. Touching is not pinning.
-   */
-  const guard = (pinnerCmd: Partial<RobotCommand>): number => {
-    const w = pinWorld();
-    runCmds(w, new Map([[0, cmd(pinnerCmd)], [1, cmd({})]]), 12);
-    return w.match.fouls.blue.minor;
-  };
-  check(
-    'an idle robot merely touching an idle victim is not pinning it',
-    guard({}) === 0,
-    `${guard({})} MINORs over 12 s`,
-  );
-  check(
-    '...nor is one driving PAST it rather than into it',
-    guard({ driveX: 1 }) === 0,
-    `${guard({ driveX: 1 })} MINORs over 12 s`,
-  );
-  check(
-    '...but one driving INTO it against the wall is, struggle or no struggle',
-    guard({ driveY: 1 }) >= 3,
-    `${guard({ driveY: 1 })} MINORs over 12 s`,
-  );
-}
-
-// ---- G422 "preventing the movement": the pinner has to be IN THE WAY --------
-{
-  /**
-   * A robot driving ITSELF into a wall satisfies every other clause — contact, attempting to
-   * move, going nowhere, trapped — while the opponent behind it prevents nothing. The rule says
-   * PINNING is "PREVENTING the movement", so the pinner must lie along where the victim is
-   * trying to go. Measured before this: the WEAKEST legal build "pinned" a default chassis.
-   */
-  const intoWall = (pinnerSpec: Partial<RobotSpec>) => {
-    const w = pinWorld();
-    Object.assign(w.robots[0].spec, pinnerSpec);
-    const push = cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 });
-    runCmds(w, new Map([[0, push], [1, push]]), 6); // BOTH drive at the wall
-    return w.match.fouls.blue.minor + w.match.fouls.blue.major;
-  };
-  check(
-    'a robot driving itself into a wall is not being pinned by whoever is behind it',
-    intoWall({}) === 0 && intoWall({ drivetrain: 'xdrive', massLb: 18, driveRpm: 600 }) === 0,
-    `default pinner ${intoWall({})}, weakest legal pinner ${intoWall({ drivetrain: 'xdrive', massLb: 18, driveRpm: 600 })}`,
-  );
-}
-
-// ---- G422: the ORDINARY wall pin — a victim strafing to get out ------------
-{
-  /**
-   * THE COMMON PIN, and it used to draw NOTHING.
-   *
-   * Held flat against a wall, a driver does not reverse into the robot leaning on them — they
-   * strafe along the wall. The obstruction test asked whether the PINNER lay along where the
-   * victim was trying to go, which is true of a straight reverse and false of every sideways
-   * exit, so the whole scene was ruled un-pinned however stuck the victim was. The rule names
-   * this case itself — prevention "either direct or transitive (such as against a FIELD
-   * element)".
-   *
-   * ⚠️ WHAT CHANGED UNDER IT: `capDrag`. The victim used to be welded in place (1.1in in six
-   * seconds) partly because the HOLDER was dragged sideways with it by an unbounded bumper
-   * friction, so the contact never slid off. With that friction bounded, a sideways exit along
-   * an open wall is a REAL escape — measured, 33.6in in 3.3s — and a robot that gets away is
-   * not being prevented from moving, so nothing is billed. That is the rule, not a regression:
-   * strafing out is the escape, and a defender has to steer to keep up with it.
-   *
-   * So the pin is now tested where the exit is actually closed: the CORNER, where the same
-   * strafe puts the victim into the second wall. Both halves are asserted — the escape draws
-   * nothing, the cornered hold draws the MINOR — because the pair is the property.
-   */
-  // victim (heading π/2, so +y is its forward) strafes sideways along the wall; the pinner
-  // holds it there. Its own forward is left at 0 — it is trying to leave, not to press in.
-  /**
-   * ⚠️ THE ESCAPE IS COULOMB FRICTION NOW, not a clip artefact. The wall and the holder's bumper
-   * together hold the victim with (wall + bumper) times the holder's push, against a strafe worth
-   * the victim's own — and a stalled motor pushes with its whole stall force at any throttle. The
-   * old '52in escape from a 42 lb tank' came from the post-solve lateral clip handing the
-   * commanded strafe back after the contact had refused it; a 42 lb tank holds a mecanum on any
-   * wall now (see ). An EQUAL holder can be strafed out of, and the victim
-   * commands ONLY the strafe — its own forward press would add to the friction holding it.
-   */
-  const cmds = new Map([[0, cmd({ driveY: 1 })], [1, cmd({ driveX: 1 })]]);
-  const open = pinWorld();
-  runCmds(open, cmds, 3.3);
-  const esc = open.robots[1];
-  check(
-    'a victim that strafes CLEAR along an open wall is not being pinned',
-    open.match.fouls.blue.minor === 0 && Math.hypot(esc.pos.x, esc.pos.y - 63) > 12,
-    `blueMinor=${open.match.fouls.blue.minor} moved ${Math.hypot(esc.pos.x, esc.pos.y - 63).toFixed(1)}in`,
-  );
-
-  const w = pinWorld();
-  // ...and the same scene in the CORNER: the victim's sideways exit is the +x wall
-  w.robots[1].pos = { x: 62, y: 63 };
-  w.robots[0].pos = { x: 62, y: 44 };
-  runCmds(w, cmds, 2.7);
-  check(
-    'a wall pin the victim is STRAFING out of does not foul before 3 s either',
-    w.match.fouls.blue.minor === 0,
-    `blueMinor=${w.match.fouls.blue.minor}`,
-  );
-  runCmds(w, cmds, 0.6);
-  check(
-    'a victim CORNERED while strafing to escape DOES pin its holder',
-    w.match.fouls.blue.minor >= 1,
-    `blueMinor=${w.match.fouls.blue.minor}`,
-  );
-  /**
-   * ...and it is not vacuous: the bill tracks whether the victim ACTUALLY got away, which is
-   * only visible against the free run above. Cornered it covers well under half the ground
-   * (12.7in against 33.6in) and is still being shoved around at the end; along the open wall
-   * it strafes clear and is charged nothing.
-   */
-  const v = w.robots[1];
-  const moved = Math.hypot(v.pos.x - 62, v.pos.y - 63);
-  const got = Math.hypot(esc.pos.x, esc.pos.y - 63);
-  check(
-    '...and that victim covers far less ground than the one that escaped',
-    moved < got / 2,
-    `cornered ${moved.toFixed(1)}in vs free ${got.toFixed(1)}in in 3.3 s`,
-  );
-}
-
-// ---- G422: ...and getting away is what LIMITS the bill ----------------------
-{
-  /**
-   * The other half of the same rule. Prevention is an OUTCOME, not a stick direction, so the
-   * relaxed test above must not foul a robot the victim simply drove away from. Criterion B
-   * and `PIN_STUCK_SPEED` are what decide that, and this is the comparison that shows they do:
-   * the SAME victim, the SAME 42 lb tank holding it, the same sideways escape — the only thing
-   * that differs is whether that escape has anywhere to go.
-   *
-   * ⚠️ THE VARIABLE IS THE EXIT, NOT THE HOLDER. This used to contrast a holder the victim
-   * could beat with one it could not, and holder strength no longer decides it: with the contact
-   * free to slip, a victim strafing along an OPEN wall gets clear of ANY holder — measured, 52in
-   * away from this same 42 lb tank at full throttle, in under two seconds — and one whose strafe
-   * runs into the second wall gets clear of none. Keeping the old staging asserted "goes nowhere"
-   * about a robot that had gone 52in, which is how it read when it broke.
-   *
-   * Note it is not "escaping ends the count" — a pin held for 3 s is still a pin, and a victim
-   * that gets clear and is then RE-CAUGHT starts a new one. What escaping buys is that the bill
-   * stops growing.
-   */
-  const held = (x0: number): { escaped: number; g422: number } => {
-    // the WEAKEST legal holder — see the strafe-clear pair for why it is not the 42 lb tank
-    const w = createWorld('match', 55, [setup(0, 'blue', { drivetrain: 'xdrive', massLb: 18, driveRpm: 200 }, 0), setup(1, 'red', {}, 0)]);
-    w.match.phase = 'teleop';
-    w.match.phaseTimeLeft = 200;
-    for (const r of w.robots) { r.heading = Math.PI / 2; r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-    w.robots[1].pos = { x: x0, y: FIELD_HALF - DEFAULT_SPEC.length / 2 - INTAKE_PRESETS[DEFAULT_SPEC.intake].reach }; // intake tip flush on the wall
-    w.robots[0].pos = { x: x0, y: 44 };
-    // a TANK pusher is commanded on its SIDE STICKS — given only driveY it does not move at
-    // all, which silently turns "held against a wall" into "standing next to a wall"
-    const pc = cmd({ driveY: 1 });
-    runCmds(w, new Map([[0, pc], [1, cmd({ driveX: 1 })]]), 20);
-    // how far the victim's own escape (+x, along the wall it is held against) actually got it,
-    // and G422 EVENTS rather than `fouls.blue.minor`, since the corner staging sits in a
-    // protected zone's neighbourhood
-    return { escaped: w.robots[1].pos.x - x0, g422: pins(w).onBlue };
-  };
-  const cornered = held(62); // the sideways exit runs into the +x wall
-  check(
-    'a victim a heavy tank holds against the wall goes nowhere and keeps being billed',
-    cornered.escaped < 6 && cornered.g422 >= 5,
-    `escaped ${cornered.escaped.toFixed(1)}in, ${cornered.g422} G422 over 20 s`,
-  );
-  const free = held(0); // ...and the identical hold with the wall open beside it
-  check(
-    '...while the same holder bills nothing once the victim can strafe clear',
-    free.g422 === 0 && free.escaped > 24,
-    `escaped ${free.escaped.toFixed(1)}in, ${free.g422} G422 over 20 s`,
-  );
-}
-
-// ---- G422: a pin does NOT need a wall --------------------------------------
-{
-  /**
-   * "Pinning penalty should happen without being against the wall."
-   *
-   * `pinnedAgainstWall` was a hard requirement, kept because it was the only thing telling the
-   * aggressor from the victim when two robots lean on each other — but it meant an open-floor
-   * pin drew nothing at all, which is neither the rule (a FIELD element is an example, "such
-   * as") nor what a referee calls.
-   *
-   * Staged as a STALEMATE a long way from every wall: a light pusher that cannot actually shift
-   * a heavy victim, so the pair stays put and stays in open floor for the whole run. That is the
-   * only open-field pin the rule can sustain — anything that travels is ended by criterion B.
-   */
-  const mid = (
-    pinnerCmd: Partial<RobotCommand>,
-    victimCmd: Partial<RobotCommand>,
-    /** EQUAL chassis for the mutual case. A light pusher against a heavy victim is not a
-     *  stalemate at all — the heavy one wins, drives the light one into the far wall and
-     *  genuinely pins it there, which is a real foul and not the scene being tested. */
-    equal = false,
-  ) => {
-    const w = createWorld('match', 55, [
-      setup(0, 'blue', equal ? {} : { drivetrain: 'xdrive', massLb: 18, driveRpm: 600 }, 0),
-      setup(1, 'red', equal ? {} : { drivetrain: 'tank', massLb: 42, driveRpm: 200 }, 0),
-    ]);
-    w.match.phase = 'teleop';
-    w.match.phaseTimeLeft = 200;
-    for (const r of w.robots) { r.heading = Math.PI / 2; r.vel = { x: 0, y: 0 }; r.fieldCentric = false; }
-    w.robots[1].pos = { x: 0, y: 0 };
-    w.robots[0].pos = { x: 0, y: -19 };
-    runCmds(w, new Map([[0, cmd(pinnerCmd)], [1, cmd(victimCmd)]]), 12);
-    const wall = Math.min(
-      ...w.robots.map((r) => Math.min(FIELD_HALF - Math.abs(r.pos.x), FIELD_HALF - Math.abs(r.pos.y))),
-    );
-    return { blue: w.match.fouls.blue.minor, red: w.match.fouls.red.minor, wall };
-  };
-  const idle = mid({ driveY: 1 }, {});
-  check(
-    'a pin in OPEN FIELD is billed — no wall required',
-    idle.blue >= 3 && idle.red === 0,
-    `pusher ${idle.blue}, victim ${idle.red}, nearest wall ${idle.wall.toFixed(0)}in`,
-  );
-  check(
-    '...and it really was open floor, not a wall pin in disguise',
-    idle.wall > 40,
-    `nearest wall ${idle.wall.toFixed(0)}in`,
-  );
-  const strafing = mid({ driveY: 1 }, { driveX: 1 });
-  check(
-    '...whether or not the victim is struggling',
-    strafing.blue >= 3 && strafing.red === 0,
-    `pusher ${strafing.blue}, victim ${strafing.red}`,
-  );
-  // ...and the guards, which are what stops open floor becoming a foul for touching anybody
-  const mutual = mid({ driveY: 1 }, { driveY: -1 }, true);
-  check(
-    'two robots shoving each other in open field is mutual — nobody is fouled (criterion C)',
-    mutual.blue === 0 && mutual.red === 0,
-    `${mutual.blue}/${mutual.red}`,
-  );
-  check(
-    'an idle robot in contact in open field pins nobody',
-    mid({}, {}).blue === 0,
-  );
-  check(
-    '...nor does one driving AWAY from the robot it is touching',
-    mid({ driveY: -1 }, {}).blue === 0,
-  );
-}
-
-// ---- G422 pinning: the 3-count SURVIVES the flicker in its own inputs -------
-// Every input to the pin test drops out for the odd tick in a real match — the SAT
-// contact list unloads as bumpers rock, the victim's stick crosses the dead zone.
-// The count PAUSES on a lapse instead of resetting, so a pin held through those
-// gaps still reaches 3 s; wiping it on any one-tick lapse is why the foul used to
-// almost never fire.
-{
-  const w = pinWorld();
-  const idle = new Map([[0, cmd({ driveY: 1 })], [1, cmd({})]]); // victim's stick at rest
-  for (let i = 0; i < 12; i++) {
-    runCmds(w, PIN_CMDS, 0.28);
-    runCmds(w, idle, 0.05); // a lapse well under PIN_BREAK_S
-  }
-  check(
-    'a pin held through repeated brief lapses still draws the foul',
-    w.match.fouls.blue.minor + w.match.fouls.blue.major >= 1,
-    `blueMinor=${w.match.fouls.blue.minor} blueMajor=${w.match.fouls.blue.major}`,
-  );
-}
-
-// ---- G422 pinning: a GOAL WEDGE traps just like the perimeter ---------------
-// The old wall test accepted only the field PERIMETER, so a robot held against a
-// goal or the classifier — the corners where everyone is trying to score, and so
-// where pinning actually happens — was never recognised as pinned at all. This
-// exact scenario drew zero fouls before.
-{
-  const w = foulWorld();
-  const n = goalFaceNormal('red'); // unit normal, INTO the field off the goal face
-  const face = goalFacePoints('red');
-  const mid = { x: (face[0].x + face[1].x) / 2, y: (face[0].y + face[1].y) / 2 };
-  const vict = w.robots[1]; // red, backed onto its own goal face
-  const pinr = w.robots[0]; // blue, pressing it there from the field side
-  vict.heading = Math.atan2(-n.y, -n.x); // both face the goal (foulWorld is robot-centric)
-  pinr.heading = vict.heading;
-  // seated ON the face, not 3in off it: the victim now RESISTS rather than driving at the goal,
-  // so an equally matched pinner stalemates wherever they first touch — start it where a pinned
-  // robot actually ends up
-  vict.pos = { x: mid.x + n.x * 10.5, y: mid.y + n.y * 10.5 };
-  pinr.pos = { x: mid.x + n.x * 29, y: mid.y + n.y * 29 };
-  // the pinner presses at the face; the VICTIM reverses off it, trying to get out (see PIN_CMDS)
-  const drive = new Map([[0, cmd({ driveY: 1 })], [1, cmd({ driveY: -1 })]]);
-  runCmds(w, drive, 4.2);
-  check(
-    'pinning a robot against the GOAL face fouls the pinner (not just the perimeter)',
-    w.match.fouls.blue.minor + w.match.fouls.blue.major >= 1 &&
-      w.match.fouls.red.minor + w.match.fouls.red.major === 0,
-    `blue=${w.match.fouls.blue.minor}/${w.match.fouls.blue.major} red=${w.match.fouls.red.minor}/${w.match.fouls.red.major}`,
-  );
-}
-
-// ---- G422: the geometries the single far-wall scene above cannot see --------
-/**
- * Every pin check before this one used ONE geometry — both robots square, dead centre, against
- * the flat far wall — and the push rewrite changed everything G422 reads: the victim now ROTATES
- * when it is caught off centre, how fast it is driven depends on a push force that was wrong in
- * four different ways, and how deep it sinks into the wall moved. `pinnedAgainstWall` projects
- * the victim's leading corner, so a spinning victim is exactly the case that geometry cannot
- * reach.
- *
- * `pins()` returns G422s attributed by OFFENDER. The event line names the alliance CREDITED
- * (the victim of the foul), so the offender is the other one — counting `fouls.blue` alone would
- * also sweep up G424/G425/G427, which a pin scene near a wall can easily trip on its own.
- */
-function pins(w: World): { onBlue: number; onRed: number } {
-  const g422 = w.events.filter((e) => e.includes('G422'));
-  return {
-    onBlue: g422.filter((e) => / RED \+/.test(e)).length,
-    onRed: g422.filter((e) => / BLUE \+/.test(e)).length,
-  };
-}
-
-/**
- * Blue pins red at `victim`, pressing along `dir` from 20in back.
- *
- * THE VICTIM DRIVES AWAY, which is the honest reading of G422's "while it is commanding
- * movement": a pinned driver is trying to get out. Making it drive INTO the wall alongside the
- * pinner (which is what the older far-wall scene does) tests something weaker — a robot stuck
- * against a wall by its own throttle satisfies every clause of the rule whether or not the
- * opponent behind it could hold it at all, so the WEAKEST legal build "pins" you. Fleeing is
- * what separates a pin from a robot leaning on you.
- */
-function pinScene(
-  victim: { x: number; y: number },
-  dir: { x: number; y: number },
-  opts: { offset?: number; pinnerSpec?: Partial<RobotSpec>; seconds?: number; headOn?: boolean } = {},
-): { onBlue: number; onRed: number; moved: number } {
-  const w = createWorld('match', 55, [setup(0, 'blue', opts.pinnerSpec ?? {}, 0), setup(1, 'red', {}, 0)]);
-  w.match.phase = 'teleop';
-  w.match.phaseTimeLeft = 60;
-  for (const ball of w.balls) ball.state = { kind: 'held', robot: 99 };
-  const [p, v] = w.robots;
-  const h = Math.atan2(dir.y, dir.x);
-  // perpendicular offset, so the pinner catches the victim off centre and spins it
-  const off = opts.offset ?? 0;
-  // the victim faces BACK down the push, so its own forward is its escape route
-  v.pos = { x: victim.x, y: victim.y }; v.heading = h + Math.PI; v.vel = { x: 0, y: 0 }; v.angVel = 0; v.fieldCentric = false;
-  p.pos = { x: victim.x - dir.x * 20 - dir.y * off, y: victim.y - dir.y * 20 + dir.x * off };
-  p.heading = h; p.vel = { x: 0, y: 0 }; p.angVel = 0; p.fieldCentric = false;
-  const push = cmd({ driveY: 1, leftDrive: 1, rightDrive: 1 }); // robot-centric forward
-  runCmds(w, new Map([[0, push], [1, push]]), opts.seconds ?? 5);
-  return { ...pins(w), moved: Math.hypot(v.pos.x - victim.x, v.pos.y - victim.y) };
-}
-
-{
-  const FAR = { x: 0, y: 63 };
-  const UP = { x: 0, y: 1 };
-  // OFF CENTRE — the victim gets spun by the impulse, which is new behaviour and is exactly
-  // what moves the leading corner `pinnedAgainstWall` projects.
-  const offs = [0, 4, 8].map((o) => pinScene(FAR, UP, { offset: o }));
-  check(
-    'a pin fouls whether the pinner catches the victim square or off centre',
-    offs.every((r) => r.onBlue >= 1 && r.onRed === 0),
-    offs.map((r, i) => `${[0, 4, 8][i]}in→${r.onBlue}/${r.onRed}`).join(' '),
-  );
-  // EVERY WALL, not just the far one
-  const side = pinScene({ x: 62, y: 20 }, { x: 1, y: 0 });
-  const audience = pinScene({ x: -20, y: -63 }, { x: 0, y: -1 });
-  check(
-    'a pin fouls against the side and audience walls too',
-    side.onBlue >= 1 && side.onRed === 0 && audience.onBlue >= 1 && audience.onRed === 0,
-    `side ${side.onBlue}/${side.onRed}, audience ${audience.onBlue}/${audience.onRed}`,
-  );
-  /**
-   * THE CLASSIFIER CHANNEL — `pinnedAgainstWall` claims it and nothing tested it, and testing it
-   * takes care: the obvious scene tests the PERIMETER instead. The probe point must land inside
-   * `classifierRect` (x −72..−66, and only the +y half — the channel does not run the length of
-   * the wall) while staying INSIDE the perimeter, or `Math.abs(p.x) >= FIELD_HALF` answers first
-   * and the classifier branch is never reached. Victim centre −58 puts its trailing corner at
-   * −65.25 and the probe at −68.25: in the channel, 3.75in clear of the wall.
-   */
-  const chan = pinScene({ x: -58, y: 30 }, { x: -1, y: 0 });
-  check(
-    'a pin against the CLASSIFIER channel fouls the pinner (not just the perimeter)',
-    chan.onBlue >= 1 && chan.onRed === 0,
-    `${chan.onBlue}/${chan.onRed}`,
-  );
-  /**
-   * ...AND A ROBOT TOO WEAK TO HOLD ANYONE NEVER DRAWS ONE. This is new: pushing power used to
-   * be mass-independent and double-counted on gearing, so who could actually pin whom had very
-   * little to do with what either robot was built like. The weakest legal build cannot keep a
-   * default chassis anywhere — the victim simply drives off — and a pin foul for a shove you
-   * could walk out of is a phantom.
-   */
-  const weak = pinScene(FAR, UP, { pinnerSpec: { drivetrain: 'xdrive', massLb: 18, driveRpm: 600 } });
-  check(
-    'a robot too weak to hold anyone never draws a pin foul',
-    weak.onBlue === 0 && weak.moved > 40,
-    `${weak.onBlue} fouls, victim drove ${weak.moved.toFixed(0)}in clear`,
-  );
-  const strong = pinScene(FAR, UP, { pinnerSpec: { drivetrain: 'tank', massLb: 42, driveRpm: 200 } });
-  check(
-    '...while the strongest one pins and is fouled for it',
-    strong.onBlue >= 1 && strong.onRed === 0 && strong.moved < 5,
-    `${strong.onBlue}/${strong.onRed}, victim held to ${strong.moved.toFixed(1)}in`,
-  );
-  /**
-   * NEGATIVE: a head-on stalemate in the middle of the field. Every other clause of G422 is
-   * satisfied — sustained contact, the victim commanding motion, neither robot going anywhere —
-   * and the ONLY thing standing between it and a foul is `pinnedAgainstWall` finding nothing
-   * behind the victim to trap it against. That is the clause this pins, and it is the one that
-   * decides pinner from pinned in every wall scene above.
-   */
-  const open = pinScene({ x: 0, y: 6 }, UP, { seconds: 6 });
-  check(
-    'a head-on stalemate in open field is not a pin — there is nothing to pin against',
-    open.onBlue === 0 && open.onRed === 0,
-    `${open.onBlue}/${open.onRed}, victim moved ${open.moved.toFixed(0)}in`,
-  );
-}
-
-// ---- a drained artifact never passes THROUGH a robot -------------------------------
-// The doorway artifact is exempted from the artifacts a robot is CARRYING (they step aside
-// for something being expelled), and exempting it from the CHASSIS too let it travel
-// straight through a parked robot. The chassis is never optional.
-{
-  for (const ry of [-8, -12]) {
-    for (const hopper of [0, 3]) {
-      const w = mkWorld('match', 'red', 42, { intake: 'vector', width: 17.5, length: 14.5 });
-      startMatch(w);
-      w.match.phase = 'teleop';
-      const r = w.robots[0];
-      for (const b of w.balls) {
-        if (b.state.kind !== 'held') continue;
-        b.state = { kind: 'ground' };
-        b.pos = { x: -FIELD_HALF + 6, y: -FIELD_HALF + 6 };
-        b.vel = { x: 0, y: 0 };
-        b.z = 0;
-        b.vz = 0;
-      }
-      r.hopper = Array.from({ length: hopper }, () => 'green' as const);
-      for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: -FIELD_HALF + 6, y: -FIELD_HALF + 6 };
-      for (let i = 0; i < 9; i++) {
-        const b = w.balls[i];
-        const cs = GATE_STOP_S + i * RAIL_PITCH;
-        b.state = { kind: 'rail', goal: 'red', s: cs, v: 0, overflow: false, pending: false };
-        b.pos = railPos('red', cs);
-        b.vel = { x: 0, y: 0 };
-        b.z = RAMP_SURFACE_Z;
-        b.vz = 0;
-      }
-      r.pos = { x: railPos('red', RAIL_EXIT_S).x, y: ry };
-      r.heading = Math.PI / 2;
-      r.fieldCentric = false;
-      r.vel = { x: 0, y: 0 };
-      let worst = 0;
-      for (let i = 0; i < Math.round(10 / SIM_DT); i++) {
-        w.goals.red.gatePos = 1;
-        w.goals.red.gateOpen = true;
-        w.goals.red.gateLatch = 1;
-        step(w, SIM_DT, new Map([[0, cmd({})]]));
-        for (const b of w.balls) {
-          if (b.state.kind !== 'ground' || b.pos.x < 0) continue;
-          worst = Math.max(worst, pointDepthInChassis(r, b.pos));
-        }
-      }
-      check(
-        `a drained artifact does not pass through a robot on the outflow (y=${ry}, hopper ${hopper})`,
-        worst < 0.6,
-        `deepest inside the chassis ${worst.toFixed(2)}in`,
-      );
-    }
-  }
-}
-
-// ---- GATE INTAKING with a FULL hopper still drains ---------------------------------
-// "release rate is slower than normal when gate intaking" — it did not slow, it STOPPED.
-// While the intake is swallowing, the doorway clears itself and the ramp actually drains
-// FASTER than with nobody there (0.169s vs 0.350s). But a full robot carries three held
-// artifacts physically sitting in its mouth, and `collideBallHeld` shoved the doorway
-// artifact straight back into the gate — cancelling the outward nudge to the third decimal,
-// every tick. At the stall the gate is open, the robot is NOT blocking the mouth
-// (mouth.s = -Infinity) and an artifact waits at s = -4.00: the doorway is the only false
-// condition. 4 of 9 out and a dead stop; 9 of 9 once nothing on the robot may push back the
-// artifact it is expelling.
-{
-  const w = mkWorld('match', 'red', 42, { intake: 'vector', width: 17.5, length: 14.5 });
-  startMatch(w);
-  w.match.phase = 'teleop';
-  const r = w.robots[0];
-  // clear the PRELOADS — the hopper array AND the physical held artifacts. Leaving those in
-  // the mouth silently blocks the intake and makes any gate-intaking probe measure nothing
-  // but its own preloads; that mistake cost a whole investigation.
-  for (const b of w.balls) {
-    if (b.state.kind !== 'held') continue;
-    b.state = { kind: 'ground' };
-    b.pos = { x: -FIELD_HALF + 6, y: -FIELD_HALF + 6 };
-    b.vel = { x: 0, y: 0 };
-    b.z = 0;
-    b.vz = 0;
-  }
-  r.hopper = [];
-  for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: -FIELD_HALF + 6, y: -FIELD_HALF + 6 };
-  for (let i = 0; i < 9; i++) {
-    const b = w.balls[i];
-    const cs = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'red', s: cs, v: 0, overflow: false, pending: false };
-    b.pos = railPos('red', cs);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-  // the reported pose, verbatim off the in-game readout
-  r.pos = { x: 57.3, y: -10.0 };
-  r.heading = (19 * Math.PI) / 180;
-  r.fieldCentric = false;
-  run(w, cmd({ driveY: 1, intake: true }), 16);
-  const left = w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'red').length;
-  /**
-   * WHAT THIS POSE DOES, AND WHY — read this before "fixing" it. The pose is verbatim off the
-   * in-game readout: pressed on the lever at 19 degrees, hopper full, intaking the outflow.
-   *
-   * It has been through three states this session and the current one is the physical one:
-   *
-   *  · originally the arm applied no torque at all, and the robot held 19 degrees;
-   *  · then the arm SQUARED it, which put the mouth over the drop point where the drop-space
-   *    rule correctly stalls the ramp — 0 of 9, and gate intaking was dead;
-   *  · now the arm PIVOTS rather than squares (it is a 2.5in stub, not a face), so a robot
-   *    leaning on it turns about it instead of being swung flat, keeps its angle, and keeps
-   *    the drain running.
-   *
-   * So what is asserted is the thing the technique needs: the ramp keeps discharging while a
-   * robot works the lever, and the hopper fills from it.
-   */
-  check(
-    'GATE INTAKING: working the lever keeps the ramp discharging',
-    9 - left >= 3 && r.hopper.length > 0,
-    `${9 - left}/9 out, hopper ${r.hopper.length} (0 of 9 when the arm squared the robot onto its own outflow)`,
-  );
-
-}
-
-// ---- GATE INTAKING drains at full speed ---------------------------------------------
-// "holding the gate open with the front left or right while simultaneously intaking balls
-// that come out of the classifier is called gate intaking and it is very common. When I do
-// this though, the balls come down at a slower cadence."
-//
-// They did: the doorway nudge was suppressed whenever the artifact sat inside ANY robot's
-// footprint, which is true on every single release of this manoeuvre. 5 of 9 artifacts in
-// 14s, against 9 of 9 at a 0.32s mean gap once the nudge is allowed to work — and 0.32s is
-// the rate with no robot there at all, so there is nothing left to win.
-{
-  const gateHold = (intake: boolean) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-    for (let i = 0; i < 9; i++) {
-      const b = w.balls[i];
-      const cs = GATE_STOP_S + i * RAIL_PITCH;
-      b.state = { kind: 'rail', goal: 'blue', s: cs, v: 0, overflow: false, pending: false };
-      b.pos = railPos('blue', cs);
-      b.vel = { x: 0, y: 0 };
-      b.z = RAMP_SURFACE_Z;
-      b.vz = 0;
-    }
-    const r = w.robots[0];
-    const ar = gateArmRect('blue');
-    // FIELD-CENTRIC: driveY=1 resolves to field −x for blue, i.e. straight INTO the lever.
-    // Driving along the wall does not open it (pushingGate is one-directional), so a probe
-    // that gets this wrong measures a gate that never opened rather than a slow drain.
-    r.pos = { x: ar.x1 + 7, y: (ar.y0 + ar.y1) / 2 };
-    r.heading = Math.PI;
-    r.fieldCentric = true;
-    r.vel = { x: 0, y: 0 };
-    r.hopper = [];
-    const left = () => w.balls.filter((b) => b.state.kind === 'rail' && b.state.goal === 'blue').length;
-    let prev = left();
-    const times: number[] = [];
-    for (let i = 0; i < Math.round(14 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, intake })]]));
-      const n = left();
-      if (n < prev) {
-        for (let k = 0; k < prev - n; k++) times.push(i * SIM_DT);
-        prev = n;
-      }
-    }
-    const gaps = times.slice(1).map((t, i) => t - times[i]);
-    return { out: 9 - left(), mean: gaps.length ? gaps.reduce((p, q) => p + q, 0) / gaps.length : 0 };
-  };
-  const on = gateHold(true);
-  check(
-    'GATE INTAKING: holding the lever while intaking drains the whole ramp',
-    on.out === 9,
-    `${on.out}/9 out at a ${on.mean.toFixed(3)}s mean gap (was 5/9)`,
-  );
-  check(
-    '...at the same cadence as no robot being there at all',
-    on.mean < 0.45,
-    `${on.mean.toFixed(3)}s vs the no-robot rate of ~0.32s`,
-  );
-  // The IDLE-intake counterpart is deliberately NOT asserted here: whether an artifact ends
-  // up inside an idle mouth depends on exactly where the robot came to rest against the
-  // lever (5/9 at x=-58, 9/9 at x=-56), so it is a fragile thing to pin a check to. The
-  // behaviour that matters — not shoving an artifact into something that will not take it —
-  // is already covered by the doorway-buzz check.
-}
-
-// ---- the gate opener rides ABOVE the artifacts, so it must not push them -----------
-// It is solid to walls, robots and the gate lever — that is `footprintExtents`, untouched —
-// but the roller and the opener blocks on its beam ends sit high in z, so artifacts pass
-// underneath. This only became reachable when the roller grew to 72mm: at 1in deep the
-// wedge covered essentially the whole reach and the drawing and the collision agreed, but
-// the wedge now stops a roller-radius short and the band in front of it was still solid.
-// Measured before the fix: an artifact placed dead centre of the block was ejected 4.2in.
-{
-  for (const key of ['sloped', 'triangle'] as const) {
-    const width = 18; // widest chassis -> the biggest opener block
-    const spec = { ...DEFAULT_SPEC, intake: key, length: INTAKE_PRESETS[key].maxLength, width };
-    const mo = intakeMouth(spec);
-    const hl = spec.length / 2;
-    const hw = width / 2;
-    const tip = hl + INTAKE_PRESETS[key].reach;
-    const wedgeFront = tip - intakeRollerDia(spec) / 2;
-    const w = mkWorld('match', 'blue', 7, spec);
-    startMatch(w);
-    const r = w.robots[0];
-    r.pos = { x: 0, y: 0 };
-    r.heading = 0; // robot frame == world frame
-    r.vel = { x: 0, y: 0 };
-    r.angVel = 0;
-    for (const b of w.balls) {
-      b.state = { kind: 'ground' };
-      b.pos = { x: FIELD_HALF - 6, y: -FIELD_HALF + 6 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-    }
-    const t = w.balls[0];
-    // forward of BOTH the chassis and the wedge front — the opener's REAR half sits above
-    // the wedge, which is floor-level structure and legitimately solid
-    // ...and CLEAR of the slope's compliant lip by its whole radius: the artifact is a 5in
-    // ball, not a point, and the slope is legitimately solid out to the end of that lip
-    t.pos = { x: tip + INTAKE_LIP + BALL_RADIUS + 0.05, y: (mo.mouthHalf + hw) / 2 };
-    const p0 = { ...t.pos };
-    for (let i = 0; i < Math.round(1 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({})]]));
-      for (const b of w.balls) {
-        if (b.id !== t.id && b.state.kind === 'ground') {
-          b.pos = { x: FIELD_HALF - 6, y: -FIELD_HALF + 6 };
-          b.vel = { x: 0, y: 0 };
-        }
-      }
-    }
-    const moved = hyp(t.pos.x - p0.x, t.pos.y - p0.y);
-    check(
-      `${key}: an artifact under the gate opener is not pushed by it`,
-      moved < 0.05,
-      `moved ${moved.toFixed(3)}in (4.2in before the fix)`,
-    );
-  }
 }
 
 // ---- the roller and its GATE OPENER match the collision box exactly ---------------
@@ -12516,1840 +5513,6 @@ function pinScene(
     Math.abs(intakeMouth(vs).mouthHalf - vs.width / 2) < 1e-9,
     `mouthHalf ${intakeMouth(vs).mouthHalf} = width/2 ${vs.width / 2}`,
   );
-}
-
-// ---- the intake and the chassis must not fight over the same artifact -------------
-// "It seems to be harder to intake in general compared to the stable version."
-// The capture ENVELOPE was never the problem — the same offsets hit and the same ones miss
-// as on main. What changed is that the chassis became a collider in the artifact solve, and
-// the intake's funnel pulls toward the throat at `local.x = hl`, which IS the chassis front
-// face. The two reached for the same artifact and pulled opposite ways: measured 7in
-// off-centre, the funnel drew it 7.0 -> 4.4 -> 3.9 and the chassis shoved it back out
-// 4.2 -> 4.7 -> 5.3 -> 6.1 -> 6.9 -> 7.8 -> 8.8 before it was finally swallowed. 1.45s
-// against main's 0.33s, and that oscillation is what reads as the intake not gripping.
-{
-  const grab = (offset: number, key: 'sloped' | 'vector' | 'triangle') => {
-    const w = mkWorld('match', 'blue', 7, {
-      intake: key,
-      length: INTAKE_PRESETS[key].maxLength,
-      width: Math.max(ROBOT_MIN_WIDTH, INTAKE_PRESETS[key].minWidth),
-    });
-    startMatch(w);
-    const r = w.robots[0];
-    r.hopper = [];
-    for (const b of w.balls) {
-      b.state = { kind: 'ground' };
-      b.pos = { x: FIELD_HALF - 6, y: -FIELD_HALF + 6 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-    }
-    const target = w.balls[0];
-    target.pos = { x: offset, y: -10 };
-    r.pos = { x: 0, y: -26 };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    r.vel = { x: 0, y: 0 };
-    let pushedOut = offset;
-    for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: 1, intake: true })]]));
-      // the human player restocks during teleop — keep everything but the target away
-      for (const b of w.balls) {
-        if (b.id !== target.id && b.state.kind === 'ground') {
-          b.pos = { x: FIELD_HALF - 6, y: -FIELD_HALF + 6 };
-          b.vel = { x: 0, y: 0 };
-        }
-      }
-      if (target.state.kind !== 'ground') return { t: i * SIM_DT, pushedOut };
-      pushedOut = Math.max(pushedOut, target.pos.x);
-    }
-    return { t: -1, pushedOut };
-  };
-  // measured on main, which is the reference the user is comparing against
-  const edge = grab(7, 'sloped');
-  /**
-   * 0.33s -> 0.53s when the intake's reach was cut to the landing bound, and the budget moved
-   * with it. This check is about the two passes FIGHTING, not about reach: its companion below
-   * (`pushedOut < 7.5`) is the one that actually detects the oscillation, and that is unmoved.
-   * A shorter reach means the funnel engages later on a full-throttle approach, so the swallow
-   * lands later — the requested behaviour, not the defect. The ceiling stays far under the
-   * 1.45s the oscillation produced, so the check still fails if it ever comes back.
-   */
-  check(
-    'an artifact at the edge of the mouth is swallowed promptly, not batted about',
-    edge.t >= 0 && edge.t < 0.65,
-    `7in off-centre: ${edge.t < 0 ? 'never' : edge.t.toFixed(2) + 's'} (main 0.33s, 0.53s once the reach became the landing bound, unclaimed 1.45s)`,
-  );
-  check(
-    '...and the chassis never shoves it back out of the mouth',
-    edge.pushedOut < 7.5,
-    `pushed out to x=${edge.pushedOut.toFixed(2)} (started at 7.0; unclaimed reached 9.28)`,
-  );
-  // the envelope itself is unchanged — this is about the two passes fighting, not reach
-  check(
-    'the capture envelope is unchanged: in at 6in, out at 8in',
-    grab(6, 'sloped').t >= 0 && grab(8, 'sloped').t < 0,
-    `6in ${grab(6, 'sloped').t.toFixed(2)}s, 8in ${grab(8, 'sloped').t < 0 ? 'MISS' : 'hit'}`,
-  );
-}
-
-// ---- G408: intaking from a clump is not over-possession — but HOLDING one is ------
-// Reported: "I get overpossession penalties when I am just intaking from a clump" —
-// "clump against a wall, specifically". Two separate things were counting artifacts the
-// robot does not control, and both are structural rather than a matter of timing:
-//   · the FIELD holds a jammed pile, not the robot. CONTROL means being in a position to
-//     move an artifact where you want, and a pile pressed on a wall goes nowhere — the
-//     manual names this BULLDOZING and excludes it. (Transitive: the front row is not on
-//     the wall, it is on the row that is.)
-//   · an artifact in the MOUTH while intaking is not a fourth artifact. POSSESSION_LIMIT
-//     and HOPPER_CAPACITY are the same 3, so a full robot cannot keep what it is drawing
-//     in; counting it charges the same limit twice.
-// A velocity test was tried first and is WRONG — see the note in penalties.ts. Measured:
-// this scenario drew 5 MINORs before, 0 after.
-{
-  const w = mkWorld('match', 'blue', 31);
-  startMatch(w);
-  w.balls.length = 0;
-  const cy = FIELD_HALF - BALL_RADIUS; // clump jammed on the far wall
-  for (let i = 0; i < 6; i++) {
-    w.balls.push({
-      id: 900 + i,
-      color: 'purple',
-      state: { kind: 'ground' },
-      pos: { x: -6 + (i % 3) * 5.2, y: cy - Math.floor(i / 3) * 5.0 },
-      vel: { x: 0, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  }
-  const r = w.robots[0];
-  r.pos = { x: 0, y: cy - 26 };
-  r.heading = Math.PI / 2; // facing the clump
-  r.fieldCentric = false;
-  const before = w.match.fouls.blue.minor;
-  // the window where it still has SLOTS: that is what the exemption is, so that is what is
-  // asserted. Past it the robot is full, acquiring nothing, and still leaning on the pile.
-  run(w, cmd({ driveY: 1, intake: true }), 0.6);
-  const acquiring = w.match.fouls.blue.minor - before;
-  /**
-   * ...AND IT IS OVER-POSSESSION NOW, which is the trade that was asked for.
-   *
-   * This case was the reason for the BULLDOZING carve-out: the field holds a jammed pile, so
-   * the robot cannot take it anywhere, so it is not control. The carve-out is gone with the
-   * rest of the alpha filters — "I'm still not getting any overpossession penalties, maybe
-   * just revert the penalty engine to the MAIN branch" — and main's rule asks one question:
-   * is it touching you while you are moving. Driving into a clump therefore costs, and the
-   * way not to pay is to stop driving into it once you are full.
-   */
-  check(
-    'driving into a wall clump to INTAKE from it is not over-possession while it has room',
-    acquiring === 0,
-    `minor fouls=${acquiring} while it still had room, hopper=${r.hopper.length} — the slots waiting for them are what excuses them, and only as many as there is room for`,
-  );
-  check('...and it actually intaked (the test is not vacuous)', r.hopper.length > 0, `hopper=${r.hopper.length}`);
-  /**
-   * ...AND STAYING THERE IS NOT A SECOND VIOLATION. AN ARRIVAL IS NOT A JOURNEY.
-   *
-   * This check used to assert the opposite — that leaning on the pile "keeps costing" — which
-   * came from the invented TRAPPING branch, and it is the behaviour that was reported as wrong:
-   * "I still get penalties when I'm pushing forward against two balls against the wall... it
-   * counts as me moving them even tho its basically staying in place."
-   *
-   * The push that PUT them there is a violation and is billed. Once nothing is moving, control
-   * drains: the per-artifact hold advances only while the artifact is still being taken
-   * somewhere (`POSSESSION_MOVE_MIN`), so it falls back under the confirm window and the
-   * continuing tariff stops. That is also what G408 itself says — its violation line is one
-   * assessment, with no continuing clause at all.
-   */
-  // The ARRIVAL at full throttle scatters what the funnel cannot take: round, frictionless
-  // artifacts outside the throat are squeezed out along the wall, and that push is billed ONCE,
-  // the way the wall-row ram further down is — it moved them. It is over inside a second and a
-  // half. What must not happen is the bill continuing while the robot then sits on the pile.
-  run(w, cmd({ driveY: 1, intake: true }), 1.5);
-  const arrival = w.match.fouls.blue.minor - before - acquiring;
-  run(w, cmd({ driveY: 1, intake: true }), 6.5);
-  const holding = w.match.fouls.blue.minor - before - acquiring - arrival;
-  check(
-    '...and leaning on it afterwards does NOT keep costing (an arrival is not a journey)',
-    holding === 0 && arrival <= 1,
-    `${arrival} MINOR for the arrival's scatter, then ${holding} further over 6.5s of holding the same pile on the wall`,
-  );
-}
-
-// ---- G408: pushing a clump in the open fouls even with the intake held ------------
-// "I was just pushing a clump out in the open" - and it drew nothing. The acquire carve-out
-// was bounded by HOPPER ROOM, which is the wrong axis: an EMPTY robot excused
-// HOPPER_CAPACITY artifacts outright, and a clump you would actually push around is three
-// to six, so with the intake held (which is what a driver does) ploughing one was free at
-// every realistic size:
-//
-//     clump of   3   4   5   6   8
-//     intake ON  0   0   2   0   0
-//     intake off 0   1   6   5   7
-//
-// Time is the axis that separates acquiring from carrying. Note the hold clocks PLATEAU
-// around 1.2-1.35s because the station test re-anchors as artifacts shuffle along the
-// bumper, so POSSESSION_ACQUIRE_S has to sit well under that or it excuses everything - at
-// 1.0s it was completely inert, which is how the plateau got noticed.
-{
-  /** the furthest an artifact travelled in the LAST `clump()` run */
-  let clumpMoved = 0;
-  const clump = (
-    n: number,
-    drive: (t: number) => RobotCommand,
-    secs: number,
-    cy = -10,
-    ry = -22,
-    hopper: ArtifactColor[] = [],
-    /** where the robot starts ACROSS the clump: 0 is dead centre, and an offset wide enough to
-     *  miss the middle column is how a scene drives PAST a pile rather than into it */
-    rx = 0,
-  ) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.hopper = [...hopper];
-    // REMOVE the artifacts this scene is not using, rather than parking them at (900,900).
-    // Anything outside the perimeter is dragged back in by the containment pass in world.ts,
-    // so the "parked" ones reappear somewhere on the field and the robot meets them later —
-    // which is how a THREE-artifact clump managed to draw a foul.
-    const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-    w.balls = w.balls.filter((b) => !spare.includes(b));
-    let k = 0;
-    const placed = new Map<number, { x: number; y: number }>();
-    for (const b of w.balls) {
-      if (b.state.kind !== 'ground' || k >= n) continue;
-      b.pos = { x: -5 + (k % 3) * 5.1, y: cy + Math.floor(k / 3) * 5.1 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-      placed.set(b.id, { ...b.pos });
-      k++;
-    }
-    r.pos = { x: rx, y: ry };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    for (let i = 0; i < Math.round(secs / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, drive(i * SIM_DT)]]));
-    }
-    // how far the furthest artifact was actually moved — a scene that claims to have CLIPPED
-    // one has to show that it touched anything at all
-    clumpMoved = 0;
-    for (const b of w.balls) {
-      const s = placed.get(b.id);
-      if (s) clumpMoved = Math.max(clumpMoved, Math.hypot(b.pos.x - s.x, b.pos.y - s.y));
-    }
-    return w.match.fouls.blue.minor;
-  };
-  const push = () => cmd({ driveY: 1, intake: true });
-  /**
-   * A SUSTAINED HERD, at a third throttle and started from the bottom of the field.
-   *
-   * At full throttle this scene does not do what it is named: the robot covers eighty inches
-   * in a second and a half, swallows three artifacts on the way, scatters the rest, and spends
-   * the remaining six and a half seconds PARKED against the far wall with exactly three in the
-   * hopper — which is at the limit and not a violation at all. It used to "pass" because the
-   * engine's invented TRAPPING branch fired on a stationary robot resting near an artifact that
-   * happened to be against a wall. Slowing the drive and giving it room to run is what makes it
-   * an actual push across open floor.
-   */
-  // Full throttle, not 0.2. Herding requires a HERDING SPEED now
-  // (`POSSESSION_HERD_SPEED`), and a 0.2 nudge is exactly the case the owner ruled should be
-  // free. The scenario's point is unchanged: a clump driven across OPEN FLOOR, with room to
-  // run, still fouls even with the intake held.
-  const herd = () => cmd({ driveY: 1, intake: true });
-  const HERD: [number, number] = [-55, -67]; // clump near the bottom wall, robot behind it
-  /**
-   * RE-BASELINED FROM (5, 6) TO (6, 8) when the intake's reach was cut to the landing bound,
-   * and the reason is the rule working rather than the rule breaking. Swept at 0.2 throttle:
-   *
-   *     clump of   3   4   5   6   7   8   9
-   *     MINORs     0   0   0   1   0   2   6
-   *
-   * A 5-clump used to bill and now does not. G408's carry test is NET DISTANCE ALONG THE PUSH
-   * DIRECTION, and a shorter reach means the artifacts the robot has not swallowed are no
-   * longer held on the bumper — they squirt sideways out of the squeeze, covering no ground
-   * where the robot is driving them. That is the exact distinction CLAUDE.md records the rule
-   * being rewritten around ("running into things is free and taking them somewhere is not"),
-   * so a pile the intake now scatters instead of herding SHOULD cost less. The scene is noisy
-   * either side of the threshold (7 draws 0, 8 draws 2) because the human player restocks into
-   * it, so the check asserts two sizes that are clearly past what the intake can absorb.
-   * ⚠️ Do NOT rescue this by slowing the intake or widening the reach.
-   */
-  check(
-    'pushing a clump across open floor fouls even with the intake held',
-    clump(6, herd, 12, ...HERD) > 0 && clump(8, herd, 12, ...HERD) > 0,
-    `6-clump ${clump(6, herd, 12, ...HERD)} MINORs, 8-clump ${clump(8, herd, 12, ...HERD)} (5-clump now 0 — the intake scatters it rather than herding it)`,
-  );
-  // ...and three of them, which is all an empty robot may take, stays clean at the same throttle
-  check(
-    '...while herding only THREE with an empty hopper is exactly the limit',
-    clump(3, herd, 12, ...HERD) === 0,
-    `3-clump ${clump(3, herd, 12, ...HERD)} MINORs`,
-  );
-  // ...and the three cases that must stay clean, all previously reported
-  /**
-   * ...WHILE CLIPPING ONE IN PASSING STILL DOES NOT — and "in passing" now has to be staged as
-   * passing, because the artifact coupling changed under it.
-   *
-   * This drove DEAD CENTRE into the clump at full throttle for 0.9 s and then strafed off, on
-   * the strength of the balls being punted clear of the bumper and left behind. They are not any
-   * more: a struck artifact leaves at about the speed of the robot that struck it, so it rides
-   * the bumper instead, and 0.9 s at 56 in/s is 25in of that. Measured, four artifacts went 48in
-   * downfield still in contact — that is a plough, not a clip, and the rule is right to bill it
-   * (the identical scene with a full hopper is asserted to foul a hundred lines below).
-   *
-   * So the scene is what the check has always said in words: the robot drives PAST the pile,
-   * clipping its edge column on the way by. Contact is real — an artifact is knocked most of the
-   * length of the field — and it costs nothing, which is G408's own bulldozing carve-out:
-   * "INADVERTENT contact with a SCORING ELEMENT while in the path of the ROBOT moving about the
-   * FIELD".
-   */
-  const clipped = clump(6, push, 4, -10, -22, [], 11);
-  const clippedMove = clumpMoved;
-  check(
-    '...while clipping one in passing still does not',
-    clipped === 0 && clippedMove > 24,
-    `${clipped} MINORs, and it really did clip one — knocked ${clippedMove.toFixed(0)}in`,
-  );
-  check(
-    '...nor nosing in briefly and backing off',
-    clump(4, (t) => (t < 1.2 ? cmd({ driveY: 1, intake: true }) : cmd({ driveY: -1, intake: true })), 5) === 0,
-    'acquiring is not controlling',
-  );
-}
-
-// ---- G408: running into a pile already at the wall is not control (split from the block
-// above; its own `wallRow` helper, independent of `clump`) ------------------------------
-{
-  /**
-   * ...AND RUNNING INTO A PILE THAT IS ALREADY AT THE WALL IS NOT CONTROL OF IT.
-   *
-   * Both of these were reported against the first cut of the CONTROL rewrite — "if you drive
-   * into a pile to intake you get a penalty if you go in too far" and "you get a penalty if you
-   * drive into five balls that are ALREADY at the wall." Neither is a violation: the robot did
-   * not take those artifacts anywhere. G408 names the case itself, as the first thing that is
-   * NOT control — "bulldozing (INADVERTENT contact with a SCORING ELEMENT while in the path of
-   * the ROBOT moving about the FIELD)".
-   *
-   * What makes it work is that POSSESSION_CARRY_DIST is measured ALONG THE PUSH: a row pinned
-   * on the perimeter squirts sideways out of the squeeze, quickly, and covers no ground in the
-   * direction the robot is driving it. Contrast the check below, where the robot drove the pile
-   * to the wall itself and the latch keeps it there.
-   */
-  const wallRow = (
-    n: number,
-    hopper: ArtifactColor[],
-    intake: boolean,
-    secs: number,
-    gain = 1,
-    /** how far OFF the wall the row starts, i.e. how much ground the robot can actually take it
-     *  over before the perimeter stops it. 0 is the row already resting there. */
-    gap = 0,
-  ) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.hopper = [...hopper];
-    const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-    w.balls = w.balls.filter((b) => !spare.includes(b));
-    const rowY = FIELD_HALF - BALL_RADIUS - gap;
-    let k = 0;
-    for (const b of w.balls) {
-      if (b.state.kind !== 'ground' || k >= n) continue;
-      // a ROW across the field, `gap` in from the far wall — at gap 0 it is flush against it,
-      // already there, with nowhere left to go
-      b.pos = { x: (k - (n - 1) / 2) * 5.1, y: rowY };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-      k++;
-    }
-    r.pos = { x: 0, y: rowY - 16 };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    for (let i = 0; i < Math.round(secs / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, cmd({ driveY: gain, intake })]]));
-    }
-    return w.match.fouls.blue.minor;
-  };
-  check(
-    'driving into FIVE artifacts already resting on the wall is not control (no G408)',
-    wallRow(5, ['green', 'green', 'green'], false, 8) === 0,
-    `blueMinor=${wallRow(5, ['green', 'green', 'green'], false, 8)}`,
-  );
-  check(
-    '...nor leaning on them for twenty seconds — the robot took them nowhere',
-    wallRow(5, ['green', 'green', 'green'], false, 20) === 0,
-    `blueMinor=${wallRow(5, ['green', 'green', 'green'], false, 20)}`,
-  );
-  check(
-    '...nor nosing DEEP into a nine-row at the wall with the intake held',
-    wallRow(9, ['green', 'green', 'green'], true, 10, 0.5) === 0,
-    `blueMinor=${wallRow(9, ['green', 'green', 'green'], true, 10, 0.5)}`,
-  );
-  /**
-   * ...BUT THE LINE IS DISPLACEMENT, NOT INTENT, and this is the other side of it. The SAME ram,
-   * at the SAME full throttle, against the SAME nine-row: the only thing that differs is whether
-   * the row has anywhere to go. Flush on the wall it does not — the check above stands at full
-   * throttle too — and 48in out it does, so the ram drives it the whole way and costs 3 MINORs.
-   * (48, not 32: a rammed row now reads its HONEST velocity, zero once it reaches the wall, so
-   * the confirm window has to elapse on the way there — measured, 0 MINORs at 32in, 3 at 48,
-   * 6 at 64. The old 32 counted the artifacts' phantom jitter against the wall as carry.)
-   *
-   * ⚠️ THE VARIABLE USED TO BE THE THROTTLE, and it cannot be any more. A row wedged between a
-   * bumper and the perimeter is barely displaceable now: measured, a full-throttle ram moves it
-   * 0in downrange and 6in sideways, where it used to squirt the outer artifacts forty inches
-   * along the wall — which is where the old contrast came from, and it was reading the SCATTER,
-   * not the herd. Since the artifacts genuinely go nowhere, no foul is the rule working: G408's
-   * own bulldozing carve-out, and the same verdict as the three checks above it.
-   */
-  const ramAtWall = wallRow(9, ['green', 'green', 'green'], true, 10, 1);
-  const ramWithRoom = wallRow(9, ['green', 'green', 'green'], true, 10, 1, 48);
-  check(
-    '...but RAMMING a nine-row at full throttle, scattering it, does foul',
-    ramWithRoom > 0,
-    `blueMinor=${ramWithRoom} for a row driven 32in into the wall`,
-  );
-  check(
-    '...while the identical ram of a row ALREADY on the wall still does not — it goes nowhere',
-    ramAtWall === 0,
-    `blueMinor=${ramAtWall}`,
-  );
-}
-
-// ---- G408: fires while STEERING, not just dead straight (split from the block above;
-// its own copy of the `clump` helper) ------------------------------------------------
-{
-  /** the furthest an artifact travelled in the LAST `clump()` run */
-  let clumpMoved = 0;
-  const clump = (
-    n: number,
-    drive: (t: number) => RobotCommand,
-    secs: number,
-    cy = -10,
-    ry = -22,
-    hopper: ArtifactColor[] = [],
-    rx = 0,
-  ) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.hopper = [...hopper];
-    const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-    w.balls = w.balls.filter((b) => !spare.includes(b));
-    let k = 0;
-    const placed = new Map<number, { x: number; y: number }>();
-    for (const b of w.balls) {
-      if (b.state.kind !== 'ground' || k >= n) continue;
-      b.pos = { x: -5 + (k % 3) * 5.1, y: cy + Math.floor(k / 3) * 5.1 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-      placed.set(b.id, { ...b.pos });
-      k++;
-    }
-    r.pos = { x: rx, y: ry };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    for (let i = 0; i < Math.round(secs / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, drive(i * SIM_DT)]]));
-    }
-    clumpMoved = 0;
-    for (const b of w.balls) {
-      const s = placed.get(b.id);
-      if (s) clumpMoved = Math.max(clumpMoved, Math.hypot(b.pos.x - s.x, b.pos.y - s.y));
-    }
-    return w.match.fouls.blue.minor;
-  };
-  void clumpMoved;
-  /**
-   * ...AND IT FIRES WHEN THE DRIVER IS STEERING, WHICH IS THE ONLY WAY ANYONE DRIVES.
-   *
-   * Reported as "when I just push a clump in open space it doesn't give me [the penalty]", and
-   * the cause was not a threshold. An artifact used to count ONLY on the ticks it was actually
-   * touching the footprint — but artifacts do not ride a bumper here, they bounce off it and
-   * are re-struck, so contact is intermittent. The moment the driver steered at all, a robot
-   * pushing a six-clump controlled exactly THREE (its own hopper) for 97% of ticks and the rule
-   * never fired. An ESTABLISHED hold now keeps counting while it DRAINS, so a re-struck
-   * artifact stays controlled between bounces; the drain is what bounds it.
-   */
-  const steer = (amp: number, freq: number) => (t: number) =>
-    cmd({ driveY: 0.6, rotate: Math.sin(t * freq) * amp, intake: false });
-  check(
-    'herding a clump in open space fouls WHILE STEERING, not only dead straight',
-    clump(6, steer(0.15, 1.3), 10, -40, -52, ['green', 'green', 'green']) > 0 &&
-      clump(6, steer(0.08, 0.5), 10, -40, -52, ['green', 'green', 'green']) > 0,
-    `gentle steer ${clump(6, steer(0.15, 1.3), 10, -40, -52, ['green', 'green', 'green'])} MINORs, ` +
-      `corrective ${clump(6, steer(0.08, 0.5), 10, -40, -52, ['green', 'green', 'green'])}`,
-  );
-  // ...and a throttle that is not held perfectly steady is the same violation
-  check(
-    '...and while the throttle wobbles',
-    clump(6, (t) => cmd({ driveY: 0.4 + 0.3 * Math.sin(t * 3) }), 10, -40, -52, ['green', 'green', 'green']) > 0,
-    `${clump(6, (t) => cmd({ driveY: 0.4 + 0.3 * Math.sin(t * 3) }), 10, -40, -52, ['green', 'green', 'green'])} MINORs`,
-  );
-}
-
-// ---- G408 in FREE DRIVE (split from the block above; already self-contained) -----------
-{
-  /**
-   * ...AND IT ALL APPLIES IN FREE DRIVE, which is where people actually practise.
-   *
-   * `freeplay` is a live phase everywhere else in the sim — `robotsEnabled` says so, the human
-   * player restocks in it, the shooter fires in it — and `updatePenalties` was the one
-   * subsystem that quietly excluded it, so the ENTIRE penalty engine was off in Free Drive.
-   * Measured on an identical six-clump herd: free drive 0 fouls, match 13. Three rounds of
-   * "I'm still not getting the penalty" were all this, and no amount of tuning the rule could
-   * have shown up.
-   */
-  {
-    const free = (mode: GameMode) => {
-      const w = createWorld(mode, 42, [
-        { id: 0, alliance: 'blue', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
-      ]);
-      if (mode === 'match') { w.match.phase = 'teleop'; w.match.phaseTimeLeft = 120; }
-      const r = w.robots[0];
-      r.hopper = ['green', 'green', 'green'];
-      const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(6);
-      w.balls = w.balls.filter((b) => !spare.includes(b));
-      let k = 0;
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground' || k >= 6) continue;
-        b.pos = { x: -5.1 + (k % 3) * 5.1, y: -40 + Math.floor(k / 3) * 5.1 };
-        b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0; k++;
-      }
-      r.pos = { x: 0, y: -52 }; r.heading = Math.PI / 2; r.fieldCentric = false;
-      for (let i = 0; i < Math.round(10 / SIM_DT); i++) step(w, SIM_DT, new Map([[0, cmd({ driveY: 0.5 })]]));
-      return w.match.fouls.blue.minor;
-    };
-    const inFree = free('free');
-    const inMatch = free('match');
-    check(
-      'G408 is assessed in FREE DRIVE too — the same herd costs the same as in a match',
-      inFree > 0 && inFree === inMatch,
-      `free drive ${inFree} MINORs vs match ${inMatch}`,
-    );
-  }
-}
-
-// ---- G408 with the PLAYER assists on (split from the block above; already self-contained) -
-{
-  /**
-   * ...AND IT FIRES FOR A ROBOT USING THE ASSISTS, WHICH IS EVERY REAL PLAYER.
-   *
-   * Every scene in this file used DEFAULT_ASSISTS (auto-intake and auto-fire OFF). The PLAYER
-   * default is PLAYER_ASSISTS, which has BOTH ON — and the rule behaved completely differently
-   * there: a nine-clump herded in open space drew 15 MINORs with auto-intake off and 2 with it
-   * on. The cause was the mouth carve-out being bounded by hopper ROOM: auto-fire keeps all
-   * three slots empty and auto-intake keeps `intaking` true, so THREE artifacts were excused on
-   * every tick, forever. It is now capped at what the rollers actually take in one cycle.
-   *
-   * A robot with auto-intake still controls FEWER artifacts than one without, and that is
-   * honest rather than a bug — it is eating the pile as it pushes, so there is less of a pile.
-   */
-  {
-    const withAssists = (n: number, a: Partial<AssistConfig>) => {
-      const w = createWorld('match', 42, [
-        { id: 0, alliance: 'blue', spec: { ...DEFAULT_SPEC }, assists: { ...PLAYER_ASSISTS, ...a }, startIndex: 0 },
-      ]);
-      w.match.phase = 'teleop';
-      w.match.phaseTimeLeft = 120;
-      const r = w.robots[0];
-      r.hopper = [];
-      const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-      w.balls = w.balls.filter((b) => !spare.includes(b));
-      let k = 0;
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground' || k >= n) continue;
-        b.pos = { x: -5.1 + (k % 3) * 5.1, y: -40 + Math.floor(k / 3) * 5.1 };
-        b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0; k++;
-      }
-      r.pos = { x: 0, y: -52 }; r.heading = Math.PI / 2; r.fieldCentric = false;
-      for (let i = 0; i < Math.round(12 / SIM_DT); i++) step(w, SIM_DT, new Map([[0, cmd({ driveY: 0.4 })]]));
-      return w.match.fouls.blue.minor;
-    };
-    check(
-      'herding a pile fouls a robot running the PLAYER assists (auto-intake + auto-fire)',
-      withAssists(9, {}) > 0,
-      `${withAssists(9, {})} MINORs with both assists on, ${withAssists(9, { autoIntake: false })} with auto-intake off`,
-    );
-  }
-}
-
-// ---- G408: leaning on a wall pile draws nothing, but shoving one there with a FULL robot
-// does (split from the original block; its own copy of the `clump` helper) -------------
-{
-  /**
-   * ...AND PUSHING FORWARD AGAINST ARTIFACTS THAT ARE ON THE WALL IS NOT AN ONGOING VIOLATION.
-   *
-   * Reported directly: "I still get penalties when I'm pushing forward against two balls
-   * against the wall. Likely because it counts as me moving them even tho its basically staying
-   * in place." Exactly right. Control latched on the way in and then never released, so the
-   * continuing tariff kept charging every POSSESSION_REBILL_S while nothing moved.
-   *
-   * The hold now DRAINS whenever the artifact is not actually going anywhere, even in full
-   * contact, so a robot parked against a wall pile with a full hopper settles at zero.
-   */
-  /** the furthest an artifact travelled in the LAST `clump()` run */
-  let clumpMoved = 0;
-  const clump = (
-    n: number,
-    drive: (t: number) => RobotCommand,
-    secs: number,
-    cy = -10,
-    ry = -22,
-    hopper: ArtifactColor[] = [],
-    rx = 0,
-  ) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.hopper = [...hopper];
-    const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-    w.balls = w.balls.filter((b) => !spare.includes(b));
-    let k = 0;
-    const placed = new Map<number, { x: number; y: number }>();
-    for (const b of w.balls) {
-      if (b.state.kind !== 'ground' || k >= n) continue;
-      b.pos = { x: -5 + (k % 3) * 5.1, y: cy + Math.floor(k / 3) * 5.1 };
-      b.vel = { x: 0, y: 0 };
-      b.z = 0;
-      b.vz = 0;
-      placed.set(b.id, { ...b.pos });
-      k++;
-    }
-    r.pos = { x: rx, y: ry };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    for (let i = 0; i < Math.round(secs / SIM_DT); i++) {
-      step(w, SIM_DT, new Map([[0, drive(i * SIM_DT)]]));
-    }
-    clumpMoved = 0;
-    for (const b of w.balls) {
-      const s = placed.get(b.id);
-      if (s) clumpMoved = Math.max(clumpMoved, Math.hypot(b.pos.x - s.x, b.pos.y - s.y));
-    }
-    return w.match.fouls.blue.minor;
-  };
-  const push = () => cmd({ driveY: 1, intake: true });
-  {
-    const lean = (n: number, secs: number) => {
-      const w = mkWorld('match', 'blue', 42);
-      startMatch(w);
-      w.match.phase = 'teleop';
-      const r = w.robots[0];
-      r.hopper = ['green', 'green', 'green'];
-      const spare = w.balls.filter((b) => b.state.kind === 'ground').slice(n);
-      w.balls = w.balls.filter((b) => !spare.includes(b));
-      let k = 0;
-      for (const b of w.balls) {
-        if (b.state.kind !== 'ground' || k >= n) continue;
-        b.pos = { x: (k - (n - 1) / 2) * 5.2, y: FIELD_HALF - BALL_RADIUS };
-        b.vel = { x: 0, y: 0 }; b.z = 0; b.vz = 0; k++;
-      }
-      // already flush against them, pushing into the wall — no approach, no journey
-      r.pos = { x: 0, y: FIELD_HALF - BALL_RADIUS - 13 };
-      r.heading = Math.PI / 2;
-      r.fieldCentric = false;
-      const early = Math.round(2 / SIM_DT);
-      for (let i = 0; i < Math.round(secs / SIM_DT); i++) step(w, SIM_DT, new Map([[0, cmd({ driveY: 1 })]]));
-      void early;
-      return w.match.fouls.blue.minor;
-    };
-    check(
-      'pushing forward against TWO artifacts on the wall with a full hopper draws nothing',
-      lean(2, 15) === 0,
-      `blueMinor=${lean(2, 15)} over 15s`,
-    );
-    check(
-      '...and it does not start costing if you simply stay longer',
-      lean(2, 30) === 0,
-      `blueMinor=${lean(2, 30)} over 30s`,
-    );
-  }
-
-  // ...and shoving one against a wall with a FULL robot does. The hopper is now passed in,
-  // because the helper always emptied it: this check has said "with a FULL robot" since it was
-  // written and has never once had one, which mattered the moment the acquire carve-out started
-  // depending on hopper room.
-  //
-  // ⚠️ AND THE ROBOT NOW HAS TO DO THE SHOVING. The clump used to be staged five inches off the
-  // wall — its back row already resting on it — so what the check really ran was a robot arriving
-  // among artifacts that were as good as parked. That is the case the three checks above say is
-  // NOT control, and it stopped fouling once a pile wedged on the perimeter stopped being
-  // squirted forty inches by the impact. Placed 30in out, the robot drives the pile the whole
-  // way into the wall and leans on it, which is what "shoving one against a wall" describes:
-  // 2 MINORs for the journey, none for the leaning (asserted just above).
-  // 55in out, not 30: artifacts read their HONEST velocity now, zero once the pile reaches the
-  // wall, so the confirm window has to elapse on the way there (see the ram scene above)
-  const shoved = clump(6, push, 8, FIELD_HALF - BALL_RADIUS - 55, FIELD_HALF - 80, ['green', 'green', 'green']);
-  const shovedMove = clumpMoved;
-  check(
-    '...but shoving one against a wall with a FULL robot does',
-    shoved > 0 && shovedMove > 24,
-    `${shoved} MINORs, pile driven ${shovedMove.toFixed(0)}in — a full robot is acquiring nothing, ` +
-      'and the field holding the pile is not an excuse',
-  );
-}
-
-// ---- G408: HOLDING THE INTAKE BUTTON DOES NOT MAKE PLOWING LEGAL ------------
-// Reported next session as "I never get overpossession pen anymore", and the carve-out
-// above is why: it was written as a REGION (everything in front of the chassis, unbounded
-// in count, for as long as the button was held) rather than as the artifacts being
-// ACQUIRED. Drivers hold intake essentially all the time, so the rule stopped existing.
-//
-// This whole block ran green through that regression because EVERY G408 check either had
-// the intake off or put the clump on a wall. The distinguishing case is a FULL hopper on
-// OPEN floor: nowhere to put any of it, so every artifact in the mouth is being plowed —
-// and the count must come out the same whether the button is held or not.
-{
-  const herd = (intake: boolean) => {
-    const w = mkWorld('match', 'blue', 31);
-    startMatch(w);
-    w.balls.length = 0;
-    for (let i = 0; i < 6; i++) {
-      w.balls.push({
-        id: 900 + i,
-        color: 'purple',
-        state: { kind: 'ground' },
-        pos: { x: -6 + (i % 3) * 5.2, y: -10 + Math.floor(i / 3) * 5.0 }, // open floor
-        vel: { x: 0, y: 0 },
-        z: 0,
-        vz: 0,
-      });
-    }
-    const r = w.robots[0];
-    r.pos = { x: 0, y: -22 };
-    r.heading = Math.PI / 2; // facing the pile, driving into it
-    r.fieldCentric = false;
-    r.hopper = ['green', 'green', 'green']; // FULL — it cannot acquire anything
-    run(w, cmd({ driveY: 1, intake }), 8);
-    return w.match.fouls.blue.minor;
-  };
-  const off = herd(false);
-  const on = herd(true);
-  check(
-    'herding a pile on open floor with a FULL hopper is over-possession (G408 fires)',
-    off > 0,
-    `intake off: ${off} MINORs`,
-  );
-  check(
-    'holding the intake button does not excuse it — a full robot acquires nothing',
-    on === off,
-    `intake on: ${on} vs off: ${off}`,
-  );
-}
-
-// ---- G408: the plow test is CONTACT + CARRIED, not proximity ----------------
-// The lenient model only counts a loose ball the robot is genuinely bulldozing:
-// touching, ahead along the direction of travel, and moving WITH the robot. A ball
-// clipped in passing, or squirting out sideways, is not possession.
-{
-  const w = foulWorld();
-  const r = w.robots[0];
-  r.pos = { x: 0, y: -8 };
-  r.heading = 0;
-  r.hopper = ['green', 'green', 'green'];
-  // ...and ONLY the squirting ball is on the field, so a long enough window cannot quietly
-  // turn this into a check about whatever the robot drives into next.
-  w.balls = w.balls.filter((b) => b.state.kind !== 'ground');
-  // STEPPED, not hand-held: the possession test is about where an artifact STAYS relative to
-  // the robot, so a fixture that pins both in place and only calls updatePenalties would show
-  // a permanently stationed artifact and assert the opposite of what it means to.
-  w.balls.push({ id: 9101, color: 'purple', state: { kind: 'ground' }, pos: { x: 12, y: 0 }, vel: { x: 0, y: 60 }, z: 0, vz: 0 });
-  runCmds(w, new Map([[0, cmd({ driveY: 1 })]]), acquireSecs(POSSESSION_HERD_SPEED + 5) + 0.5);
-  check(
-    'a ball squirting sideways off the bumper is not plowed (no G408)',
-    w.match.fouls.blue.minor === 0,
-    `blueMinor=${w.match.fouls.blue.minor} — it never holds a station, so DEFLECTING needs no carve-out of its own`,
-  );
-
-  // ...and one lying AT REST that the robot drives past is BULLDOZING, which G408 names as
-  // NOT control: it slips backwards at the robot's whole road speed rather than holding
-  // station, so it fails the possession test on the tick of contact.
-  const w2 = foulWorld();
-  const r2 = w2.robots[0];
-  r2.pos = { x: 0, y: -8 };
-  r2.heading = 0;
-  r2.hopper = ['green', 'green', 'green'];
-  r2.heading = Math.PI / 2; // driving +y, PAST a line of artifacts strung along that path
-  r2.pos = { x: 0, y: -60 };
-  for (let i = 0; i < 5; i++) {
-    // offset to the SIDE of the lane: clipped in passing, never gathered in front
-    w2.balls.push({ id: 9110 + i, color: 'purple', state: { kind: 'ground' }, pos: { x: i % 2 === 0 ? -12 : 12, y: -40 + i * 16 }, vel: { x: 0, y: 0 }, z: 0, vz: 0 });
-  }
-  runCmds(w2, new Map([[0, cmd({ driveY: 1 })]]), 4);
-  check(
-    'driving PAST artifacts lying on the field is bulldozing, not control (no G408)',
-    w2.match.fouls.blue.minor === 0,
-    `blueMinor=${w2.match.fouls.blue.minor}`,
-  );
-
-  // REVERSE PLOWING is still plowing. "In front" is measured along the DIRECTION OF TRAVEL,
-  // not along the chassis front, so hoarding a pile against the BACK bumper and reversing
-  // it downfield is the same foul as pushing it with the nose. (Without that, the obvious
-  // dodge would be to gather with the rear, then turn around and fire.)
-  const w3 = foulWorld();
-  const r3 = w3.robots[0];
-  r3.pos = { x: 0, y: -8 };
-  r3.heading = 0; // facing +x...
-  r3.hopper = ['green', 'green', 'green'];
-  r3.vel = { x: -(POSSESSION_HERD_SPEED + 5), y: 0 }; // ...but DRIVING in reverse, toward −x
-  // the ball is behind the chassis and ahead along the direction of travel, carried along
-  w3.balls.push({ id: 9103, color: 'purple', state: { kind: 'ground' }, pos: { x: -2, y: 0 }, vel: { x: -(POSSESSION_HERD_SPEED + 5), y: 0 }, z: 0, vz: 0 });
-  for (let i = 0; i < acquireTicks(POSSESSION_HERD_SPEED + 5); i++) {
-    w3.time = i / 60;
-    updatePenalties(w3, 1 / 60, new Map());
-  }
-  check(
-    'plowing a load with the REAR bumper in reverse is the same foul (no back-door hoarding)',
-    w3.match.fouls.blue.minor === 1,
-    `blueMinor=${w3.match.fouls.blue.minor}`,
-  );
-
-  // PER ARTIFACT OVER THE LIMIT, and TRANSITIVELY. The manual's violation line is "MINOR
-  // FOUL per SCORING ELEMENT over the limit", and CONTROL "requires contact with a ROBOT,
-  // either directly or transitively through other SCORING ELEMENTS" — so a robot shoving a
-  // WEDGE controls the whole wedge, not just the artifacts against its bumper, and pays per
-  // artifact. One flat MINOR however far over you were made a bulldozer cost the same as a
-  // robot with one ball stuck to it.
-  const w4 = foulWorld();
-  const r4 = w4.robots[0];
-  r4.pos = { x: 0, y: -8 };
-  r4.heading = 0;
-  r4.hopper = ['green', 'green', 'green']; // 3 stored = at the limit
-  const push = POSSESSION_HERD_SPEED + 5;
-  r4.vel = { x: push, y: 0 };
-  // a CHAIN of four: only the first touches the bumper, the rest touch each other
-  for (let i = 0; i < 4; i++) {
-    w4.balls.push({
-      id: 9200 + i,
-      color: 'purple',
-      state: { kind: 'ground' },
-      pos: { x: 2 + i * (BALL_RADIUS * 2), y: 0 },
-      vel: { x: push, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  }
-  for (let i = 0; i < acquireTicks(POSSESSION_HERD_SPEED + 5); i++) {
-    w4.time = i / 60;
-    updatePenalties(w4, 1 / 60, new Map());
-  }
-  check(
-    'a shoved WEDGE counts transitively and costs a MINOR per artifact over the limit',
-    w4.match.fouls.blue.minor === 4 && w4.match.scores.red.foulPoints === 20,
-    `blueMinor=${w4.match.fouls.blue.minor} redFoulPts=${w4.match.scores.red.foulPoints}`,
-  );
-
-  // YELLOW CARD, clause A: "simultaneous CONTROL of 5 or more ARTIFACTS" is excessive on
-  // its own. w4 above is controlling 7 (3 hopper + a 4-wedge), so the card comes with the
-  // fouls — and the rule caps itself ("REPEATED excessive violations ... do not result in
-  // additional YELLOW CARDS"), so holding it does not escalate to a red.
-  check(
-    'controlling 5+ at once draws a YELLOW CARD (G408 clause A)',
-    w4.match.cards?.blue.yellow === 1 && w4.match.cards?.blue.red === 0,
-    `cards=${JSON.stringify(w4.match.cards?.blue)}`,
-  );
-  const beforeHold = w4.match.cards?.blue.yellow;
-  for (let i = 0; i < 600; i++) {
-    w4.time = 10 + i / 60;
-    updatePenalties(w4, 1 / 60, new Map());
-  }
-  check(
-    'a held excessive violation does not stack a second card (one per match)',
-    w4.match.cards?.blue.yellow === beforeHold && w4.match.cards?.blue.red === 0,
-    `cards=${JSON.stringify(w4.match.cards?.blue)}`,
-  );
-
-  // A RED CARD voids the alliance's match points: the breakdown still shows what was
-  // earned, the total counts zero.
-  const w5 = foulWorld();
-  awardFoul(w5, 'red', 'minor', 'test'); // gives BLUE points (and recomputes its total)
-  const earned = w5.match.scores.blue.total;
-  awardCard(w5, w5.robots[0], 'test'); // yellow
-  awardCard(w5, w5.robots[0], 'test'); // ...escalates to red
-  // The TARIFF TOPS UP as a pile grows inside one held violation. Opening at 4 and scooping
-  // up to 7 used to cost a single MINOR, because the count was taken once at the episode
-  // edge — so escalating while already over was free. It is a MINOR "per SCORING ELEMENT
-  // over the limit", so the bill follows the pile.
-  {
-    const w = foulWorld();
-    const r = w.robots[0];
-    r.pos = { x: 0, y: -8 };
-    r.heading = 0;
-    r.hopper = ['green', 'green', 'green'];
-    const v = 30;
-    r.vel = { x: v, y: 0 };
-    const add1 = (id: number, x: number): void => {
-      w.balls.push({ id, color: 'purple', state: { kind: 'ground' }, pos: { x, y: -8 }, vel: { x: v, y: 0 }, z: 0, vz: 0 });
-    };
-    add1(9950, 2); // 4 controlled: 1 over
-    const run1 = (secs: number, t0: number): void => {
-      for (let i = 0; i < Math.round(secs / (1 / 60)); i++) {
-        w.time = t0 + i / 60;
-        updatePenalties(w, 1 / 60, new Map());
-      }
-    };
-    run1(2, 0);
-    const atFour = w.match.fouls.blue.minor;
-    for (let i = 1; i < 4; i++) add1(9950 + i, 2 + i * (BALL_RADIUS * 2)); // now 7: 4 over
-    run1(2, 2);
-    check(
-      'growing the pile inside a held violation tops the tariff up (not billed once)',
-      atFour >= 1 && w.match.fouls.blue.minor > atFour,
-      `${atFour} MINOR at four artifacts -> ${w.match.fouls.blue.minor} once the pile grew`,
-    );
-  }
-
-  // ---- G408 possession: the manual's test is RELATIVE, and these are the cases that only
-  // a relative test gets right. Each of the first three drew ZERO fouls under the previous
-  // absolute-velocity model, which is why they are pinned.
-  {
-    /** a robot over the limit, holding `n` artifacts in station relative to itself */
-    const hoard = (n: number, setup: (r: World['robots'][number]) => void, secs = 4): World => {
-      const w = foulWorld();
-      const r = w.robots[0];
-      r.pos = { x: 0, y: -8 };
-      r.heading = 0;
-      r.hopper = ['green', 'green', 'green']; // at the limit before a single loose one
-      setup(r);
-      for (let i = 0; i < n; i++) {
-        const pos = { x: 2 + i * (BALL_RADIUS * 2), y: -8 };
-        // station-keeping = the artifact carries the robot's rigid-body velocity AT its own
-        // position, spin included — which is what "remains in approximately the same position
-        // relative to the ROBOT" means moment to moment
-        const vel = {
-          x: r.vel.x - r.angVel * (pos.y - r.pos.y),
-          y: r.vel.y + r.angVel * (pos.x - r.pos.x),
-        };
-        w.balls.push({ id: 9800 + i, color: 'purple', state: { kind: 'ground' }, pos, vel, z: 0, vz: 0 });
-      }
-      for (let i = 0; i < Math.round(secs / (1 / 60)); i++) {
-        w.time = i / 60;
-        updatePenalties(w, 1 / 60, new Map());
-      }
-      return w;
-    };
-
-    // SPINNING IN PLACE is named in the possession definition itself — "moves forward, turns,
-    // backs up, spins in place" — so a corralled pile spun on the spot is possessed.
-    const spun = hoard(4, (r) => { r.angVel = 2.5; });
-    check(
-      'a pile corralled and SPUN IN PLACE is possessed (G408 fires)',
-      spun.match.fouls.blue.minor > 0,
-      `blueMinor=${spun.match.fouls.blue.minor}`,
-    );
-
-    /**
-     * ⚠️ ...BUT CREEPING ONE DOWNFIELD IS FREE NOW, AND THAT IS A DELIBERATE TRADE.
-     *
-     * This check asserted the opposite, because the engine used to turn on DISTANCE alone and
-     * a slow-herd window was a known exploit. `POSSESSION_HERD_SPEED` reopens that window on
-     * purpose: measured, the engine had NO leniency gradient at all — a 6-row nudged at 0.08
-     * throttle drew the same 6 MINORs and the same yellow card as a full-throttle ram, and a
-     * SINGLE loose artifact drew 3. A rule that cannot tell a feather touch from a bulldoze is
-     * not one anybody can play around.
-     *
-     * Owner's ruling on the trade: “If a pile is crept downfield at 5 in/s, then it doesn't
-     * really matter. It is slow anyway. It's a valid tradeoff.” The exploit it grants is
-     * bounded by its own slowness — 5 in/s is 2.4 s per artifact diameter, and a robot doing
-     * that is not taking the field away from anybody.
-     *
-     * Flip this back and lower `POSSESSION_HERD_SPEED` together, never one alone.
-     */
-    const crept = hoard(4, (r) => { r.vel = { x: 5, y: 0 }; });
-    check(
-      'a pile CREPT downfield at 5 in/s is NOT possessed (the leniency trade)',
-      crept.match.fouls.blue.minor === 0,
-      `blueMinor=${crept.match.fouls.blue.minor} — below POSSESSION_HERD_SPEED=${POSSESSION_HERD_SPEED}`,
-    );
-
-    /**
-     * A robot doing NOTHING AT ALL, in open floor, is outside BOTH halves of the definition.
-     *
-     * POSSESSION is conditional on the robot moving or turning, and TRAPPING is "preventing
-     * the movement of a SCORING ELEMENT against a FIELD element" — with nothing to press them
-     * against, a robot parked among artifacts is holding none of them. Without that second
-     * half the trapping clock caught exactly this: a robot sitting where the transition left
-     * it, touching the spike marks, billed the whole tariff and re-billed every few seconds
-     * for standing still. "I'm getting spammed with over-possession continuing penalties just
-     * by standing still."
-     *
-     * The wall case is the other half of the same check, and it is in the wall-clump block
-     * above: pressing a pile against the perimeter with a full robot still costs.
-     */
-    const inert = hoard(4, () => {});
-    check(
-      'a motionless robot in open floor is holding nothing — no G408',
-      inert.match.fouls.blue.minor === 0,
-      `blueMinor=${inert.match.fouls.blue.minor}`,
-    );
-
-    /**
-     * ...BUT A ROBOT THAT PUSHED THEM THERE AND THEN STOPPED IS STILL CONTROLLING THEM.
-     *
-     * "intentionally pushes a SCORING ELEMENT TO A DESIRED LOCATION or in a preferred
-     * direction" — the first half of that phrase does not stop being true the moment the
-     * wheels stop. This is the LATCH, and it is the difference between the two checks: the one
-     * above never pushed anything, this one pushed and then held. It replaces an invented
-     * TRAPPING rule that reached the same place by asking whether the FIELD was holding the
-     * artifacts, which fouled a robot for merely standing near a wall.
-     */
-    const heldOn = hoard(4, (r) => { r.vel = { x: POSSESSION_HERD_SPEED + 5, y: 0 }; });
-    const before = heldOn.match.fouls.blue.minor;
-    heldOn.robots[0].vel = { x: 0, y: 0 };
-    heldOn.robots[0].angVel = 0;
-    for (const b of heldOn.balls) if (b.state.kind === 'ground') b.vel = { x: 0, y: 0 };
-    for (let i = 0; i < Math.round(POSSESSION_REBILL_S * 2 * 60); i++) {
-      heldOn.time = 10 + i / 60;
-      updatePenalties(heldOn, 1 / 60, new Map());
-    }
-    check(
-      'a pile HERDED and then held while stationary stays controlled (the latch)',
-      before > 0 && heldOn.match.fouls.blue.minor > before,
-      `${before} MINORs while pushing -> ${heldOn.match.fouls.blue.minor} after holding still`,
-    );
-
-    /**
-     * CLAUSE B NAMES THE GEOMETRY: herding is done "with a FLAT OR CONCAVE FACE of the ROBOT".
-     * A convex CORNER is neither — an artifact met by a vertex squirts off it rather than being
-     * taken anywhere — so a pile stacked diagonally off a corner is not control however hard
-     * the robot drives at it. This was the one piece of clause B the engine had never modelled.
-     */
-    const cornered = (() => {
-      const w = foulWorld();
-      const r = w.robots[0];
-      r.pos = { x: 0, y: -8 };
-      r.heading = 0;
-      r.hopper = ['green', 'green', 'green'];
-      r.vel = { x: 20, y: 0 };
-      const e = footprintExtents(r.spec);
-      for (let i = 0; i < 4; i++) {
-        // beyond BOTH face planes at once: the nearest feature is the front-left vertex
-        const x = e.front + BALL_RADIUS * 0.7 + i * 3.6;
-        const y = e.half + BALL_RADIUS * 0.7 + i * 3.6;
-        w.balls.push({ id: 9700 + i, color: 'purple', state: { kind: 'ground' }, pos: { x, y: -8 + y }, vel: { x: 20, y: 0 }, z: 0, vz: 0 });
-      }
-      for (let i = 0; i < 300; i++) { w.time = i / 60; updatePenalties(w, 1 / 60, new Map()); }
-      return w.match.fouls.blue.minor;
-    })();
-    check(
-      'artifacts stacked off a convex CORNER are not herded (CONTROL clause B: a flat or concave face)',
-      cornered === 0,
-      `blueMinor=${cornered}`,
-    );
-  }
-
-  /**
-   * THE PER-ARTIFACT CLOCKS ARE SWEPT when an artifact stops being a loose ground ball.
-   *
-   * They keyed "robotId:ballId" and were only ever deleted along the NOT-TOUCHING path, so an
-   * artifact that got INTAKEN while in contact kept its clock and station for the rest of the
-   * match. That is unbounded growth inside `world.penalties` — which is plain JSON and rides
-   * every snapshot and replay — and, because ids are handed out as max(id)+1 and humanPlayer
-   * SPLICES balls out, a stale key can rebind to a DIFFERENT artifact that then arrives
-   * pre-latched, skipping the confirm window that is the whole bulldozing filter.
-   */
-  {
-    const w = mkWorld('match', 'blue', 31);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    const r = w.robots[0];
-    r.pos = { x: 0, y: -30 };
-    r.heading = Math.PI / 2;
-    r.fieldCentric = false;
-    r.hopper = [];
-    w.balls.length = 0;
-    for (let i = 0; i < 3; i++) {
-      w.balls.push({ id: 9600 + i, color: 'purple', state: { kind: 'ground' }, pos: { x: -2.5 + i * 5.1, y: -14 }, vel: { x: 0, y: 0 }, z: 0, vz: 0 });
-    }
-    run(w, cmd({ driveY: 1, intake: true }), 4);
-    const stale = Object.keys(w.penalties.ballHold).filter((k) => {
-      const id = Number(k.split(':')[1]);
-      const b = w.balls.find((x) => x.id === id);
-      return !b || b.state.kind !== 'ground';
-    });
-    check(
-      'per-artifact G408 clocks do not outlive the artifact leaving the ground',
-      stale.length === 0 && r.hopper.length > 0,
-      `${stale.length} stale key(s) ${JSON.stringify(stale)}, hopper=${r.hopper.length}`,
-    );
-
-    // ...and the whole set is dropped when play is not live. Robots are FROZEN across the
-    // transition, so a clock carried through it resumes at the teleop buzzer with its grace
-    // already spent — the same reason the gate/ramp tracking is dropped there.
-    w.match.phase = 'transition';
-    updatePenalties(w, 1 / 60, new Map());
-    check(
-      'G408 clocks are cleared outside auto/teleop',
-      Object.keys(w.penalties.ballHold).length === 0 &&
-        Object.keys(w.penalties.ballAnchor).length === 0 &&
-        Object.keys(w.penalties.possession).length === 0,
-      `holds=${Object.keys(w.penalties.ballHold).length} anchors=${Object.keys(w.penalties.ballAnchor).length} clocks=${Object.keys(w.penalties.possession).length}`,
-    );
-  }
-
-  // The LOADING ZONE carve-out: "inadvertent contact with a SCORING ELEMENT while attempting
-  // to acquire a SCORING ELEMENT from the LOADING ZONE" is not control. Without it a robot
-  // collecting its own restock was fouled for the artifacts it went there to collect.
-  {
-    const w = foulWorld();
-    const r = w.robots[0];
-    const lz = loadZone(r.alliance);
-    r.pos = { x: (lz.x0 + lz.x1) / 2, y: (lz.y0 + lz.y1) / 2 };
-    r.heading = 0;
-    r.hopper = ['green', 'green', 'green'];
-    r.vel = { x: 20, y: 0 };
-    for (let i = 0; i < 3; i++) {
-      w.balls.push({
-        id: 9900 + i,
-        color: 'purple',
-        state: { kind: 'ground' },
-        // spread ACROSS the zone, so all three stay inside it — the grab row a robot
-        // actually drives into. (One carried OUT of the zone is control again, correctly.)
-        pos: { x: r.pos.x + 2, y: r.pos.y + (i - 1) * (BALL_RADIUS * 2) },
-        vel: { x: 20, y: 0 },
-        z: 0,
-        vz: 0,
-      });
-    }
-    for (let i = 0; i < 240; i++) {
-      w.time = i / 60;
-      updatePenalties(w, 1 / 60, new Map());
-    }
-    /**
-     * ...AND THE CARVE-OUT IS SCOPED TO A ROBOT ACTUALLY IN THERE ACQUIRING.
-     *
-     * G408's carve-out C is "inadvertent contact with a SCORING ELEMENT while attempting to
-     * acquire a SCORING ELEMENT FROM THE LOADING ZONE", so the robot's position is the test.
-     * It used to key on the ARTIFACT's position alone, which made the whole 23x23 corner a
-     * control-free sanctuary — and G432.D settles that it is not one, describing an artifact
-     * whose "CONTROL begins when the ROBOT is in the LOADING ZONE" and which "is still
-     * CONTROLLED by the ROBOT when the ROBOT leaves". A robot OUTSIDE the zone herding a line
-     * whose far end lies inside it is controlling the whole line.
-     */
-    const reachIn = (() => {
-      const w2 = foulWorld();
-      const r2 = w2.robots[0];
-      const lz2 = loadZone(r2.alliance);
-      r2.pos = { x: 20, y: (lz2.y0 + lz2.y1) / 2 };
-      r2.heading = 0;
-      r2.hopper = ['green', 'green', 'green'];
-      r2.vel = { x: POSSESSION_HERD_SPEED + 5, y: 0 };
-      for (let i = 0; i < 5; i++) {
-        w2.balls.push({ id: 9950 + i, color: 'purple', state: { kind: 'ground' }, pos: { x: 32.9 + i * 5.1, y: r2.pos.y }, vel: { x: 20, y: 0 }, z: 0, vz: 0 });
-      }
-      for (let i = 0; i < 120; i++) { w2.time = i / 60; updatePenalties(w2, 1 / 60, new Map()); }
-      return w2.match.fouls.blue.minor;
-    })();
-    check(
-      '...but a robot OUTSIDE its loading zone gets no exemption for a pile reaching into it',
-      reachIn > 0,
-      `blueMinor=${reachIn} — the zone is not a sanctuary (G432.D)`,
-    );
-
-    check(
-      'acquiring artifacts from your own LOADING ZONE is not control (no G408)',
-      w.match.fouls.blue.minor === 0,
-      `blueMinor=${w.match.fouls.blue.minor}`,
-    );
-
-    /**
-     * ⚠️ AN EXEMPTION MUST NOT BECOME EXTRA REACH — the shipped-replay bug.
-     *
-     * `dsim-decode-s4-v2` billed 26 G408 MINORs and a yellow card, all of them from this: a
-     * PARKED robot standing in its own loading zone, hopper full, with ZERO established holds
-     * on anything, was charged with controlling TWELVE artifacts. The loading-zone carve-out
-     * adds every in-zone artifact to `excused`, `excused` used to SEED the transitive chain,
-     * and the chain then flooded the human player's restock cluster — so one artifact the
-     * robot merely stood beside conducted control to everything piled behind it.
-     *
-     * Two invariants pin it: the chain may only start from something the robot is TOUCHING,
-     * and a loading-zone-excused artifact does not conduct at all (the mouth exemption still
-     * does — the rollers owning one artifact cannot repeal the pile pressed on the robot
-     * through it). A stationary robot controls nothing it has not taken anywhere.
-     */
-    {
-      const w3 = foulWorld();
-      const r3 = w3.robots[0];
-      const lz3 = loadZone(r3.alliance);
-      const cx = (lz3.x0 + lz3.x1) / 2;
-      const cy = (lz3.y0 + lz3.y1) / 2;
-      r3.pos = { x: cx, y: cy };
-      r3.heading = 0;
-      r3.hopper = ['green', 'green', 'green'];
-      r3.vel = { x: 0, y: 0 }; // PARKED. Not herding, not pushing, not moving at all.
-      // one artifact against the robot, then a contiguous line of ten running out of the zone
-      for (let i = 0; i < 11; i++) {
-        w3.balls.push({
-          id: 9800 + i,
-          color: 'purple',
-          state: { kind: 'ground' },
-          pos: { x: cx + 9 + i * 5.1, y: cy },
-          vel: { x: 0, y: 0 },
-          z: 0,
-          vz: 0,
-        });
-      }
-      for (let i = 0; i < 600; i++) {
-        w3.time = i / 60;
-        updatePenalties(w3, 1 / 60, new Map());
-      }
-      check(
-        'a PARKED robot in its own loading zone is not charged for the pile beside it (G408)',
-        w3.match.fouls.blue.minor === 0 && w3.match.fouls.blue.major === 0,
-        `blueMinor=${w3.match.fouls.blue.minor} blueMajor=${w3.match.fouls.blue.major} — an exemption must not become reach`,
-      );
-      check(
-        '...and it draws no excessive-control CARD either',
-        !w3.penalties.carded[r3.id],
-        `carded=${!!w3.penalties.carded[r3.id]}`,
-      );
-    }
-  }
-
-  // CROSSING A LITTERED FIELD is the case G408 explicitly excuses — "BULLDOZING (inadvertent
-  // contact with a SCORING ELEMENT while in the path of the ROBOT moving about the FIELD)".
-  // A full hopper driving straight through a dozen scattered artifacts must draw NOTHING.
-  // Before the per-artifact confirm gate this scenario drew 5 MINORs and a yellow card:
-  // every brush counted, and the per-robot clock could not tell a dozen different artifacts
-  // touched briefly from the same six held.
-  {
-    const w = foulWorld();
-    const r = w.robots[0];
-    // clear the staged field so this isolates BRUSHING PAST scattered artifacts. Driving a
-    // whole spike ROW down the field for seconds is a different act — the artifacts hold
-    // station against the bumper the entire way — and it SHOULD foul; the manual puts that
-    // burden on the robot ("design your ROBOT so that it is impossible to inadvertently
-    // ... CONTROL more than the limit").
-    w.balls.length = 0;
-    w.robots[1].pos = { x: 60, y: 60 }; // and the opponent out of the lane
-    r.pos = { x: 0, y: -60 };
-    r.heading = Math.PI / 2;
-    r.hopper = ['green', 'green', 'green'];
-    for (let i = 0; i < 12; i++) {
-      w.balls.push({
-        id: 9300 + i,
-        color: 'purple',
-        state: { kind: 'ground' },
-        // OFF the driving lane, alternating sides: this tests BRUSHING PAST. An artifact
-        // parked dead in front gets pushed the whole way instead, which is herding — a
-        // different act, and one that should foul.
-        pos: { x: i % 2 === 0 ? -11 : 11, y: -48 + i * 9 },
-        vel: { x: 0, y: 0 },
-        z: 0,
-        vz: 0,
-      });
-    }
-    runCmds(w, new Map([[0, cmd({ driveY: 1 })]]), 8);
-    /**
-     * ...AND CROSSING A LITTERED FIELD COSTS NOW TOO. The per-artifact CONFIRM clock was what
-     * separated brushing past a dozen artifacts from herding six, and it went with the rest of
-     * the alpha filters when the rule was reverted to main's — which asks only whether an
-     * artifact is touching a moving robot. Brushing three at once while full is therefore a
-     * violation, and it is recorded rather than argued with: it is the same trade as the wall
-     * clump above, and the price of a rule that actually fires in play.
-     */
-    check(
-      'crossing a littered field is BULLDOZING, not control (no G408)',
-      w.match.fouls.blue.minor === 0 && !w.match.cards?.blue.yellow,
-      `blueMinor=${w.match.fouls.blue.minor} cards=${JSON.stringify(w.match.cards?.blue ?? {})} — brushed artifacts never hold a station`,
-);
-  }
-
-  check(
-    'a second card becomes a RED, which voids that alliance total',
-    w5.penalties.carded[w5.robots[0].id] === 'red' &&
-      earned > 0 &&
-      w5.match.scores.blue.total === 0 &&
-      w5.match.scores.blue.foulPoints === 5 && // the breakdown still shows what was earned
-      w5.match.cards?.blue.red === 1 &&
-      w5.match.cards?.blue.yellow === 0,
-    `earned=${earned} total=${w5.match.scores.blue.total} cards=${JSON.stringify(w5.match.cards?.blue)}`,
-  );
-}
-
-// ---- a PINNED artifact in the doorway is not shoved — it must not buzz -------------
-// "only the ball that has already dropped from the classifier moves back and forth."
-// EXIT_NUDGE is a velocity FLOOR re-applied every tick the doorway is occupied. With a robot
-// parked down the tunnel the artifact has nowhere to go, so the floor and the chassis took
-// turns: 60 direction reversals in two seconds, one every OTHER TICK, peaking at 67.6 in/s.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-  for (let i = 0; i < 9; i++) {
-    const b = w.balls[i];
-    const cs = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'blue', s: cs, v: 0, overflow: false, pending: false };
-    b.pos = railPos('blue', cs);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-  const r = w.robots[0];
-  const z = gateZone('blue');
-  r.pos = { x: z.x1 + 7, y: (z.y0 + z.y1) / 2 };
-  r.heading = Math.PI;
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  run(w, cmd({ driveY: 1 }), 0.4); // tap it open so something drops out
-  r.pos = { x: railPos('blue', RAIL_EXIT_S).x, y: -16 }; // ...then park down the tunnel
-  r.heading = Math.PI / 2;
-  r.vel = { x: 0, y: 0 };
-  const hist = new Map<number, { x: number; y: number }[]>();
-  for (let i = 0; i < Math.round(6 / SIM_DT); i++) {
-    step(w, SIM_DT, new Map([[0, cmd({})]]));
-    for (const b of w.balls) {
-      if (b.state.kind !== 'ground' || b.pos.x > 100) continue;
-      if (!hist.has(b.id)) hist.set(b.id, []);
-      hist.get(b.id)!.push({ x: b.pos.x, y: b.pos.y });
-    }
-  }
-  let worst = 0;
-  let peak = 0;
-  for (const pts of hist.values()) {
-    if (pts.length < 120) continue;
-    const t = pts.slice(-120); // the last 2s, long after everything should have settled
-    let rev = 0;
-    for (let i = 2; i < t.length; i++) {
-      const a1 = { x: t[i - 1].x - t[i - 2].x, y: t[i - 1].y - t[i - 2].y };
-      const a2 = { x: t[i].x - t[i - 1].x, y: t[i].y - t[i - 1].y };
-      const m2 = hyp(a2.x, a2.y);
-      if (a1.x * a2.x + a1.y * a2.y < 0 && m2 > 0.004) {
-        rev++;
-        peak = Math.max(peak, m2 * 60);
-      }
-    }
-    worst = Math.max(worst, rev);
-  }
-  check(
-    'an artifact pinned in the doorway settles instead of buzzing back and forth',
-    worst <= 4,
-    `worst ${worst} reversals in the last 2s, peak ${peak.toFixed(1)} in/s`,
-  );
-}
-
-// ---- overflow RIDES the retained column, it does not glide over a flat lid --------
-// "overflow balls should not stack either. also, remember the geometry. overflow balls
-// should not be flowing down that smoothly." Both halves were true: the ride height was a
-// flat OVERFLOW_Z for the whole descent (measured dead level at 13.50 across nine spheres)
-// and 13.5 is LESS than a diameter above the ramp — sunk into the column it is supposed to
-// be riding on. A ball resting on a ball sits one full diameter up.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  w.robots[0].pos = { x: 0, y: -40 };
-  for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-  for (let i = 0; i < RAMP_SLOTS; i++) {
-    const b = w.balls[i];
-    const cs = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'blue', s: cs, v: 0, overflow: false, pending: false };
-    b.pos = railPos('blue', cs);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-  const rider = w.balls[RAMP_SLOTS];
-  rider.state = { kind: 'rail', goal: 'blue', s: 46, v: 0, overflow: true, pending: false };
-  rider.pos = railPos('blue', 46);
-  rider.vel = { x: 0, y: 0 };
-  rider.z = OVERFLOW_Z;
-  rider.vz = 0;
-  let zLo = Infinity;
-  let zHi = -Infinity;
-  const speeds: number[] = [];
-  /**
-   * DRIVEN BY AN OPEN GATE, because what an overflow artifact does is decided by the column
-   * under it: it is rolling on BALLS, not on the ramp (see OVERFLOW_CARRY). Against a shut
-   * gate the column is stationary and the rider is dragged to a stop and parks on it, which
-   * is correct and measures nothing. Open the gate and the column runs, and the ride is the
-   * stepping-plus-carry this asks about.
-   */
-  for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-    w.goals.blue.gatePos = 1;
-    w.goals.blue.gateOpen = true;
-    w.goals.blue.gateLatch = 1;
-    step(w, SIM_DT, new Map([[0, cmd({})]]));
-    if (rider.state.kind !== 'rail') break;
-    const st = rider.state as { s: number; v: number };
-    if (st.s < 4) break; // stop before it leaves the column
-    zLo = Math.min(zLo, rider.z);
-    zHi = Math.max(zHi, rider.z);
-    speeds.push(Math.abs(st.v));
-  }
-  // the HOLLOW between two artifacts is the lowest the scallop goes — a rider carried along
-  // the column sits in one as often as it crests one, so the band is hollow..crest, not crest
-  const hollow = RAMP_SURFACE_Z + Math.sqrt(Math.max(0, 4 * BALL_RADIUS * BALL_RADIUS - (RAIL_PITCH / 2) ** 2));
-  check(
-    'an overflow artifact rides on top of the column, between its hollows and its crests',
-    Math.abs(OVERFLOW_Z - (RAMP_SURFACE_Z + 2 * BALL_RADIUS)) < 1e-9 &&
-      zHi > hollow - 0.2 &&
-      zHi <= RAMP_SURFACE_Z + 2 * BALL_RADIUS + 1e-6,
-    `peak z ${zHi.toFixed(2)}, hollow ${hollow.toFixed(2)}, crest ${(RAMP_SURFACE_Z + 2 * BALL_RADIUS).toFixed(2)}`,
-  );
-  check(
-    '...and its height UNDULATES over the spheres rather than tracking a flat lid',
-    zHi - zLo > 0.3,
-    `z ${zLo.toFixed(2)}..${zHi.toFixed(2)} (span ${(zHi - zLo).toFixed(2)}in)`,
-  );
-  /**
-   * ...and the ride LURCHES: the rate it gains speed at swings by several times over one
-   * artifact, hardest dropping into a hollow and least climbing the next crest.
-   *
-   * This used to assert the rider LOSES speed on a crest, which it did — but from the
-   * velocity drag that has since been replaced, not from the geometry. A bump strong enough
-   * to actually reverse the gain is also strong enough to STRAND the rider on the uphill
-   * shoulder of the topmost artifact, where nothing above it can ever push it back on: swept
-   * over 26 starting states, that begins at OVERFLOW_BUMP 19 against a net pull of 16 and it
-   * never gets better. On a packed column the crests are 0.7in deep, so what a rider can
-   * honestly do is surge and hesitate.
-   */
-  const accels: number[] = [];
-  for (let i = 1; i < speeds.length; i++) accels.push((speeds[i] - speeds[i - 1]) / SIM_DT);
-  const gainLo = Math.min(...accels);
-  const gainHi = Math.max(...accels);
-  check(
-    '...and it LURCHES over the spheres rather than gaining speed at one steady rate',
-    accels.length > 30 && gainHi > gainLo * 2 + 1,
-    `gain ${gainLo.toFixed(1)}..${gainHi.toFixed(1)} in/s² over ${accels.length} ticks`,
-  );
-  // ...which is exactly the invariant that keeps it a lurch and not a trap.
-  check(
-    'the scallop never cancels the ramp: OVERFLOW_BUMP * slope stays under the net ride pull',
-    OVERFLOW_BUMP * OVERFLOW_SLOPE_MAX < RAIL_ACCEL - OVERFLOW_ROLL_LOSS,
-    `${(OVERFLOW_BUMP * OVERFLOW_SLOPE_MAX).toFixed(0)} vs ${(RAIL_ACCEL - OVERFLOW_ROLL_LOSS).toFixed(0)} in/s²`,
-  );
-}
-
-// ---- an overflow artifact rides the COLUMN, not the ramp -------------------------
-// "Overflow balls come down too quickly. Remember that they ride on top of the balls already
-// in the classifier, so it would move kinda like in steps, and it would get extra momentum
-// from the balls if the gate is open." Both halves are one rule: rolling contact drags the
-// rider toward the speed of the artifact under it (OVERFLOW_CARRY). It used to take the
-// ramp's own gravity less a rolling loss, with no idea what it was riding, and arrived
-// FASTER than the column it was supposedly on top of.
-{
-  const ride = (gateOpen: boolean) => {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    w.balls.length = RAMP_SLOTS + 1; // the first ten are re-purposed below, the rest leave the field (an off-field POSITION is clamped back in, onto one point)
-    fillBlueRail(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    const rider = w.balls[RAMP_SLOTS];
-    rider.state = { kind: 'rail', goal: 'blue', s: 46, v: 0, overflow: true, pending: false };
-    rider.pos = railPos('blue', 46);
-    rider.vel = { x: 0, y: 0 };
-    rider.z = OVERFLOW_Z;
-    rider.vz = 0;
-    let travelled = 0;
-    const s0 = 46;
-    for (let i = 0; i < Math.round(2 / SIM_DT); i++) {
-      if (gateOpen) {
-        w.goals.blue.gatePos = 1;
-        w.goals.blue.gateOpen = true;
-        w.goals.blue.gateLatch = 1;
-      }
-      step(w, SIM_DT, new Map([[0, cmd({})]]));
-      if (rider.state.kind === 'rail') travelled = s0 - (rider.state as { s: number }).s;
-      else travelled = 99;
-    }
-    return travelled;
-  };
-  const shut = ride(false);
-  const open = ride(true);
-  /**
-   * A RIDER ON A STOPPED COLUMN CRAWLS. IT DOES NOT SIT.
-   *
-   * This asked for under 4in of travel in two seconds — "sits on a STATIONARY column" — and
-   * that is what parked them: the carry pulled a rider toward the carrier in both directions,
-   * so a stopped pile was a brake, and a rider that arrived over one stayed for as long as the
-   * gate was shut. "Overflows keep getting stuck in the classifier."
-   *
-   * What it should be is SLOW, not stopped: the ride's own net pull, clambering over crest
-   * after crest, which at 9in in two seconds is a crawl next to the 40in/s the ramp itself
-   * delivers. The relation the check is really about survives — a moving column still carries
-   * a rider along at twice that.
-   */
-  check(
-    'an overflow artifact CRAWLS over a stationary column rather than racing or parking',
-    shut > 4 && shut < 20,
-    `${shut.toFixed(1)}in of travel in 2s against a shut gate (under 4 was "sits on it", and sitting is how they got stuck)`,
-  );
-  check(
-    '...and takes the momentum of the column once it is running',
-    open > shut * 1.8,
-    `${open.toFixed(1)}in in the same 2s with the gate held open, against ${shut.toFixed(1)}in shut`,
-  );
-}
-
-// ---- the overflow lane FLOWS, and at a speed the ramp explains ------------------
-// Reported: "ball flow for overflow is weird and slightly slow". It was both, and from one
-// cause: OVERFLOW_BUMP 40 and a 2.2/s velocity drag were sized against a RAIL_ACCEL of 80 and
-// were never rescaled when the ramp became 25. The drag pinned the ride at 25/2.2 = 11 in/s
-// against a ramp lane running 17..54, and the bump — now 1.6x the pull meant to drive the
-// ride — turned the scallops into traps: measured, three of four riders dropped onto a full
-// column stuck on it forever, one of them held at v = +5 in/s, being pushed steadily back UP
-// the ramp.
-{
-  const starts = [46, 43.5, 42.8, 40.2, 35, 30, 25, 20, 12];
-  const exits: number[] = [];
-  const times: number[] = [];
-  let stuck = 0;
-  for (const s0 of starts) {
-    const w = mkWorld('match', 'blue', 42);
-    startMatch(w);
-    w.match.phase = 'teleop';
-    fillBlueRail(w);
-    w.robots[0].pos = { x: 0, y: -40 };
-    const rider = w.balls[RAMP_SLOTS];
-    rider.state = { kind: 'rail', goal: 'blue', s: s0, v: 0, overflow: true, pending: false };
-    rider.pos = railPos('blue', s0);
-    rider.vel = { x: 0, y: 0 };
-    rider.z = OVERFLOW_Z;
-    rider.vz = 0;
-    let out = 0;
-    for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-      // the gate is HELD OPEN: an overflow artifact rides the column, so what it does is what
-      // the column does. Against a shut gate it parks on a stationary pile, which is right and
-      // is not what this asks about — see OVERFLOW_CARRY.
-      w.goals.blue.gatePos = 1;
-      w.goals.blue.gateOpen = true;
-      w.goals.blue.gateLatch = 1;
-      step(w, SIM_DT, new Map([[0, cmd({})]]));
-      if (rider.state.kind !== 'rail') {
-        out = (i + 1) * SIM_DT;
-        exits.push(hyp(rider.vel.x, rider.vel.y));
-        times.push(out);
-        break;
-      }
-    }
-    if (!out) stuck++;
-  }
-  check(
-    'every overflow artifact clambers off a DRAINING column instead of parking on it',
-    stuck === 0,
-    `${stuck} of ${starts.length} still on the pile after 8s`,
-  );
-  // the honest band: the ride accelerates at RAIL_ACCEL - OVERFLOW_ROLL_LOSS the whole way,
-  // so it must land between "the ramp lane's speed" (it is lossier than that) and the crawl a
-  // fixed drag used to impose (RAIL_ACCEL / 2.2 = 11 in/s, which is what read as slow).
-  const slowest = Math.min(...exits);
-  const fastest = Math.max(...exits);
-  const rampLane = Math.sqrt(2 * RAIL_ACCEL * (RAIL_S_MAX - RAIL_EXIT_S));
-  check(
-    '...and leaves the ramp slower than the ramp lane but far above the old drag crawl',
-    slowest > 14 && fastest < rampLane,
-    `exits ${slowest.toFixed(0)}..${fastest.toFixed(0)} in/s in ${Math.min(...times).toFixed(1)}..${Math.max(...times).toFixed(1)}s (ramp lane tops out at ${rampLane.toFixed(0)})`,
-  );
-}
-
-// ---- A ROBOT CANNOT TOUCH AN ARTIFACT THAT IS STILL ON THE CLASSIFIER ----------
-// "I should not be able to intake directly off of the balls on the classifier or interact
-// in any way (push)." Artifacts in `rail` state are excluded from the Rapier solve
-// (solveBalls takes only `ground`) and from intake capture (robot.ts skips anything that is
-// not `ground`), so the ONLY path a robot ever had to one was railBlock's hand-off. It is
-// gone. This check states the invariant directly so it cannot come back by another route.
-{
-  const w = mkWorld('match', 'blue', 42);
-  startMatch(w);
-  for (const b of w.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-  for (let i = 0; i < 6; i++) {
-    const b = w.balls[i];
-    const s = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'blue', s, v: 0, overflow: false, pending: false };
-    b.pos = railPos('blue', s);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-  const ids = w.balls.slice(0, 6).map((b) => b.id);
-  const r = w.robots[0];
-  const z = gateZone('blue');
-  const hopper0 = r.hopper.length; // it starts with PRELOADS — only growth would matter
-  // Parked ON the outflow, well BELOW the lever (gateArmRect is y -2..3) so it cannot open
-  // the gate — otherwise the column advances because the gate opened, which is gate
-  // operation and not a shove, and the comparison below would be measuring that instead.
-  r.pos = { x: railPos('blue', RAIL_EXIT_S).x, y: -10 };
-  r.heading = 0;
-  r.fieldCentric = false;
-  r.vel = { x: 0, y: 0 };
-  void z;
-  for (let i = 0; i < Math.round(3 / SIM_DT); i++) {
-    step(w, SIM_DT, new Map([[0, cmd({ intake: true })]]));
-  }
-  const took = w.balls.filter((b) => ids.includes(b.id) && b.state.kind === 'held').length;
-  const withBot = w.balls.slice(0, 6).map((b) => (b.state as { s?: number }).s ?? NaN);
-  check(
-    'a robot driving into a shut gate with the intake running takes NOTHING off the rail',
-    took === 0 && r.hopper.length === hopper0,
-    `took ${took}, hopper ${hopper0} -> ${r.hopper.length}`,
-  );
-  // ...and it must not PUSH them. Against a CONTROL with no robot present, because the
-  // column settles against the shut gate on its own and that settling is not a shove.
-  const ctl = mkWorld('match', 'blue', 42);
-  startMatch(ctl);
-  for (const b of ctl.balls) if (b.state.kind === 'ground') b.pos = { x: 900, y: 900 };
-  for (let i = 0; i < 6; i++) {
-    const b = ctl.balls[i];
-    const cs = GATE_STOP_S + i * RAIL_PITCH;
-    b.state = { kind: 'rail', goal: 'blue', s: cs, v: 0, overflow: false, pending: false };
-    b.pos = railPos('blue', cs);
-    b.vel = { x: 0, y: 0 };
-    b.z = RAMP_SURFACE_Z;
-    b.vz = 0;
-  }
-  ctl.robots[0].pos = { x: 0, y: -40 }; // nowhere near
-  for (let i = 0; i < Math.round(3 / SIM_DT); i++) step(ctl, SIM_DT, new Map([[0, cmd({})]]));
-  const control = ctl.balls.slice(0, 6).map((b) => (b.state as { s?: number }).s ?? NaN);
-  // ...and it must not move anything that is INSIDE the channel. Scoped to s > RAIL_OPEN_S
-  // deliberately: below the mouth the rail runs on in the open under the gate, and a robot
-  // parked there legitimately blocks the outflow — that is a block, not a shove.
-  const inChannel = withBot
-    .map((v, i) => ({ v, c: control[i] }))
-    .filter((e) => e.c > RAIL_OPEN_S + BALL_RADIUS);
-  const shove = Math.max(...inChannel.map((e) => Math.abs(e.v - e.c)));
-  check(
-    '...and cannot move an artifact that is inside the channel (vs no robot at all)',
-    inChannel.length >= 4 && shove < 0.01,
-    `${inChannel.length} in-channel, worst difference ${shove.toFixed(4)}in`,
-  );
-}
-
-// ---- the gate's mouth is a PLACE, and a blocked one holds the column back ----
-// A drained artifact used to become a ground artifact at a fixed point below the gate
-// whatever occupied it, so parking a robot over the outflow made artifacts materialise
-// inside it and pile up. The mouth is checked now, and a robot on it BLOCKS - it does not
-// collect. Handing artifacts straight off the rail into a hopper was the one path a robot
-// had to an artifact still in the classifier ("I should not be able to intake directly off
-// of the balls on the classifier"); they have to come OUT of the gate first, and then the
-// ordinary intake picks them up off the floor like anything else.
-{
-  const stagedDrain = (hopper: number): World => {
-    const w = foulWorld();
-    w.balls.length = 0;
-    const r = w.robots[1]; // red owns this classifier
-    w.robots[0].pos = { x: -60, y: -60 };
-    r.hopper = Array.from({ length: hopper }, () => 'green' as const);
-    const mouth = railPos('red', RAIL_EXIT_S);
-    r.pos = { x: mouth.x - 2, y: mouth.y }; // parked squarely on the outflow
-    r.heading = Math.PI / 2;
-    r.vel = { x: 0, y: 0 };
-    for (let i = 0; i < 6; i++) {
-      w.balls.push({
-        id: 400 + i,
-        color: 'purple',
-        state: { kind: 'rail', goal: 'red', s: 6 + i * 5.2, v: 0, overflow: false, pending: false },
-        pos: railPos('red', 6 + i * 5.2),
-        vel: { x: 0, y: 0 },
-        z: 0,
-        vz: 0,
-      });
-    }
-    for (let i = 0; i < Math.round(5 / SIM_DT); i++) {
-      w.goals.red.gatePos = 1; // hold the gate fully open
-      step(w, SIM_DT, new Map());
-    }
-    return w;
-  };
-
-  const empty = stagedDrain(0);
-  const er = empty.robots[1];
-  const insideEmpty = empty.balls.filter(
-    (b) => b.state.kind === 'ground' &&
-      Math.abs(b.pos.x - er.pos.x) < er.spec.width / 2 &&
-      Math.abs(b.pos.y - er.pos.y) < er.spec.length / 2,
-  ).length;
-  check(
-    'a robot parked under the gate BLOCKS the drain — it never takes one off the rail',
-    er.hopper.length === 0 && insideEmpty === 0,
-    `hopper=${er.hopper.length} inside=${insideEmpty}`,
-  );
-  check(
-    '...and the column queues on the rail behind it rather than materialising in it',
-    empty.balls.filter((b) => b.state.kind === 'rail').length === 6,
-    `${empty.balls.filter((b) => b.state.kind === 'rail').length}/6 still on the rail`,
-  );
-
-  const full = stagedDrain(HOPPER_CAPACITY);
-  const fr = full.robots[1];
-  const stillRail = full.balls.filter((b) => b.state.kind === 'rail').length;
-  const insideFull = full.balls.filter(
-    (b) => b.state.kind === 'ground' &&
-      Math.abs(b.pos.x - fr.pos.x) < fr.spec.width / 2 &&
-      Math.abs(b.pos.y - fr.pos.y) < fr.spec.length / 2,
-  ).length;
-  check(
-    'a FULL robot on the mouth blocks the drain — the column queues on the rail',
-    stillRail >= 4 && insideFull === 0,
-    `rail=${stillRail} inside=${insideFull}`,
-  );
-}
-
-// ---- artifacts leave the ramp at the speed the ramp gave them ---------------
-// The release used to ASSIGN a scripted exit velocity, discarding whatever the artifact was
-// doing. An artifact resting against a closed gate has ~zero speed and was handed 23 in/s
-// on the tick it touched the floor: a step change with no cause. Speed down a ramp comes
-// from gravity, so it should still be that speed at the bottom — the only legitimate change
-// across the transition is ONE TICK of RAIL_ACCEL.
-{
-  const w = foulWorld();
-  w.balls.length = 0;
-  w.robots[0].pos = { x: -60, y: -60 };
-  w.robots[1].pos = { x: -60, y: 60 };
-  for (let i = 0; i < 9; i++) {
-    w.balls.push({
-      id: 950 + i,
-      color: 'purple',
-      state: { kind: 'rail', goal: 'red', s: GATE_STOP_S + i * RAIL_PITCH, v: 0, overflow: false },
-      pos: railPos('red', GATE_STOP_S + i * RAIL_PITCH),
-      vel: { x: 0, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  }
-  const before = new Map<number, { kind: string; v: number }>();
-  let worst = 0;
-  for (let i = 0; i < Math.round(8 / SIM_DT); i++) {
-    w.goals.red.gatePos = 1; // hold it open so the whole column drains
-    for (const b of w.balls) {
-      before.set(b.id, {
-        kind: b.state.kind,
-        v: b.state.kind === 'rail' ? Math.abs((b.state as { v: number }).v) : hyp(b.vel.x, b.vel.y),
-      });
-    }
-    step(w, SIM_DT, new Map());
-    for (const b of w.balls) {
-      const p = before.get(b.id);
-      if (!p || p.kind !== 'rail' || b.state.kind !== 'ground') continue;
-      worst = Math.max(worst, Math.abs(hyp(b.vel.x, b.vel.y) - p.v));
-    }
-  }
-  check(
-    'artifacts leave the ramp at ramp speed (no kick as they reach the floor)',
-    worst <= RAIL_ACCEL * SIM_DT * 1.5,
-    `worst step ${worst.toFixed(2)}in/s, one tick of gravity is ${(RAIL_ACCEL * SIM_DT).toFixed(2)}`,
-  );
-}
-
-// ---- OVERFLOW stops at the exit, and queues if it cannot leave ---------------
-// Overflow rides OVER the retained column ("OVERFLOW ARTIFACTS can pass over the top of the
-// GATE to exit the RAMP", 9.8.3) — but it still has to STOP at the exit. Its flow had no
-// floor, which was invisible while every artifact released the instant it reached
-// RAIL_EXIT_S; once the release waits for a clear doorway, an ungated overflow artifact
-// kept going down the tunnel and off the field, still in `rail` state.
-{
-  const w = foulWorld();
-  w.balls.length = 0;
-  w.robots[0].pos = { x: -60, y: -60 };
-  const r = w.robots[1]; // red, parked ON the mouth with a full hopper: nothing can leave
-  r.hopper = ['green', 'green', 'green'];
-  const mouth = railPos('red', RAIL_EXIT_S);
-  r.pos = { x: mouth.x - 2, y: mouth.y };
-  r.heading = Math.PI / 2;
-  r.vel = { x: 0, y: 0 };
-  for (let i = 0; i < 4; i++) {
-    w.balls.push({
-      id: 700 + i,
-      color: 'purple',
-      state: { kind: 'rail', goal: 'red', s: 20 + i * 6, v: 0, overflow: true },
-      pos: railPos('red', 20 + i * 6),
-      vel: { x: 0, y: 0 },
-      z: OVERFLOW_Z,
-      vz: 0,
-    });
-  }
-  runCmds(w, new Map(), 8);
-  const rail = w.balls.filter((b) => b.state.kind === 'rail');
-  const ss = rail.map((b) => (b.state as { s: number }).s).sort((a, b) => a - b);
-  const runaway = w.balls.some((b) => b.state.kind === 'rail' && (b.state as { s: number }).s < RAIL_EXIT_S);
-  // ...and they QUEUE nose to tail rather than all clamping onto the exit point: rail
-  // artifacts are placed by `s` alone, so the ground solver never separates them.
-  const spaced = ss.every((v, i) => i === 0 || v - ss[i - 1] >= RAIL_PITCH - 0.01);
-  check(
-    'blocked OVERFLOW stops at the exit and queues instead of running off the field',
-    rail.length === 4 && !runaway && spaced,
-    `s = ${ss.map((v) => v.toFixed(1)).join(', ')} (exit ${RAIL_EXIT_S})`,
-  );
-}
-
-// ---- artifacts never STACK, however hard they are rammed --------------------
-// Rapier separates artifacts early in the tick, but the bespoke robot push, the held-ball
-// block, the classifier eviction and the wall clamp all move them AFTERWARDS. Without a
-// final relaxation the overlap those create survives the tick, and while a robot keeps
-// pushing, the next tick never wins either — artifacts visibly stacked when rammed into a
-// clump, and piled up at the gate when a robot blocked the outflow.
-{
-  const overlapWorst = (w: World): number => {
-    const g = w.balls.filter((b) => b.state.kind === 'ground');
-    let worst = 0;
-    for (let i = 0; i < g.length; i++) {
-      for (let j = i + 1; j < g.length; j++) {
-        worst = Math.max(worst, BALL_RADIUS * 2 - hyp(g[i].pos.x - g[j].pos.x, g[i].pos.y - g[j].pos.y));
-      }
-    }
-    return worst;
-  };
-
-  const w = foulWorld();
-  w.balls.length = 0;
-  w.robots[1].pos = { x: 60, y: 60 };
-  const r = w.robots[0];
-  r.hopper = ['green', 'green', 'green'];
-  r.pos = { x: 0, y: -30 };
-  r.heading = Math.PI / 2;
-  for (let i = 0; i < 9; i++) {
-    w.balls.push({
-      id: 9500 + i,
-      color: 'purple',
-      state: { kind: 'ground' },
-      pos: { x: -6 + (i % 3) * 6, y: -12 + Math.floor(i / 3) * 6 },
-      vel: { x: 0, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  }
-  let worst = 0;
-  for (let c = 0; c < 6; c++) {
-    runCmds(w, new Map([[0, cmd({ driveY: 1 })]]), 0.65);
-    worst = Math.max(worst, overlapWorst(w));
-    runCmds(w, new Map([[0, cmd({ driveY: -1 })]]), 0.35);
-    worst = Math.max(worst, overlapWorst(w));
-  }
-  /**
-   * A soft-contact solver leaves a little slop; STACKING is a different thing entirely — half
-   * a diameter or more, and it NEVER RESOLVES. Both halves of that sentence are the test, and
-   * only the numeric half is written here, so the bound has to leave room for a hard ram.
-   *
-   * It moved from 0.5 to 0.75 of a radius when the artifact solve's chassis became DYNAMIC.
-   * A robot that the artifacts push back on drives a little deeper into a pile before it
-   * stops, because the stall is now the solver satisfying a contact rather than a bespoke
-   * pass killing the velocity outright the instant an artifact reads as pinned. Measured
-   * every tick of this scene rather than at the four sample points below: peak overlap 1.25
-   * -> 2.01in, over the old bound on 21 ticks of 360, and the longest unbroken stretch is
-   * 0.18s — always while the robot is at 0.2-1.1 in/s, i.e. the moment the ram stops and the
-   * jam rule holds the wedged artifacts where they are. It resolves to 0.00in every time.
-   * That is the ram compressing, not a stack: it stays inside the half-diameter above.
-   */
-  check(
-    'ramming a clump never stacks artifacts (overlap stays contact slop)',
-    worst < BALL_RADIUS * 0.75,
-    `worst overlap ${worst.toFixed(2)}in of ${BALL_RADIUS * 2}in diameter`,
-  );
-}
-
-// ---- penalty state stays deterministic -------------------------------------
-{
-  const w1 = pinWorld(); runCmds(w1, PIN_CMDS, 4);
-  const w2 = pinWorld(); runCmds(w2, PIN_CMDS, 4);
-  check('penalty engine is bit-for-bit deterministic', JSON.stringify(w1) === JSON.stringify(w2));
 }
 
 // ============================================================================
@@ -14535,10 +5698,10 @@ function pinScene(
   {
     const setup: RobotSetup = {
       id: 0, alliance: 'blue',
-      spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'decode'),
+      spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'chain'),
       assists: { ...DEFAULT_ASSISTS }, startIndex: 0,
     };
-    const run = runRecordMatch(5, [setup], () => new Map(), { mode: 'free', stopTick: 900 });
+    const run = runRecordMatch(5, [setup], () => new Map(), { mode: 'free', stopTick: 900, game: 'chain' });
     const secs = run.replay.ticks * SIM_DT;
     check(
       'playtime: a match credits its REAL duration (ticks x SIM_DT)',
@@ -14667,54 +5830,6 @@ function pinScene(
   }
 }
 
-/**
- * ...AND DECODE'S OWN ARCHETYPE AXIS IS THE INTAKE PRESET.
- *
- * The three presets are not cosmetic: each carries its own `mouth` geometry and transfer
- * cadence, and the TRIANGLE takes TWO artifacts per cycle (`dual`) where the others take one.
- * A replay that dropped the preset would re-simulate a different robot picking up a different
- * number of artifacts at a different rate.
- */
-{
-  for (const intake of ['sloped', 'vector', 'triangle'] as const) {
-    const setup: RobotSetup = {
-      id: 0,
-      alliance: 'blue',
-      spec: coerceSpec({ ...DEFAULT_SPEC, intake }, DEFAULT_SPEC, 'decode'),
-      assists: { ...DEFAULT_ASSISTS, fieldCentric: false, autoIntake: true, autoFire: true },
-      startIndex: 0,
-    };
-    // sweep the spike rows with the intake down, then fire what it gathered. The PEAK hopper
-    // is watched rather than the final one: a run that intakes and then shoots everything ends
-    // at zero, so reading only the end cannot tell it from a run that never picked anything up.
-    let peakHopper = 0;
-    const src: CommandSource = (tick, w) => {
-      peakHopper = Math.max(peakHopper, w.robots[0].hopper.length);
-      return new Map([[0, cmd({
-        driveY: 1,
-        rotate: tick > 200 ? 0.35 : 0,
-        intake: true,
-        fire: tick > 260,
-      })]]);
-    };
-    const run = runRecordMatch(31, [setup], src, { mode: 'free', stopTick: 420 });
-    const live = run.world.robots[0];
-    check(`replay/intake:${intake}: the recorded run actually intook`, peakHopper > 0,
-      `peak hopper=${peakHopper}, ended ${live.hopper.length}`);
-    check(
-      `replay/intake:${intake}: re-simulating the replay reproduces the run exactly`,
-      worldHash(simulateReplay(run.replay)) === worldHash(run.world),
-    );
-    const stored: Replay = JSON.parse(JSON.stringify(run.replay));
-    check(
-      `replay/intake:${intake}: survives the JSON round-trip, preset intact`,
-      worldHash(simulateReplay(stored)) === worldHash(run.world) &&
-        stored.setups[0].spec.intake === intake,
-      `intake=${stored.setups[0].spec.intake}`,
-    );
-  }
-}
-
 // The gap that shipped a broken feature: replays were only ever exercised through the
 // determinism helpers, never by driving a robot and watching the recording drive it back.
 // TANK (and BUTTERFLY, half of whose life is tank mode) is commanded EXCLUSIVELY through
@@ -14725,7 +5840,7 @@ function pinScene(
     const setup: RobotSetup = {
       id: 0,
       alliance: 'blue',
-      spec: coerceSpec({ ...DEFAULT_SPEC, drivetrain }, DEFAULT_SPEC, 'decode'),
+      spec: coerceSpec({ ...DEFAULT_SPEC, drivetrain }, DEFAULT_SPEC, 'chain'),
       assists: { ...DEFAULT_ASSISTS, autoIntake: false, autoFire: false },
       startIndex: 0,
     };
@@ -14738,18 +5853,21 @@ function pinScene(
       // in place, again in both shapes. A replay has to carry whichever pair its drivetrain
       // reads, so both are exercised on every build.
       return new Map([[0, cmd({
-        driveX: t < 2.5 ? -1 : 0, // AWAY from the wall it starts against
+        driveX: t < 2.5 ? -1 : 0, // AWAY from the wall it starts against (field-centric: −x)
         driveY: 0,
         rotate: t < 2.5 ? 0 : 0.6,
-        leftDrive: t < 2.5 ? -1 : -0.6,
-        rightDrive: t < 2.5 ? -1 : 0.6,
+        // the tank sides are ROBOT-centric, and Chain Reaction's anchor 0 faces −x already
+        // (x=57, heading π), so FORWARD is away from that wall; backward ran it into it
+        leftDrive: t < 2.5 ? 1 : -0.6,
+        rightDrive: t < 2.5 ? 1 : 0.6,
       })]]);
     };
     // FREE drive: no countdown or phase gating, so the whole window is drivable
-    const run = runRecordMatch(11, [setup], src, { mode: 'free', stopTick: 300 });
+    const run = runRecordMatch(11, [setup], src, { mode: 'free', stopTick: 300, game: 'chain' });
     const live = run.world.robots[0];
     // sanity: the ROBOT ACTUALLY MOVED in the live run, or this proves nothing
-    const moved = hyp(live.pos.x - startPose('blue', 0).pos.x, live.pos.y - startPose('blue', 0).pos.y);
+    const start = createWorld('free', 11, [setup]).robots[0].pos;
+    const moved = hyp(live.pos.x - start.x, live.pos.y - start.y);
     check(`replay/${drivetrain}: the recorded run actually drove somewhere`, moved > 4, `${moved.toFixed(1)}in`);
 
     const back = simulateReplay(run.replay);
@@ -14785,7 +5903,7 @@ function pinScene(
   {
     const setup: RobotSetup = {
       id: 0, alliance: 'blue',
-      spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'decode'),
+      spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'chain'),
       // robot-centric: see the trap above
       assists: { ...DEFAULT_ASSISTS, fieldCentric: false }, startIndex: 0,
     };
@@ -14800,7 +5918,7 @@ function pinScene(
       })]]);
     };
     // the SOLO shape: fresh world + preCountdown + localized commands, recorded from tick 0
-    const run = runRecordMatch(0x5010, [setup], drive, { stopTick: 800 });
+    const run = runRecordMatch(0x5010, [setup], drive, { stopTick: 800, game: 'chain' });
     const back = simulateReplay(run.replay);
     check(
       'solo practice: a sim-driven run re-simulates to the same world',
@@ -14829,16 +5947,18 @@ function pinScene(
     const startPos = createWorld('match', 0x5010, [setup]).robots[0].pos;
     const end = run.world.robots[0].pos;
     const drove = hyp(end.x - startPos.x, end.y - startPos.y);
+    // ...and got PAST the countdown. This also asked for a score, which DECODE's three preloads
+    // gave for free; a Chain Reaction robot starts empty, so the clock is the evidence instead
     check(
-      'solo practice: the recorded run actually drove and scored',
-      drove > 5 && run.world.match.scores.blue.total > 0,
-      `moved ${drove.toFixed(1)}in (dx ${(end.x - startPos.x).toFixed(1)}, dy ${(end.y - startPos.y).toFixed(1)}), scored ${run.world.match.scores.blue.total}`,
+      'solo practice: the recorded run actually drove, and the match clock ran',
+      drove > 5 && run.world.match.phase !== 'pre',
+      `moved ${drove.toFixed(1)}in (dx ${(end.x - startPos.x).toFixed(1)}, dy ${(end.y - startPos.y).toFixed(1)}), phase ${run.world.match.phase}`,
     );
     // ...and the OLD controller-driven shape, which is what could not be recorded: no
     // preCountdown, the match started from outside the sim partway through.
     {
       const w = createWorld('match', 0x5010, [setup]);
-      const rec = new ReplayRecorder(0x5010, [setup], 'match', 'decode');
+      const rec = new ReplayRecorder(0x5010, [setup], 'match', 'chain');
       for (let t = 1; t <= 800; t++) {
         if (t === 40) startMatch(w); // the keypress — a tick the container cannot carry
         const local = new Map([[0, localizeCommand(drive(t, w).get(0)!)]]);
@@ -14859,7 +5979,7 @@ function pinScene(
   // must write TWO entries, not one (hold-last would otherwise fold them into one).
   {
     const setup: RobotSetup = { id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 };
-    const rec = new ReplayRecorder(1, [setup], 'match', 'decode');
+    const rec = new ReplayRecorder(1, [setup], 'match', 'chain');
     rec.record(1, new Map([[0, cmd({})]]));
     rec.record(2, new Map([[0, cmd({ bbRamp: true })]])); // ONLY bbRamp differs from tick 1
     const replay = rec.finish();
@@ -14875,11 +5995,11 @@ function pinScene(
   {
     const setup: RobotSetup = {
       id: 0, alliance: 'blue',
-      spec: coerceSpec({ ...DEFAULT_SPEC, drivetrain: 'tank' }, DEFAULT_SPEC, 'decode'),
+      spec: coerceSpec({ ...DEFAULT_SPEC, drivetrain: 'tank' }, DEFAULT_SPEC, 'chain'),
       assists: { ...DEFAULT_ASSISTS }, startIndex: 0,
     };
     const r = runRecordMatch(3, [setup], (tick) =>
-      new Map([[0, cmd({ leftDrive: tick < 60 ? 1 : -1, rightDrive: 1 })]]), { stopTick: 120 }).replay;
+      new Map([[0, cmd({ leftDrive: tick < 60 ? 1 : -1, rightDrive: 1 })]]), { stopTick: 120, game: 'chain' }).replay;
     check('replay: the container records at the tank-aware stride', r.format === REPLAY_FORMAT && trackStride(r.format) === 7);
     const track = r.tracks[0] ?? [];
     check(
@@ -14896,6 +6016,18 @@ function pinScene(
     // this build — but a format-1 TANK replay is refused rather than played back dead
     const legacy: Replay = { ...r, format: 1, tracks: { 0: [1, 0, 0, 0, 0] } };
     check('replay: a format-1 container still parses', simulateReplay(legacy).robots.length === 1);
+    // A DECODE RECORDING IS REFUSED, NEVER RE-SIMULATED AS ANOTHER GAME (DECODE was removed from
+    // this fork, 2026-10-12). Its `game` is 'decode' — or absent, which every replay recorded
+    // before the game seam was — and the fallback game would replay its inputs as a match that
+    // never happened.
+    check(
+      "replay: a DECODE replay ('decode', or no game at all) is refused as 'game', and a known game is not",
+      replayRefusal({ ...r, game: 'decode' as never }, r.balanceVersion, SIM_VERSION) === 'game' &&
+        replayRefusal({ ...r, game: undefined }, r.balanceVersion, SIM_VERSION) === 'game' &&
+        !replayPlayable({ ...r, game: undefined }, r.balanceVersion, SIM_VERSION) &&
+        replayRefusal(r, r.balanceVersion, SIM_VERSION) === null,
+    );
+    check('replay: replayGameOf names the game, or null for one this build lacks', replayGameOf(r) === 'chain' && replayGameOf({ game: 'decode' }) === null && replayGameOf({}) === null);
     /**
      * A SIM BUMP RETIRES OLDER REPLAYS, DELIBERATELY.
      *
@@ -15448,7 +6580,7 @@ function pinScene(
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: 'blue', startIndex: 1, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0,
   });
-  const room = new Room('smoke-encode', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-encode', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkRaw('r1'));
   room.add(mkRaw('r2'));
   room.add(mkObj('o1'));
@@ -15604,7 +6736,7 @@ function pinScene(
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance, startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0,
   });
-  const gapRoom = new Room('smoke-snapgap', () => {}, { kind: 'versus' });
+  const gapRoom = new Room('smoke-snapgap', () => {}, { kind: 'versus', game: 'chain' });
   gapRoom.add(mk('p1', 'blue'));
   gapRoom.add(mk('p2', 'red'));
   gapRoom.onMessage('p1', { t: 'start' });
@@ -15640,7 +6772,7 @@ function pinScene(
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: 'blue', startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0,
   });
-  const room = new Room('smoke-gapfill', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-gapfill', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkC('g1'));
   room.onMessage('g1', { t: 'start' });
   room.advanceForTest(5);
@@ -15716,11 +6848,11 @@ function pinScene(
       connected: true,
       disconnectAt: 0,
     };
-    const room = new Room('smoke-lead', () => {}, { kind: 'record', record: 'solo' });
+    const room = new Room('smoke-lead', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
     room.add(c);
     room.onMessage('lead-1', { t: 'start' });
     room.advanceForTest(0); // drops the real-time timer; this loop owns the ticks
-    const mod = simModuleFor('decode');
+    const mod = simModuleFor('chain');
     const ctrl = new LeadController();
     // the command a tick was stamped with, so the room's frame can be compared against it
     const stamped = new Map<number, number>();
@@ -15923,7 +7055,8 @@ function pinScene(
   const b1 = copy(); b1.balls[0].pos.y += AGREE_BALL_IN * 0.8;
   const b2 = copy(); b2.balls[0].pos.y += AGREE_BALL_IN * 1.5;
   check('world digest: an element gets its own, looser tolerance', digestsAgree(base, worldDigest(b1)) && !digestsAgree(base, worldDigest(b2)) && AGREE_BALL_IN > AGREE_POS_IN);
-  const k = copy(); k.balls[0].state = { kind: 'flight', target: 'blue' };
+  // a Chain Reaction field starts with every particle STAGED in flight, so the state change is to ground
+  const k = copy(); k.balls[0].state = { kind: 'ground' };
   const h = copy(); h.robots[0].hopper.push('purple');
   const sc = copy(); sc.match.scores.blue.total += 1;
   check('world digest: an element changing state, a hopper or a score never agrees, however close the poses', !digestsAgree(base, worldDigest(k)) && !digestsAgree(base, worldDigest(h)) && !digestsAgree(base, worldDigest(sc)));
@@ -15972,6 +7105,9 @@ function pinScene(
   let rounded = 0;
   const phases = new Set<string>();
   for (let t = 1; t <= 2700; t++) {
+    // Chain Reaction starts EMPTY (DECODE preloaded three): keep it stocked so the shot stamp,
+    // which its turret's accumulated cadence puts off the tick grid, is exercised at all
+    while (w.robots[0].hopper.length < 3) w.robots[0].hopper.push('green');
     step(w, SIM_DT, hold);
     if (t % 13 !== 0) continue;
     const got = wire(w);
@@ -16032,11 +7168,11 @@ function pinScene(
       connected: true,
       disconnectAt: 0,
     };
-    const room = new Room('smoke-shots', () => {}, { kind: 'record', record: 'solo' });
+    const room = new Room('smoke-shots', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
     room.add(c);
     room.onMessage('shot-1', { t: 'start' });
     room.advanceForTest(0);
-    const mod = simModuleFor('decode');
+    const mod = simModuleFor('chain');
     const lead = new LeadController();
     const cmd: RobotCommand = { driveX: 0, driveY: 0, rotate: 0, leftDrive: 0, rightDrive: 0, intake: true, fire: true };
     const mark = (t: number): number => (fix ? Math.round(t / SIM_DT) : t);
@@ -16062,6 +7198,10 @@ function pinScene(
       }
       if (now - sDue > 250) sDue = now - 250;
       while (now >= sDue) {
+        // the room's world starts EMPTY in Chain Reaction: stock it BEFORE the tick, so the
+        // snapshot the tick sends still carries a load and the client predicts its own shots
+        const rw = room.worldForTest();
+        if (rw) while (rw.robots[0].hopper.length < 3) rw.robots[0].hopper.push('green');
         room.advanceForTest(1);
         const r = room.worldForTest()?.robots[0];
         if (r && r.lastFireAt !== srvFire) {
@@ -16118,8 +7258,11 @@ function pinScene(
         cues.push(Math.round(r.lastFireAt / SIM_DT));
       }
     }
+    // the hopper never runs dry here, so the client's LEAD has predicted shots past the last tick
+    // the room stepped; those are not duplicates, just ahead, and there is no room shot to match
+    const roomTick = room.worldForTest()?.tick ?? 0;
     room.stop();
-    return { cues, shots };
+    return { cues: cues.filter((k) => k <= roomTick), shots };
   };
   const before = runShots(false);
   const after = runShots(true);
@@ -16245,7 +7388,7 @@ function pinScene(
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: 'blue', startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0, userId: `u-${id}`,
   });
-  const room = new Room('smoke-duo', () => {}, { kind: 'record', record: 'duo' });
+  const room = new Room('smoke-duo', () => {}, { kind: 'record', record: 'duo', game: 'chain' });
   room.add(mkD('d1'));
   room.add(mkD('d2'));
   room.onMessage('d1', { t: 'start' });
@@ -16338,7 +7481,7 @@ function pinScene(
    */
   const vs: Record<string, ServerMsg[]> = { v1: [], v2: [] };
   const mkV = (id: string): Client => ({ ...mkD(id), send: (m) => vs[id].push(m) });
-  const vroom = new Room('smoke-vs-rematch', () => {}, { kind: 'versus' });
+  const vroom = new Room('smoke-vs-rematch', () => {}, { kind: 'versus', game: 'chain' });
   vroom.add(mkV('v1'));
   vroom.add(mkV('v2'));
   vroom.onMessage('v1', { t: 'start' });
@@ -16361,7 +7504,7 @@ function pinScene(
    * ⟲ NEW RUN control instead of growing a 1/1 vote.
    */
   const solo: ServerMsg[] = [];
-  const sroom = new Room('smoke-solo-rematch', () => {}, { kind: 'record', record: 'solo' });
+  const sroom = new Room('smoke-solo-rematch', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
   sroom.add({ ...mkD('s1'), send: (m) => solo.push(m) });
   sroom.onMessage('s1', { t: 'rematch', on: true });
   const stally = [...solo].reverse().find((m) => m.t === 'rematch') as Extract<ServerMsg, { t: 'rematch' }> | undefined;
@@ -16391,7 +7534,7 @@ function pinScene(
    */
   const gh: Record<string, ServerMsg[]> = { g1: [], g2: [] };
   const mkG = (id: string): Client => ({ ...mkD(id), send: (m) => gh[id].push(m) });
-  const groom = new Room('smoke-ghost-rematch', () => {}, { kind: 'versus' });
+  const groom = new Room('smoke-ghost-rematch', () => {}, { kind: 'versus', game: 'chain' });
   groom.add(mkG('g1'));
   groom.add(mkG('g2'));
   groom.onMessage('g1', { t: 'start' });
@@ -16446,7 +7589,7 @@ function pinScene(
     send: (m) => q[id].push(m),
     player: { ...mkD(id).player, alliance },
   });
-  const qroom = new Room('smoke-ghost-2v2', () => {}, { kind: 'versus' });
+  const qroom = new Room('smoke-ghost-2v2', () => {}, { kind: 'versus', game: 'chain' });
   qroom.add(mkQ('q1', 'red'));
   qroom.add(mkQ('q2', 'red'));
   qroom.add(mkQ('q3', 'blue'));
@@ -16530,7 +7673,7 @@ const forceRoomToPost = (room: Room): void => {
     caps: ['recycle'],
     userId: 'u-' + id,
   });
-  const room = new Room('smoke-recycle', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-recycle', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkR('a', 'red'));
   room.add(mkR('b', 'blue'));
   room.add(mkR('c', 'blue'));
@@ -16601,9 +7744,9 @@ const forceRoomToPost = (room: Room): void => {
 // ...AND IT IS THE SAME LOOP IN EVERY GAME. Nothing in the recycle is game-shaped — the
 // room's `config.game` is readonly and untouched, and `startMatch`/`beginMatch` resolve
 // `simModuleFor(this.game)` on each call — but "should be game-agnostic" is exactly the
-// claim that goes stale, and BIOBUZZ has FEWER start anchors than DECODE, which is the one
-// place a rebuilt roster could pick an index its game cannot resolve.
-for (const game of ['decode', 'chain', 'biobuzz'] as const) {
+// claim that goes stale, and a rebuilt roster is the one place an index its game cannot
+// resolve could be picked.
+for (const game of GAME_IDS) {
   // ⚠️ A SERVER-CONNECTED BIOBUZZ ROOM IS 3D (owner ruling 2026-09-18, `serverPhysics`), and a
   // room whose physics is 3D refuses to tick until `physics3dReady()`. Without this the loop
   // silently measured nothing on the one game it was written to cover: `advanceForTest` ran the
@@ -16623,11 +7766,9 @@ for (const game of ['decode', 'chain', 'biobuzz'] as const) {
   room.onMessage('p1', { t: 'start' });
   forceRoomToPost(room);
   check(`recycle/${game}: the match finished`, room.worldForTest()?.match.phase === 'post');
-  // ⚠️ A DECODE WORLD CARRIES NO `game` AT ALL — that absence IS how an old world reads as
-  // DECODE (`simModuleFor` falls back), so the expectation has to be written the way every
-  // reader of the field writes it, or this check fails on the one game it cannot fail for.
-  check(`recycle/${game}: ...in THIS game, not DECODE by fallback`,
-    (room.worldForTest()?.game ?? 'decode') === game, String(room.worldForTest()?.game));
+  // every world names its game (DECODE's carried none; DECODE is gone), so no fallback is read
+  check(`recycle/${game}: ...in THIS game, not the default by fallback`,
+    room.worldForTest()?.game === game, String(room.worldForTest()?.game));
 
   room.detach('p2'); // somebody leaves from the results screen
   room.onMessage('p1', { t: 'lobby' });
@@ -16637,7 +7778,7 @@ for (const game of ['decode', 'chain', 'biobuzz'] as const) {
   room.onMessage('p1', { t: 'start' });
   const w = room.worldForTest();
   check(`recycle/${game}: the second match is built, and still in this game`,
-    w !== null && (w.game ?? 'decode') === game, String(w?.game));
+    w !== null && w.game === game, String(w?.game));
   check(`recycle/${game}: ...from the roster that is left, not the frozen one`,
     w?.robots.length === 1, String(w?.robots.length));
 }
@@ -16653,7 +7794,7 @@ for (const game of ['decode', 'chain', 'biobuzz'] as const) {
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: id === 'h' ? 'red' : 'blue', startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0, caps, userId: 'u-' + id,
   });
-  const room = new Room('smoke-recycle-mixed', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-recycle-mixed', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mk('h', ['recycle']));
   room.add(mk('old', [])); // a build from before this feature
   room.onMessage('h', { t: 'start' });
@@ -16677,7 +7818,7 @@ for (const game of ['decode', 'chain', 'biobuzz'] as const) {
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: id === 'h' ? 'red' : 'blue', startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0, caps: ['recycle'], userId: 'u-' + id,
   });
-  const room = new Room('smoke-recycle-crown', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-recycle-crown', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mk('h'));
   room.add(mk('g'));
   check('recycle: the first player through the door is host', lastRoster(sink.g)?.hostId === 'h');
@@ -16777,15 +7918,15 @@ for (const game of ['decode', 'chain', 'biobuzz'] as const) {
     b({ id: 6, kind: 'known-bug', endsAt: T - 1 }),
   ];
   const seen = (opts: { game?: string; channel?: string; dismissed?: Record<string, number> } = {}) =>
-    visibleBanners(set, { game: opts.game ?? 'decode', channel: opts.channel ?? 'stable', dismissed: opts.dismissed ?? {}, now: T }).map((x) => x.id);
+    visibleBanners(set, { game: opts.game ?? 'chain', channel: opts.channel ?? 'stable', dismissed: opts.dismissed ?? {}, now: T }).map((x) => x.id);
   check('banners: the restart outranks everything, then warning, known bug, notice',
     JSON.stringify(seen({ game: 'biobuzz', channel: 'alpha' })) === '[4,3,2,1]', JSON.stringify(seen({ game: 'biobuzz', channel: 'alpha' })));
-  check('banners: a game-scoped one shows only in its game', !seen({ game: 'decode' }).includes(2) && seen({ game: 'biobuzz' }).includes(2));
+  check('banners: a game-scoped one shows only in its game', !seen({ game: 'chain' }).includes(2) && seen({ game: 'biobuzz' }).includes(2));
   check('banners: a channel-scoped one shows only on its site', !seen({ channel: 'stable' }).includes(3));
   check('banners: a scheduled one waits for its start, an ended one is gone', !seen().includes(5) && !seen().includes(6));
   check('banners: a dismissal holds at its revision', !seen({ dismissed: { '1': 1 } }).includes(1));
   check('banners: ...and an edit (new revision) brings it back',
-    visibleBanners([b({ id: 1, revision: 2 })], { game: 'decode', channel: 'stable', dismissed: { '1': 1 }, now: T }).length === 1);
+    visibleBanners([b({ id: 1, revision: 2 })], { game: 'chain', channel: 'stable', dismissed: { '1': 1 }, now: T }).length === 1);
   check('banners: a restart cannot be dismissed', seen({ dismissed: { '4': 1 } }).includes(4));
 
   // the in-flow maintenance strip (presence) steps aside for a SITE lockdown once it bites
@@ -16913,8 +8054,8 @@ const recordDrive: CommandSource = (tick) => {
 };
 {
   // recordSetups shape
-  const solo = recordSetups(DEFAULT_SPEC, 'solo', DEFAULT_ASSISTS, undefined, true);
-  const duo = recordSetups(DEFAULT_SPEC, 'duo', DEFAULT_ASSISTS, undefined, true);
+  const solo = recordSetups(DEFAULT_SPEC, 'solo', DEFAULT_ASSISTS);
+  const duo = recordSetups(DEFAULT_SPEC, 'duo', DEFAULT_ASSISTS);
   check('recordSetups solo = 1 robot (1v0)', solo.length === 1 && solo[0].id === 0);
   check(
     'recordSetups duo = 2 robots at distinct poses',
@@ -16925,8 +8066,6 @@ const recordDrive: CommandSource = (tick) => {
     { ...DEFAULT_SPEC, drivetrain: 'tank' },
     'duo',
     DEFAULT_ASSISTS,
-    undefined,
-    true,
     undefined,
     { ...DEFAULT_SPEC, drivetrain: 'swerve' },
   );
@@ -16950,9 +8089,11 @@ const recordDrive: CommandSource = (tick) => {
   // including the entire current season. That is a far worse outcome than an ending
   // that lands a point or two off the saved score. A refusal is now reserved for the
   // cases where playback would be MEANINGLESS rather than merely imprecise.
+  // tagged with a game this build has: a game-less recording is DECODE's, refused before any of
+  // the questions below are asked (the replay-refusal checks cover that one)
   const rp = (over: Partial<Pick<Replay, 'format' | 'balanceVersion' | 'sim' | 'setups'>>) =>
     replayFidelity(
-      { format: REPLAY_FORMAT, balanceVersion: 5, sim: 2, setups: [], ...over },
+      { format: REPLAY_FORMAT, balanceVersion: 5, sim: 2, setups: [], game: 'chain', ...over },
       5,
       2,
     );
@@ -16975,7 +8116,7 @@ const recordDrive: CommandSource = (tick) => {
    * drift and PLAYED, showing a robot sitting still. `replayRefusal` asks the fatal
    * questions first for exactly this reason.
    */
-  const tankLegacy = { format: 1, balanceVersion: 5, sim: 1, setups: [setup(0, 'blue', { drivetrain: 'tank' })] };
+  const tankLegacy = { format: 1, balanceVersion: 5, sim: 1, setups: [setup(0, 'blue', { drivetrain: 'tank' })], game: 'chain' as const };
   check('playability: a format-1 TANK replay is STALE even though its sim also moved',
     replayFidelity(tankLegacy, 5, 2) === 'stale');
   check('playability: ...and it is named `tank`, not `behaviour`',
@@ -17013,11 +8154,10 @@ const recordDrive: CommandSource = (tick) => {
 }
 {
   // full SOLO record match → re-simulate → byte-identical (the core guarantee).
+  // Recorded in BIOBUZZ, the default game (it was DECODE until DECODE was removed, 2026-10-12).
   // Fused with the CR block below (rather than split further) because the CR block's
-  // "differs from a decode re-sim" check needs THIS run's hash — splitting it out
-  // would mean re-running a full decode match a second time just to get it, which
-  // costs strictly more than keeping the two together.
-  const solo = recordSetups(DEFAULT_SPEC, 'solo', DEFAULT_ASSISTS, undefined, true);
+  // "differs from the other module's re-sim" check needs THIS run's hash.
+  const solo = recordSetups(DEFAULT_SPEC, 'solo', DEFAULT_ASSISTS);
   const run = runRecordMatch(0x51ce, solo, recordDrive);
   check('record match runs to phase "post"', run.world.match.phase === 'post');
   check('replay stamped with format + balance version', run.replay.format === REPLAY_FORMAT && run.replay.balanceVersion === BALANCE_VERSION);
@@ -17053,15 +8193,15 @@ const recordDrive: CommandSource = (tick) => {
     const crV = verifyReplay(crRun.replay);
     check('CR replay: verifyReplay reproduces the final worldHash', crV.hash === crRun.result.hash, `${crV.hash} vs ${crRun.result.hash}`);
     check('CR replay: simulateReplay is referentially stable', worldHash(simulateReplay(crRun.replay)) === crV.hash);
-    // a DECODE and a CR replay of the SAME seed diverge (different sim module) — proves the
+    // a BIOBUZZ and a CR replay of the SAME drive diverge (different sim module) — proves the
     // module is actually chosen from replay.game, not hardcoded.
-    check('CR replay: re-sims via the chain module (differs from a decode re-sim)', crV.hash !== v.hash);
+    check('CR replay: re-sims via the chain module (differs from the BIOBUZZ re-sim)', crV.hash !== v.hash);
   }
 }
 {
   // DUO (2v0) short run: two command tracks, both re-simulate deterministically.
   // `stopTick` keeps this one cheap already — independent of the full-match block above.
-  const duo = recordSetups(DEFAULT_SPEC, 'duo', DEFAULT_ASSISTS, undefined, true);
+  const duo = recordSetups(DEFAULT_SPEC, 'duo', DEFAULT_ASSISTS);
   const duoRun = runRecordMatch(0xd0, duo, recordDrive, { stopTick: 700 });
   check('duo replay has a track per robot', !!duoRun.replay.tracks[0] && !!duoRun.replay.tracks[1]);
   check('duo replay re-simulates deterministically', verifyReplay(duoRun.replay).hash === duoRun.result.hash);
@@ -17087,7 +8227,7 @@ const recordDrive: CommandSource = (tick) => {
     connected: true,
     disconnectAt: 0,
   };
-  const room = new Room('smoke-rec', () => {}, { kind: 'record', record: 'solo' });
+  const room = new Room('smoke-rec', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
   check('record-solo room caps the roster at 1', room.canJoin());
   room.add(host);
   check('record-solo room is full after 1 driver', !room.canJoin());
@@ -17171,7 +8311,7 @@ const recordDrive: CommandSource = (tick) => {
     },
     connected: true, disconnectAt: 0, userId: `u-${id}`,
   });
-  const room = new Room('smoke-vs-replay', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-vs-replay', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkVs('va', 'red'));
   room.add(mkVs('vb', 'blue'));
   room.onMessage('va', { t: 'start' });
@@ -17242,7 +8382,7 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
     userId: `u-${id}`,
   });
-  const room = new Room('smoke-reconnect', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-reconnect', () => {}, { kind: 'versus', game: 'chain' });
   const a = mkC('a', 'red', []);
   const b = mkC('b', 'blue', b1);
   room.add(a);
@@ -17291,7 +8431,7 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
     userId: `u-${id}`,
   });
-  const room = new Room('smoke-rejoin-gen', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-rejoin-gen', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkC('a', 'red', []));
   room.add(mkC('b', 'blue', []));
   room.onMessage('a', { t: 'start' });
@@ -17352,7 +8492,7 @@ const recordDrive: CommandSource = (tick) => {
    client renders as a "connection lost" panel on a game screen for a match that does not exist.
    Every other room kind holds its seat, so their offer is real and stays. */
 {
-  const room = new Room('smoke-solorec-leave', () => {}, { kind: 'record', record: 'solo' });
+  const room = new Room('smoke-solorec-leave', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
   room.add({
     id: 'a',
     send: () => {},
@@ -17388,7 +8528,7 @@ const recordDrive: CommandSource = (tick) => {
    needs); the seat is left for the close that follows. */
 {
   let emptied = false;
-  const room = new Room('smoke-abandon-finish', () => { emptied = true; }, { kind: 'record', record: 'solo' });
+  const room = new Room('smoke-abandon-finish', () => { emptied = true; }, { kind: 'record', record: 'solo', game: 'chain' });
   room.add({
     id: 'a',
     send: () => {},
@@ -17407,7 +8547,7 @@ const recordDrive: CommandSource = (tick) => {
   check('abandon: a decided solo run keeps its room, so its score still saves', room.abandonSlot('a') && !emptied);
   // a run that is NOT decided is an ordinary abandon: the seat goes and the room with it
   let emptied2 = false;
-  const live = new Room('smoke-abandon-live', () => { emptied2 = true; }, { kind: 'record', record: 'solo' });
+  const live = new Room('smoke-abandon-live', () => { emptied2 = true; }, { kind: 'record', record: 'solo', game: 'chain' });
   live.add({
     id: 'a',
     send: () => {},
@@ -17462,7 +8602,7 @@ const recordDrive: CommandSource = (tick) => {
     connected: true,
     disconnectAt: 0,
   });
-  const lan = new Room('smoke-lan-cap', () => {}, { kind: 'versus' });
+  const lan = new Room('smoke-lan-cap', () => {}, { kind: 'versus', game: 'chain' });
   lan.reserveHost('host-local');
   check('LAN capacity: a room with a reserved host still admits a guest', lan.canSeat('g1'));
   lan.add(seatFor('g1'));
@@ -17475,7 +8615,7 @@ const recordDrive: CommandSource = (tick) => {
 
   // a CLOUD room reserves nothing (its host is the first client through the door), so
   // `canSeat` is exactly `canJoin` there and the 4th driver is admitted as before
-  const cloud = new Room('smoke-cloud-cap', () => {}, { kind: 'versus' });
+  const cloud = new Room('smoke-cloud-cap', () => {}, { kind: 'versus', game: 'chain' });
   cloud.add(seatFor('c1'));
   cloud.add(seatFor('c2'));
   cloud.add(seatFor('c3'));
@@ -17535,7 +8675,7 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
     userId: `u-${id}`,
   });
-  const room = new Room('smoke-spec', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-spec', () => {}, { kind: 'versus', game: 'chain' });
   const rosterA: ServerMsg[] = [];
   const rosterB: ServerMsg[] = [];
   room.add(mkDriver('a', 'red', rosterA));
@@ -17620,7 +8760,7 @@ const recordDrive: CommandSource = (tick) => {
   // no identifier at any layer, so there is nothing for a later feature to
   // accidentally surface. See 0021_presence_detail.sql.
   {
-    const r2 = new Room('smoke-opsnap', () => {}, { kind: 'versus' });
+    const r2 = new Room('smoke-opsnap', () => {}, { kind: 'versus', game: 'chain' });
     r2.add(mkDriver('signed', 'red', []));
     r2.add({ id: 'guest', send: () => {}, player: { clientId: 'guest', name: 'Guest', teamName: '', teamNumber: 0, alliance: 'blue', startIndex: 0, ready: true, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } }, connected: true, disconnectAt: 0 });
     const snap = r2.presenceSnapshot();
@@ -17658,7 +8798,7 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
     userId: `u-${id}`,
   });
-  const room = new Room('smoke-ack', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-ack', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkC('a', 'red', aMsgs));
   room.add(mkC('b', 'blue', bMsgs));
   room.onMessage('a', { t: 'start' });
@@ -17689,7 +8829,7 @@ const recordDrive: CommandSource = (tick) => {
   // an OLD client that never sends `ack` must not be force-keyframed — its ack stays
   // unknown, so the stale check never fires (it keeps getting normal deltas)
   const cMsgs: ServerMsg[] = [];
-  const room2 = new Room('smoke-ack-legacy', () => {}, { kind: 'versus' });
+  const room2 = new Room('smoke-ack-legacy', () => {}, { kind: 'versus', game: 'chain' });
   room2.add(mkC('a', 'red', cMsgs));
   room2.add(mkC('b', 'blue', []));
   room2.onMessage('a', { t: 'start' });
@@ -17727,7 +8867,7 @@ const recordDrive: CommandSource = (tick) => {
     userId: `u-${id}`,
     lossy,
   });
-  const room = new Room('smoke-lan-drop', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-lan-drop', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkLan('guest', 'red', gMsgs, true)); // a WebRTC guest: its snapshot lane drops frames
   room.add(mkLan('host', 'blue', [], false)); // the host seat, in-process, loses nothing
   room.onMessage('guest', { t: 'start' });
@@ -17788,7 +8928,7 @@ const recordDrive: CommandSource = (tick) => {
   const q = quantizeCommand(cmd({}));
 
   // ATTACK: 3,000 inputs, each stamped a tick further into a future that never arrives.
-  const eroom = new Room('smoke-input-bound', () => {}, { kind: 'versus' });
+  const eroom = new Room('smoke-input-bound', () => {}, { kind: 'versus', game: 'chain' });
   eroom.add(mkC('a', 'red'));
   eroom.add(mkC('b', 'blue'));
   eroom.onMessage('a', { t: 'start' });
@@ -17804,7 +8944,7 @@ const recordDrive: CommandSource = (tick) => {
 
   // LEGITIMATE: a real client leads by at most ~41 ticks. Every one must be kept, or
   // on-time clients lose the exact-tick match that makes prediction smooth.
-  const groom = new Room('smoke-input-legit', () => {}, { kind: 'versus' });
+  const groom = new Room('smoke-input-legit', () => {}, { kind: 'versus', game: 'chain' });
   groom.add(mkC('a', 'red'));
   groom.add(mkC('b', 'blue'));
   groom.onMessage('a', { t: 'start' });
@@ -17822,7 +8962,7 @@ const recordDrive: CommandSource = (tick) => {
   // FILLING THE LEGAL WINDOW is the most the buffer can ever hold — and that is the whole
   // bound. The old check here asserted `max <= 128` after feeding exactly 120 ticks, which
   // is true of any number at or above 120 and so asserted nothing about the cap.
-  const broom = new Room('smoke-input-cap', () => {}, { kind: 'versus' });
+  const broom = new Room('smoke-input-cap', () => {}, { kind: 'versus', game: 'chain' });
   broom.add(mkC('a', 'red'));
   broom.add(mkC('b', 'blue'));
   broom.onMessage('a', { t: 'start' });
@@ -17863,7 +9003,7 @@ const recordDrive: CommandSource = (tick) => {
    * cannot be lowered again. One input stamped at an unsafe magnitude would leave every
    * honest input afterwards looking stale and that robot would stop answering its driver.
    */
-  const froom = new Room('smoke-input-frac', () => {}, { kind: 'versus' });
+  const froom = new Room('smoke-input-frac', () => {}, { kind: 'versus', game: 'chain' });
   froom.add(mkC('a', 'red'));
   froom.add(mkC('b', 'blue'));
   froom.onMessage('a', { t: 'start' });
@@ -17919,7 +9059,7 @@ const recordDrive: CommandSource = (tick) => {
   slow.send = (m): void => {
     got.push(m);
   };
-  const room = new Room('smoke-backlog', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-backlog', () => {}, { kind: 'versus', game: 'chain' });
   room.add(slow);
   room.add(mkS('fast', 'blue', () => 0));
   room.onMessage('slow', { t: 'start' });
@@ -17969,7 +9109,7 @@ const recordDrive: CommandSource = (tick) => {
   drop.sendRaw = (s): void => {
     dead.push(s);
   };
-  const room = new Room('smoke-reattach', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-reattach', () => {}, { kind: 'versus', game: 'chain' });
   room.add(drop);
   room.add(mkR('other', 'blue'));
   room.onMessage('rj', { t: 'start' });
@@ -18004,7 +9144,7 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
   });
   let emptied = 0;
-  const clean = new Room('smoke-rec-clean', () => { emptied++; }, { kind: 'record', record: 'solo' });
+  const clean = new Room('smoke-rec-clean', () => { emptied++; }, { kind: 'record', record: 'solo', game: 'chain' });
   clean.add(mkS('p'));
   clean.onMessage('p', { t: 'start' });
   clean.advanceForTest(6);
@@ -18012,7 +9152,7 @@ const recordDrive: CommandSource = (tick) => {
   check('record reap: a CLEAN close mid-run deletes the solo record room immediately', emptied === 1, `${emptied}`);
 
   let dropped = 0;
-  const drop = new Room('smoke-rec-drop', () => { dropped++; }, { kind: 'record', record: 'solo' });
+  const drop = new Room('smoke-rec-drop', () => { dropped++; }, { kind: 'record', record: 'solo', game: 'chain' });
   drop.add(mkS('p'));
   drop.onMessage('p', { t: 'start' });
   drop.advanceForTest(6);
@@ -18021,7 +9161,7 @@ const recordDrive: CommandSource = (tick) => {
   check('record reap: a NETWORK drop keeps the solo run for the reconnect grace', dropped === 0 && drop.reattach('p', () => {}) !== null, `${dropped}`);
 
   let duoEmptied = 0;
-  const duo = new Room('smoke-rec-duo-clean', () => { duoEmptied++; }, { kind: 'record', record: 'duo' });
+  const duo = new Room('smoke-rec-duo-clean', () => { duoEmptied++; }, { kind: 'record', record: 'duo', game: 'chain' });
   duo.add(mkS('a'));
   duo.add(mkS('b'));
   duo.onMessage('a', { t: 'start' });
@@ -18037,7 +9177,7 @@ const recordDrive: CommandSource = (tick) => {
   const recRun = (code: string): { room: Room; saved: () => number; gone: () => number } => {
     let saved = 0;
     let gone = 0;
-    const room = new Room(code, () => { gone++; }, { kind: 'record', record: 'solo' }, () => { saved++; });
+    const room = new Room(code, () => { gone++; }, { kind: 'record', record: 'solo', game: 'chain' }, () => { saved++; });
     room.add(mkS('p'));
     room.onMessage('p', { t: 'start' });
     return { room, saved: () => saved, gone: () => gone };
@@ -18108,7 +9248,7 @@ const recordDrive: CommandSource = (tick) => {
   const vsRun = (code: string, ids: string[]): { room: Room; saved: () => number; gone: () => number } => {
     let saved = 0;
     let gone = 0;
-    const room = new Room(code, () => { gone++; }, { kind: 'versus' }, () => { saved++; });
+    const room = new Room(code, () => { gone++; }, { kind: 'versus', game: 'chain' }, () => { saved++; });
     for (const id of ids) room.add(mkS(id));
     room.onMessage(ids[0], { t: 'start' });
     return { room, saved: () => saved, gone: () => gone };
@@ -18206,28 +9346,6 @@ const recordDrive: CommandSource = (tick) => {
     check('settle: nothing is finalized before the buzzer', !settleStep(clock, sw, () => true) && clock.postTick === null);
   }
   {
-    const dw = createWorld('match', 4, [{ id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0 }]);
-    for (const b of dw.balls) b.vel = { x: 0, y: 0 };
-    check('settle DECODE: a quiet field is settled', decodeSettled(dw));
-    const g = dw.balls.find((b) => b.state.kind === 'ground');
-    if (g) {
-      g.vel = { x: 30, y: 0 };
-      check('settle DECODE: a ROLLING artifact is not (depot is where it stops)', !decodeSettled(dw));
-      g.vel = { x: 0, y: 0 };
-      const keep = g.state;
-      g.state = { kind: 'flight', target: 'blue' };
-      check('settle DECODE: an artifact in FLIGHT is not (it can still enter the goal)', !decodeSettled(dw));
-      g.state = { kind: 'rail', goal: 'blue', s: 10, v: 0, overflow: false, pending: true };
-      check('settle DECODE: a PENDING rail artifact is not (classified vs overflow is undecided)', !decodeSettled(dw));
-      g.state = { kind: 'rail', goal: 'blue', s: 10, v: 0, overflow: false };
-      check('settle DECODE: a rail artifact resting on the stack is settled', decodeSettled(dw));
-      g.state = keep;
-    }
-    check('settle DECODE: the quiet field had a ground artifact to test with', !!g);
-    dw.robots[0].vel = { x: 20, y: 0 };
-    check('settle DECODE: a robot still coasting is not (BASE is where it stops)', !decodeSettled(dw));
-  }
-  {
     // THROUGH THE REAL ROOM: an artifact rolling at the buzzer holds the finalize until it stops.
     // Forced to 'post' like the four scenarios above — the ball's velocity is overwritten right
     // below regardless of how it got here, and every other ball is spawned at rest (no in-flight
@@ -18237,8 +9355,14 @@ const recordDrive: CommandSource = (tick) => {
     runUntil(r.room, (w) => w.match.phase === 'post');
     const w0 = r.room.worldForTest();
     const postTick = w0?.tick ?? 0;
-    const roll = w0?.balls.find((b) => b.state.kind === 'ground');
-    if (roll) roll.vel = { x: 60, y: 20 };
+    // a Chain Reaction field may hold nothing on the ground at the buzzer (every particle staged
+    // or in play), so put one at mid-field and roll it
+    const roll = w0?.balls.find((b) => b.state.kind === 'ground') ?? w0?.balls[0];
+    if (roll) {
+      roll.state = { kind: 'ground' };
+      roll.pos = { x: 0, y: 0 };
+      roll.vel = { x: 60, y: 20 };
+    }
     let lastUnsettled = -1;
     let savedAt = -1;
     for (let i = 0; i < capTicks + 10 && savedAt < 0; i++) {
@@ -18246,7 +9370,7 @@ const recordDrive: CommandSource = (tick) => {
       const w = r.room.worldForTest();
       if (!w) break;
       if (r.saved() === 1) savedAt = w.tick - postTick;
-      else if (!decodeSettled(w)) lastUnsettled = w.tick - postTick;
+      else if (!chainSettled(w)) lastUnsettled = w.tick - postTick;
     }
     check('settle room: an artifact ROLLING at the buzzer delays the finalize until it has stopped and held',
       !!roll && lastUnsettled > 0 && savedAt === lastUnsettled + 1 + holdTicks && savedAt < capTicks,
@@ -18255,7 +9379,7 @@ const recordDrive: CommandSource = (tick) => {
   {
     // an IDLE match of each game settles well inside the cap — a game whose field jitters forever
     // would make every match wait the full cap, which is the failure to catch
-    const idle = (code: string, game: 'decode' | 'chain'): { at: number; saved: number } => {
+    const idle = (code: string, game: GameId): { at: number; saved: number } => {
       let saved = 0;
       const room = new Room(code, () => {}, { kind: 'record', record: 'solo', game }, () => { saved++; });
       room.add(mkS('p'));
@@ -18265,9 +9389,6 @@ const recordDrive: CommandSource = (tick) => {
       room.advanceForTest(capTicks + 10);
       return { at: (room.worldForTest()?.tick ?? 0) - post, saved };
     };
-    const d = idle('smoke-settle-idle-decode', 'decode');
-    check('settle room: an idle DECODE run finalizes once, after the hold and before the cap',
-      d.saved === 1 && d.at >= holdTicks && d.at < capTicks, `${d.at} ticks after the buzzer`);
     const c = idle('smoke-settle-idle-chain', 'chain');
     check('settle room: an idle Chain Reaction run finalizes once, after the hold and before the cap',
       c.saved === 1 && c.at >= holdTicks && c.at < capTicks, `${c.at} ticks after the buzzer`);
@@ -18288,7 +9409,7 @@ const recordDrive: CommandSource = (tick) => {
     connected: true,
     disconnectAt: 0,
   });
-  const room = new Room('smoke-spectators', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-spectators', () => {}, { kind: 'versus', game: 'chain' });
   check('spectators: a fresh room carries none', room.spectatorCount() === 0);
   room.addSpectator(mkSpec('s1'));
   room.addSpectator(mkSpec('s2'));
@@ -18317,16 +9438,16 @@ const recordDrive: CommandSource = (tick) => {
     disconnectAt: 0,
     userId: `u-${id}`,
   });
-  const empty = new Room('smoke-abandon', () => {}, { kind: 'versus' });
+  const empty = new Room('smoke-abandon', () => {}, { kind: 'versus', game: 'chain' });
   check('abandon: a room nobody ever joined can be dropped', empty.isAbandonable());
   empty.add(mkD('d1', 'red'));
   check('abandon: a room with a driver cannot', !empty.isAbandonable());
 
-  const watched = new Room('smoke-abandon-spec', () => {}, { kind: 'versus' });
+  const watched = new Room('smoke-abandon-spec', () => {}, { kind: 'versus', game: 'chain' });
   watched.addSpectator({ ...mkD('w1', 'red'), userId: undefined });
   check('abandon: a room somebody is WATCHING cannot', !watched.isAbandonable());
 
-  const staged = new Room('smoke-abandon-staged', () => {}, { kind: 'versus' });
+  const staged = new Room('smoke-abandon-staged', () => {}, { kind: 'versus', game: 'chain' });
   const rosterEntry = (userId: string, alliance: 'red' | 'blue', startIndex: number): PendingRosterEntry => ({
     userId,
     name: userId,
@@ -18344,7 +9465,7 @@ const recordDrive: CommandSource = (tick) => {
     seed: 7,
     mode: '1v1',
     ranked: true,
-    game: 'decode',
+    game: 'biobuzz',
     roster: [rosterEntry('ru-a', 'red', 0), rosterEntry('ru-b', 'blue', 1)],
   });
   check(
@@ -18381,7 +9502,7 @@ const recordDrive: CommandSource = (tick) => {
   const room = new Room(
     'smoke-lock',
     () => {},
-    { kind: 'versus' },
+    { kind: 'versus', game: 'chain' },
     undefined,
     (uid) => {
       active.push(uid);
@@ -18432,7 +9553,7 @@ const recordDrive: CommandSource = (tick) => {
   const room = new Room(
     'smoke-staged-lock',
     () => {},
-    { kind: 'versus' },
+    { kind: 'versus', game: 'chain' },
     undefined,
     (uid) => held.add(uid),
     (uid) => held.delete(uid),
@@ -18457,7 +9578,7 @@ const recordDrive: CommandSource = (tick) => {
   const room = new Room(
     'smoke-staged-cancel',
     () => {},
-    { kind: 'versus' },
+    { kind: 'versus', game: 'chain' },
     undefined,
     (uid) => held.add(uid),
     (uid) => held.delete(uid),
@@ -18484,7 +9605,7 @@ const recordDrive: CommandSource = (tick) => {
   let emptied = 0;
   const room = new Room('smoke-post-reap', () => {
     emptied++;
-  }, { kind: 'versus' });
+  }, { kind: 'versus', game: 'chain' });
   room.add({
     id: 'p1',
     send: () => {},
@@ -18763,7 +9884,6 @@ const recordDrive: CommandSource = (tick) => {
   const chal1 = [pv('a', 'red', 't'), pv('b', 'blue', 't')];
   check('premade flag: a rated 1v1 challenge is not a premade (the token is the opponent)', !isPremade(chal1[0], chal1));
 }
-
 
 // ---- ACCOUNT STANDING: competitive integrity, separate from skill -----------
 // Pure derivation, so these are exact. The rules being asserted are the PRODUCT ones — the
@@ -19129,7 +10249,7 @@ const recordDrive: CommandSource = (tick) => {
         { userId: 'u-blue', before: 1000, after: 984, rd: 120 },
       ],
     });
-  const room = new Room('smoke-elo', () => {}, { kind: 'versus' }, onResult);
+  const room = new Room('smoke-elo', () => {}, { kind: 'versus', game: 'chain' }, onResult);
   room.add(mk('cr', 'red', 'u-red'));
   room.add(mk('cb', 'blue', 'u-blue'));
   room.onMessage('cr', { t: 'start' });
@@ -19179,7 +10299,7 @@ const recordDrive: CommandSource = (tick) => {
         { userId: 'u-blue', before: 1300, after: 1284, rd: 110 },
       ],
     });
-  const room = new Room('smoke-rematch-elo', () => {}, { kind: 'versus' }, onResult);
+  const room = new Room('smoke-rematch-elo', () => {}, { kind: 'versus', game: 'chain' }, onResult);
   room.applyPending({
     code: 'iad-rematch-elo',
     hostRegion: 'iad',
@@ -19239,7 +10359,7 @@ const recordDrive: CommandSource = (tick) => {
     caps: ['strategy'],
   });
   let seen: MatchOutcome | null = null;
-  const room = new Room('smoke-presence', () => {}, { kind: 'versus' }, (o) => {
+  const room = new Room('smoke-presence', () => {}, { kind: 'versus', game: 'chain' }, (o) => {
     seen = o;
   });
   room.applyPending({
@@ -19311,7 +10431,7 @@ const recordDrive: CommandSource = (tick) => {
   });
   // mirror production order: the host stages the pending match FIRST, then each
   // paired client joins and the host re-checks (index.ts: add → maybeStartRanked).
-  const room = new Room('smoke-strat', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat', () => {}, { kind: 'versus', game: 'chain' });
   room.applyPending(mkRoster());
   room.add(mkC('red', 'u-red', 111));
   room.maybeStartRanked();
@@ -19387,7 +10507,7 @@ const recordDrive: CommandSource = (tick) => {
     // own rated match.
     caps: ['strategy', 'seat'],
   });
-  const room = new Room('smoke-strat-reload', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat-reload', () => {}, { kind: 'versus', game: 'chain' });
   room.applyPending({ code: 'iad-rl', hostRegion: 'iad', mode: '1v1', seed: 9, ranked: true, roster: [
     { userId: 'u-red', name: 'red', teamName: 'T', teamNumber: 1, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'red', introElo: null },
     { userId: 'u-blue', name: 'blue', teamName: 'T', teamNumber: 2, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'blue', introElo: null },
@@ -19450,7 +10570,7 @@ const recordDrive: CommandSource = (tick) => {
     userId,
     caps: ['strategy'],
   });
-  const room = new Room('smoke-strat-bail', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat-bail', () => {}, { kind: 'versus', game: 'chain' });
   room.applyPending({ code: 'iad-bl', hostRegion: 'iad', mode: '1v1', seed: 9, ranked: true, roster: [
     { userId: 'u-red', name: 'red', teamName: 'T', teamNumber: 1, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'red', introElo: null },
     { userId: 'u-blue', name: 'blue', teamName: 'T', teamNumber: 2, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'blue', introElo: null },
@@ -19474,7 +10594,7 @@ const recordDrive: CommandSource = (tick) => {
  */
 {
   const rec: Record<string, ServerMsg[]> = { a: [], b: [] };
-  const room = new Room('smoke-two-tabs', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-two-tabs', () => {}, { kind: 'versus', game: 'chain' });
   room.add({
     id: 'tab-a',
     send: (m) => rec.a.push(m),
@@ -19504,7 +10624,7 @@ const recordDrive: CommandSource = (tick) => {
 {
   const held = new Set<string>();
   const room = new Room(
-    'smoke-abandon', () => {}, { kind: 'versus' }, undefined,
+    'smoke-abandon', () => {}, { kind: 'versus', game: 'chain' }, undefined,
     (uid) => held.add(uid),
     (uid) => held.delete(uid),
   );
@@ -19535,7 +10655,7 @@ const recordDrive: CommandSource = (tick) => {
     userId,
     caps: ['strategy'],
   });
-  const room = new Room('smoke-strat-deadline', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat-deadline', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkC('red', 'u-red'));
   room.add(mkC('blue', 'u-blue'));
   room.applyPending({ code: 'iad-d', hostRegion: 'iad', mode: '1v1', seed: 7, ranked: true, roster: [
@@ -19565,7 +10685,7 @@ const recordDrive: CommandSource = (tick) => {
     userId,
     caps: ['strategy'],
   });
-  const room = new Room('smoke-report', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-report', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mk('a', 'u-a', 0));
   room.add(mk('b', 'u-b', 1));
   room.onMessage('a', { t: 'start' }); // assigns robot ids from the roster
@@ -19585,12 +10705,12 @@ const recordDrive: CommandSource = (tick) => {
 
   // an ANONYMOUS reporter or target is not actionable — a report has to be attributable at
   // both ends or a moderator cannot tell a pattern from a brigade
-  const anon = new Room('smoke-report-anon', () => {}, { kind: 'versus' });
+  const anon = new Room('smoke-report-anon', () => {}, { kind: 'versus', game: 'chain' });
   anon.add(mk('a', 'u-a', 0));
   anon.add(mk('b', undefined, 1));
   anon.onMessage('a', { t: 'start' });
   check('report: an anonymous TARGET cannot be reported', anon.resolveReport('a', 1) === null);
-  const anon2 = new Room('smoke-report-anon2', () => {}, { kind: 'versus' });
+  const anon2 = new Room('smoke-report-anon2', () => {}, { kind: 'versus', game: 'chain' });
   anon2.add(mk('a', undefined, 0));
   anon2.add(mk('b', 'u-b', 1));
   anon2.onMessage('b', { t: 'start' });
@@ -19643,7 +10763,7 @@ const recordDrive: CommandSource = (tick) => {
     const rec: Record<string, ServerMsg[]> = {};
     const reports: DodgeReport[] = [];
     const room = new Room(
-      label, () => {}, { kind: 'versus' }, undefined, undefined, undefined,
+      label, () => {}, { kind: 'versus', game: 'chain' }, undefined, undefined, undefined,
       (d) => { reports.push(d); return []; },
     );
     for (const id of attach) room.add(mkClient(id, `u-${id}`, rec));
@@ -19714,7 +10834,7 @@ const recordDrive: CommandSource = (tick) => {
     const rec: Record<string, ServerMsg[]> = {};
     const reports: DodgeReport[] = [];
     const room = new Room(
-      'smoke-dodge-custom', () => {}, { kind: 'versus' }, undefined, undefined, undefined,
+      'smoke-dodge-custom', () => {}, { kind: 'versus', game: 'chain' }, undefined, undefined, undefined,
       (d) => { reports.push(d); return []; },
     );
     room.add(mkClient('red', 'u-red', rec));
@@ -19747,7 +10867,7 @@ const recordDrive: CommandSource = (tick) => {
     userId,
     caps: ['strategy'],
   });
-  const room = new Room('smoke-strat-drop', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat-drop', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mkC('red', 'u-red'));
   room.add(mkC('blue', 'u-blue'));
   room.applyPending({ code: 'iad-x', hostRegion: 'iad', mode: '1v1', seed: 9, ranked: true, roster: [
@@ -19773,7 +10893,7 @@ const recordDrive: CommandSource = (tick) => {
     userId,
     caps,
   });
-  const room = new Room('smoke-strat-mixed', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-strat-mixed', () => {}, { kind: 'versus', game: 'chain' });
   room.applyPending({ code: 'iad-m', hostRegion: 'iad', mode: '1v1', seed: 5, ranked: true, roster: [
     { userId: 'u-red', name: 'red', teamName: 'T', teamNumber: 1, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'red', introElo: null },
     { userId: 'u-blue', name: 'blue', teamName: 'T', teamNumber: 1, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0, alliance: 'blue', introElo: null },
@@ -19899,8 +11019,8 @@ const mkMM = () => {
 {
   const { mm } = mkMM();
   mm.enqueue(rEntry('a', 'iad', { game: 'chain' }));
-  mm.enqueue(rEntry('b', 'iad', { game: 'decode' }));
-  check('game: a chain and a decode queuer do NOT pair', mm.queueSizes()['1v1'] === 2);
+  mm.enqueue(rEntry('b', 'iad', { game: 'biobuzz' }));
+  check('game: a chain and a biobuzz queuer do NOT pair', mm.queueSizes()['1v1'] === 2);
 }
 {
   const { mm } = mkMM();
@@ -20120,69 +11240,12 @@ const dumperSetup = (): RobotSetup => {
 
 // ---- registry integrity + back-compat default -------------------------------------------
 {
-  check('registry: gameOf({}) defaults to decode', gameOf({}).id === 'decode');
-  check('registry: gameOf(undefined) defaults to decode', gameOf(undefined).id === 'decode');
+  check('registry: gameOf({}) defaults to the default game', gameOf({}).id === DEFAULT_GAME);
+  check('registry: gameOf(undefined) defaults to the default game', gameOf(undefined).id === DEFAULT_GAME);
   check('registry: moduleFor("chain") resolves the chain module', moduleFor('chain').id === 'chain');
-  check('registry: an unknown game id degrades to decode', moduleFor('nope' as never).id === 'decode');
+  check('registry: an unknown game id degrades to the default game', moduleFor('nope' as never).id === DEFAULT_GAME);
   check('chain module is SCORED (ranked + records on, keyed per game)', moduleFor('chain').scored === true);
-
-  /* AUTO PATHS ARE DECODE'S, AND ONLY DECODE'S.
-     `initializePathTraversal` / `updatePathTraversal` are driven from `src/sim/world.ts` and
-     nowhere else — CR and BIOBUZZ have steps of their own — so a `.pp` path selected under
-     one of those games was accepted, saved, reported "Auto path ON", carried into the match
-     and then did NOTHING for the whole autonomous period. The capability says which game can
-     run one, and both ends of the path read it: the builder hides the section, and the spawn
-     chokepoint drops the data so it never reaches a world, a snapshot or a replay. */
-  check('autoPaths: DECODE runs auto paths', moduleFor('decode').autoPaths === true);
-  check('autoPaths: CR does not (its step never traverses one)', moduleFor('chain').autoPaths === false);
-  check('autoPaths: BIOBUZZ does not (its step never traverses one)', moduleFor('biobuzz').autoPaths === false);
-}
-
-// ---- coerceSetup drops what a game cannot run (auto path / start pose snap) --------------
-{
-    const p = {
-      fileName: 'cap.pp',
-      startPoint: { x: 0, y: 0, heading: 'constant', degrees: 0 },
-      lines: [{ id: 'l1', endPoint: { x: 10, y: 0, heading: 'constant', degrees: 0 } }],
-      sequence: [{ kind: 'path', lineId: 'l1' }],
-    } as AutoPathData;
-    const withPath = (game: GameId) =>
-      coerceSetup(
-        { id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0, autoPath: p, autoPathEnabled: true },
-        game,
-      );
-    check('coerceSetup keeps a path for DECODE', !!withPath('decode').autoPath && withPath('decode').autoPathEnabled === true);
-    check('coerceSetup drops a path CR cannot run', withPath('chain').autoPath === undefined && withPath('chain').autoPathEnabled === false);
-    check('coerceSetup drops a path BIOBUZZ cannot run', withPath('biobuzz').autoPath === undefined && withPath('biobuzz').autoPathEnabled === false);
-
-    /* G304 IS DECODE'S RULE, so the snap is DECODE's too. A game with `startLegality: false`
-       has no launch lines, goal faces or alliance halves to be snapped against, and moving
-       its robot to satisfy them is a repair for a rule it does not have. */
-    const pose = (game: GameId) =>
-      coerceSetup(
-        { id: 0, alliance: 'blue', spec: DEFAULT_SPEC, assists: DEFAULT_ASSISTS, startIndex: 0, startPose: { x: 0, y: 0, headingDeg: 0 } },
-        game,
-      ).startPose;
-    const dp = pose('decode');
-    check('coerceSetup snaps an illegal centre pose for DECODE', !!dp && (dp.x !== 0 || dp.y !== 0));
-    const cp = pose('chain');
-    check('coerceSetup leaves a CR pose where the player put it', !!cp && cp.x === 0 && cp.y === 0 && cp.headingDeg === 0);
-  }
-
-// ---- collider extraction: DECODE + Chain Reaction static counts -------------------------
-{
-  // the DECODE collider extraction is intact: 4 walls + per-alliance (face + classifier)
-  check(
-    'decode colliders: 4 walls + 2 goal-face + 2 classifier = 8 statics',
-    decodeColliders.statics.length === 8,
-    `${decodeColliders.statics.length}`,
-  );
-  // 4 perimeter walls + the 4 SOLID corner assemblies (post + mounting plate). No dynamic.
-  check(
-    'chain colliders: 4 walls + 4 corner ring-stand assemblies, no dynamic',
-    chainColliders.statics.length === 8 && !chainColliders.dynamic,
-    `${chainColliders.statics.length}`,
-  );
+  // (DECODE ran `.pp` auto paths, and no other game did; the feature went with it on 2026-10-12)
 }
 
 // ---- chain starts (G04): every anchor is spawnable, clear of the ring-stand assembly -----
@@ -20375,7 +11438,9 @@ const dumperSetup = (): RobotSetup => {
       { id: 0, alliance: 'blue', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
       { id: 1, alliance: 'red', spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
     ];
-    const w = createWorld('match', 7, setups);
+    // FREE drive: a Chain Reaction 'match' world waits in 'pre' until a countdown is set, which
+    // would hold the robots still for a reason that is not the guard
+    const w = createWorld('free', 7, setups);
     const before = { tick: w.tick, x: w.robots[0].pos.x, y: w.robots[0].pos.y };
     // drive hard for a simulated 3 seconds, exactly as the player did
     const cmd: RobotCommand = { driveX: 1, driveY: 1, rotate: 0.5, leftDrive: 1, rightDrive: 1, intake: true, fire: false };
@@ -20397,7 +11462,7 @@ const dumperSetup = (): RobotSetup => {
     );
     // and the counter-case: a LIVE session obviously does move (so the guard is the thing
     // stopping it, not some other reason the world was already static)
-    const w2 = createWorld('match', 7, setups);
+    const w2 = createWorld('free', 7, setups);
     for (let i = 0; i < 180; i++) step(w2, SIM_DT, new Map([[0, cmd]]));
     check(
       'net: the same input DOES move a live world (the guard is what stops it)',
@@ -20464,7 +11529,7 @@ const dumperSetup = (): RobotSetup => {
 
     const problems: string[] = [];
     const note = (m: string) => { if (problems.length < 6) problems.push(m); };
-    for (const game of ['decode', 'chain', undefined] as (GameId | undefined)[]) {
+    for (const game of ['chain', undefined] as (GameId | undefined)[]) {
       const lbl = game ?? 'no-game';
       for (let i = 0; i < 300; i++) {
         const raw = randomRaw();
@@ -20495,14 +11560,14 @@ const dumperSetup = (): RobotSetup => {
         }
       }
     }
-    // a CR build routed through DECODE and back must still be legal (switchGame / mixed rooms)
+    // a CR build routed through the game-less coercer and back must still be legal (mixed rooms)
     for (let i = 0; i < 100; i++) {
       const cr = coerceSpec(randomRaw(), DEFAULT_SPEC, 'chain');
-      const back = coerceSpec(coerceSpec(cr, DEFAULT_SPEC, 'decode'), DEFAULT_SPEC, 'chain');
-      if ((back.ballStorage ?? 0) > chainStorageMax(back)) note('cr->decode->chain: storage over max');
-      if (!Number.isFinite(back.massLb)) note('cr->decode->chain: mass not finite');
+      const back = coerceSpec(coerceSpec(cr, DEFAULT_SPEC, undefined), DEFAULT_SPEC, 'chain');
+      if ((back.ballStorage ?? 0) > chainStorageMax(back)) note('cr->generic->chain: storage over max');
+      if (!Number.isFinite(back.massLb)) note('cr->generic->chain: mass not finite');
     }
-    check('coerceSpec: 900 fuzzed specs hold every range/enum/mirror invariant + idempotency',
+    check('coerceSpec: 600 fuzzed specs hold every range/enum/mirror invariant + idempotency',
       problems.length === 0, problems.join(' | '));
   }
 
@@ -20915,7 +11980,6 @@ const dumperSetup = (): RobotSetup => {
     );
   }
 
-
   // CUSTOM start poses: whatever a player (or a spoofed client) asks for, the spawned robot
   // must end up inside its Lab Area and clear of the corner assembly — otherwise it spawns
   // inside a collider and gets flung across the field on tick one.
@@ -20984,7 +12048,6 @@ const dumperSetup = (): RobotSetup => {
       `front edge ${(rob.pos.x + e.front).toFixed(1)} vs box face ${(box.x - CHAIN_RINGSTAND_BOX / 2).toFixed(1)}`,
     );
   }
-
 
 // ---- chain accelerator/hook manual geometry (mm -> in / 25.4) ----------------------------
 {
@@ -22013,61 +13076,52 @@ const dumperSetup = (): RobotSetup => {
       );
     }
 
-    // MOUNTS ARE CHAIN-ONLY. The intake mount moves the COLLISION FOOTPRINT, so a CR build
-    // reaching DECODE would widen its flanks and delete its front intake reach. coerceSpec
-    // normalizes whenever the game is explicitly non-chain — and must NOT when it's unknown,
-    // since several call paths omit `game` and would otherwise wipe a real CR build.
+    // MOUNTS SURVIVE WHEN THE GAME IS UNKNOWN: several call paths omit `game`, and a reset there
+    // would wipe a real CR build. (coerceSpec also used to STRIP mounts for an explicitly
+    // mount-less game; that game was DECODE, removed 2026-10-12, so the branch went with it.)
     {
       const crBuild = { ...DEFAULT_SPEC, intakeMount: 'side' as const, shooterMount: 'left' as const };
       const asChain = coerceSpec(crBuild, DEFAULT_SPEC, 'chain');
-      const asDecode = coerceSpec(crBuild, DEFAULT_SPEC, 'decode');
       const noGame = coerceSpec(crBuild, DEFAULT_SPEC);
       check(
-        'mounts are chain-only: a CR mount is stripped for DECODE, kept when the game is unknown',
-        asChain.intakeMount === 'side' &&
-          asChain.shooterMount === 'left' &&
-          asDecode.intakeMount === 'front' &&
-          asDecode.shooterMount === 'front' &&
-          asDecode.intakeSide === false &&
-          noGame.intakeMount === 'side',
-        `chain=${asChain.intakeMount} decode=${asDecode.intakeMount} noGame=${noGame.intakeMount}`,
-      );
-      // the point of the strip: DECODE's hitbox keeps its FRONT intake reach and normal width
-      const eD = footprintExtents(asDecode);
-      const eRef = footprintExtents(coerceSpec(DEFAULT_SPEC, DEFAULT_SPEC, 'decode'));
-      check(
-        'mounts are chain-only: a leaked CR spec cannot reshape the DECODE collision box',
-        Math.abs(eD.front - eRef.front) < 1e-9 &&
-          Math.abs(eD.half - eRef.half) < 1e-9 &&
-          Math.abs(eD.rear - eRef.rear) < 1e-9,
-        `leaked=${eD.front.toFixed(2)}/${eD.half.toFixed(2)} ref=${eRef.front.toFixed(2)}/${eRef.half.toFixed(2)}`,
+        'mounts: a CR mount is kept for Chain Reaction, and when the game is unknown',
+        asChain.intakeMount === 'side' && asChain.shooterMount === 'left' && noGame.intakeMount === 'side',
+        `chain=${asChain.intakeMount} noGame=${noGame.intakeMount}`,
       );
       // the UI path: switching games swaps in that game's OWN loadout and restores it on return
       const sChain = coerceSettings({ game: 'chain', spec: crBuild });
-      const sDecode = switchGame(sChain, 'decode');
-      const sBack = switchGame(sDecode, 'chain');
+      const sBb = switchGame(sChain, 'biobuzz');
+      const sBack = switchGame(sBb, 'chain');
       check(
         'switchGame: the robot build does NOT carry across a game switch (and is restored on return)',
         intakeMountOf(sChain.spec) === 'side' &&
-          intakeMountOf(sDecode.spec) === 'front' &&
-          shooterMountOf(sDecode.spec) === 'front' &&
+          JSON.stringify(sBb.spec) === JSON.stringify(defaultSettings().spec) &&
           intakeMountOf(sBack.spec) === 'side' &&
           shooterMountOf(sBack.spec) === 'left',
-        `chain=${intakeMountOf(sChain.spec)} decode=${intakeMountOf(sDecode.spec)} back=${intakeMountOf(sBack.spec)}`,
+        `chain=${intakeMountOf(sChain.spec)} biobuzz=${intakeMountOf(sBb.spec)} back=${intakeMountOf(sBack.spec)}`,
       );
     }
 
     // ── DRIVER ASSISTS RIDE THE ROBOT (both games), all ON by default ──────────────────
     {
       // 1. the default robot has every assist enabled, in BOTH games
-      const dDecode = coerceSpec(DEFAULT_SPEC, DEFAULT_SPEC, 'decode').assists!;
+      const dBb = coerceSpec(DEFAULT_SPEC, DEFAULT_SPEC, 'biobuzz').assists!;
       const dChain = coerceSpec(DEFAULT_SPEC, DEFAULT_SPEC, 'chain').assists!;
-      const allOn = (a: typeof dDecode): boolean =>
+      const allOn = (a: typeof dBb): boolean =>
         a.fieldCentric && a.aimAssist && a.autoIntake && a.autoFire;
       check(
-        'assists: every assist defaults ON, for DECODE and Chain Reaction alike',
-        allOn(dDecode) && allOn(dChain) && allOn(defaultSettings().assists),
-        `decode=${JSON.stringify(dDecode)} chain=${JSON.stringify(dChain)}`,
+        'assists: every assist defaults ON on the shared robot, in either game',
+        allOn(dBb) && allOn(dChain),
+        `biobuzz=${JSON.stringify(dBb)} chain=${JSON.stringify(dChain)}`,
+      );
+      // ...but a FRESH install is seeded from BIOBUZZ's own first robot (the default game since
+      // DECODE left this fork), and that preset drives robot-centric with auto fire off
+      const fresh = defaultSettings();
+      check(
+        'assists: a fresh install carries BIOBUZZ’s own robot’s assists, and mirrors them',
+        fresh.game === 'biobuzz' && !fresh.assists.fieldCentric && !fresh.assists.autoFire && fresh.assists.aimAssist &&
+          fresh.assists.autoIntake && JSON.stringify(fresh.assists) === JSON.stringify(fresh.spec.assists),
+        JSON.stringify(fresh.assists),
       );
 
       // 2. they are STORED on the spec, so they survive the coercer field-by-field
@@ -22088,25 +13142,25 @@ const dumperSetup = (): RobotSetup => {
       // 3. they ride the ROBOT across a game switch — each game keeps its own, and the
       //    flat active `assists` always mirrors the active spec (they can't drift)
       const s0 = coerceSettings({ game: 'chain', spec: custom });
-      const s1 = switchGame(s0, 'decode');
+      const s1 = switchGame(s0, 'biobuzz');
       const s2 = switchGame(s1, 'chain');
       check(
         'assists: saved with the robot — per game, and the active mirror never drifts',
         s0.assists.autoIntake === false && // chain robot's own choice
-          s1.assists.autoIntake === true && // DECODE gets its own all-ON robot
-          s1.assists.fieldCentric === true &&
+          // BIOBUZZ gets its own first robot, assists and all
+          JSON.stringify(s1.assists) === JSON.stringify(defaultSettings().assists) &&
           s2.assists.autoIntake === false && // restored on return
           s2.assists.fieldCentric === false &&
           JSON.stringify(s0.assists) === JSON.stringify(s0.spec.assists) &&
           JSON.stringify(s1.assists) === JSON.stringify(s1.spec.assists) &&
           JSON.stringify(s2.assists) === JSON.stringify(s2.spec.assists),
-        `chain=${JSON.stringify(s0.assists)} decode=${JSON.stringify(s1.assists)}`,
+        `chain=${JSON.stringify(s0.assists)} biobuzz=${JSON.stringify(s1.assists)}`,
       );
 
       // 4. MIGRATION: a pre-assists-on-spec save kept the choice in the flat field with no
       //    spec.assists — adopt it onto the robot rather than resetting the player to all-ON
       const legacy = coerceSettings({
-        game: 'decode',
+        game: 'chain',
         assists: { fieldCentric: false, aimAssist: false, autoIntake: false, autoFire: false },
         spec: { ...DEFAULT_SPEC, assists: undefined },
       });
@@ -24002,17 +15056,6 @@ const dumperSetup = (): RobotSetup => {
     nested?.kind === 'foul' ? nested.rule : String(nested),
   );
 
-  const card = parsePenaltyEvent(cardEventText('yellow', 'red', '#4239', 'G408 excessive control'));
-  check(
-    'penalty line: a CARD reads back with its colour, its team and its rule',
-    card?.kind === 'card' &&
-      card.colour === 'yellow' &&
-      card.alliance === 'red' &&
-      card.who === '#4239' &&
-      card.rule === 'G408 excessive control',
-    JSON.stringify(card),
-  );
-
   const warn = parsePenaltyEvent(warningEventText('blue', 'G407 hive contact'));
   check(
     "penalty line: BIOBUZZ's verbal WARNING is a third kind, not a zero-point foul",
@@ -24032,8 +15075,8 @@ const dumperSetup = (): RobotSetup => {
   // on, and a template that drifted inside `awardFoul` would pass every check above.
   {
     const w = createWorld('match', 0x9001, [
-      { id: 0, alliance: 'red', spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'decode'), assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
-      { id: 1, alliance: 'blue', spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'decode'), assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
+      { id: 0, alliance: 'red', spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'chain'), assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
+      { id: 1, alliance: 'blue', spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'chain'), assists: { ...DEFAULT_ASSISTS }, startIndex: 0 },
     ]);
     w.events.length = 0;
     awardFoul(w, 'red', 'major', 'G417 touching an opponent gate');
@@ -24047,25 +15090,17 @@ const dumperSetup = (): RobotSetup => {
         real.points === w.match.scores.blue.foulPoints,
       `${w.events[w.events.length - 1]}`,
     );
-    awardCard(w, w.robots[0], 'G408 excessive control');
-    const realCard = parsePenaltyEvent(w.events[w.events.length - 1]);
-    check(
-      'penalty line: a card the SIM actually issued reads back on the carded alliance',
-      realCard?.kind === 'card' && realCard.alliance === 'red' && realCard.colour === 'yellow',
-      `${w.events[w.events.length - 1]}`,
-    );
   }
 
-  /* THE EMITTERS GO THROUGH THE FORMATTER — both of them. The shared `awardFoul`/`awardCard`
-     and BIOBUZZ's own tariff wrapper, which mirrors the same text for its 20-point majors. A
+  /* THE EMITTERS GO THROUGH THE FORMATTER — both of them. The shared `awardFoul` (cards were
+     DECODE's, and went with it on 2026-10-12) and BIOBUZZ's own tariff wrapper, which mirrors the same text for its 20-point majors. A
      hand-rolled template in either file is a penalty list that empties for that game only,
      which is the kind of failure nobody notices until somebody asks. */
   const scoringSrc = readFileSync('src/sim/scoring.ts', 'utf8');
   const bbPenSrc = readFileSync('src/games/biobuzz/penalties.ts', 'utf8');
   check(
     'penalty line: the shared emitter formats through penaltyLog, not a local template',
-    scoringSrc.includes('foulEventText(severity, victim, pts, rule)') &&
-      scoringSrc.includes('cardEventText(colour, robot.alliance, who, rule)'),
+    scoringSrc.includes('foulEventText(severity, victim, pts, rule)'),
   );
   check(
     "penalty line: BIOBUZZ's own tariff emitter formats through penaltyLog too",
@@ -24083,13 +15118,13 @@ const dumperSetup = (): RobotSetup => {
   const setup: RobotSetup = {
     id: 0,
     alliance: 'blue',
-    spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'decode'),
+    spec: coerceSpec({ ...DEFAULT_SPEC }, DEFAULT_SPEC, 'chain'),
     assists: { ...DEFAULT_ASSISTS, fieldCentric: false },
     startIndex: 0,
   };
   const drive: CommandSource = (tick) =>
     new Map([[0, cmd({ driveX: tick % 90 < 45 ? 0.6 : -0.3, intake: true, fire: true })]]);
-  const run = runRecordMatch(0x9002, [setup], drive, { stopTick: 900 });
+  const run = runRecordMatch(0x9002, [setup], drive, { stopTick: 900, game: 'chain' });
 
   const p1 = new ReplayPlayer(run.replay);
   check('replay log: nothing is stamped before the first step', p1.log.length === 0);
@@ -25332,8 +16367,12 @@ const dumperSetup = (): RobotSetup => {
   const J = (v: unknown): string => JSON.stringify(v);
 
   check(
-    'games: every action names at least one game, and only real ones',
-    KEY_ACTIONS.every((a) => ACTION_GAMES[a].length > 0 && ACTION_GAMES[a].every((g) => (GAME_IDS as readonly string[]).includes(g))),
+    'games: every action names at least one game, and only real ones (the RESERVED presets name none)',
+    KEY_ACTIONS.every(
+      (a) =>
+        (ACTION_GAMES[a].length > 0) !== RESERVED_ACTIONS.includes(a) &&
+        ACTION_GAMES[a].every((g) => (GAME_IDS as readonly string[]).includes(g)),
+    ),
   );
   check(
     'games: the season-specific actions are exactly the five that are',
@@ -25358,12 +16397,14 @@ const dumperSetup = (): RobotSetup => {
       actionsConflict('catalyst', 'fling') === true && actionsConflict('fire', 'bbPlace') === true &&
       actionsConflict('fire', 'catalyst') === true && actionsConflict('bbPlace', 'bbNectar') === true,
   );
-  check('games: an action always conflicts with itself', KEY_ACTIONS.every((a) => actionsConflict(a, a)));
+  check(
+    'games: an action always conflicts with itself (one no game uses yet, a RESERVED preset, conflicts with nothing)',
+    KEY_ACTIONS.every((a) => actionsConflict(a, a) !== RESERVED_ACTIONS.includes(a)),
+  );
   check(
     'games: keyActionsFor/padActionsFor drop what the game does not use',
     !keyActionsFor('biobuzz').includes('catalyst') && keyActionsFor('biobuzz').includes('bbPlace') &&
-      !padActionsFor('chain').includes('bbNectar') && padActionsFor('chain').includes('catalyst') &&
-      !keyActionsFor('decode').includes('fling') && !keyActionsFor('decode').includes('bbNectar'),
+      !padActionsFor('chain').includes('bbNectar') && padActionsFor('chain').includes('catalyst'),
   );
 
   // THE EFFECTIVE MAP with no override is main, except that the actions the game does not use
@@ -25396,12 +16437,6 @@ const dumperSetup = (): RobotSetup => {
     'effective: each game empties its OWN non-actions, not the same ones',
     J(effChain.keys.catalyst) === J(DEFAULT_BINDINGS.keys.catalyst) && J(effChain.keys.bbPlace) === J([]),
   );
-  check(
-    'effective: DECODE empties every season-specific action',
-    (['catalyst', 'fling', 'bbPlace', 'bbPlaceNectar', 'bbNectar'] as const).every(
-      (a) => effectiveBindings(DEFAULT_BINDINGS, 'decode').keys[a].length === 0,
-    ),
-  );
 }
 
 // ---- GAME-SPECIFIC KEYBINDS: overriding one action in one game --------------------
@@ -25422,9 +16457,7 @@ const dumperSetup = (): RobotSetup => {
   check('override: MAIN is untouched', J(b.keys.fire) === J(DEFAULT_BINDINGS.keys.fire), J(b.keys.fire));
   check(
     'override: the OTHER games are untouched',
-    J(effectiveBindings(b, 'decode').keys.fire) === J(DEFAULT_BINDINGS.keys.fire) &&
-      J(effectiveBindings(b, 'chain').keys.fire) === J(DEFAULT_BINDINGS.keys.fire) &&
-      !keyDesynced(b, 'chain', 'fire') && !keyDesynced(b, 'decode', 'fire'),
+    J(effectiveBindings(b, 'chain').keys.fire) === J(DEFAULT_BINDINGS.keys.fire) && !keyDesynced(b, 'chain', 'fire'),
   );
   check('override: gameHasOverrides answers per game', gameHasOverrides(b, 'biobuzz') && !gameHasOverrides(b, 'chain'));
 
@@ -25493,7 +16526,7 @@ const dumperSetup = (): RobotSetup => {
     'override: an action the game does not use is refused outright',
     refused.perGame === undefined && J(refused) === J(cloneBindings(DEFAULT_BINDINGS)),
   );
-  const removed = removeKeyInGame(DEFAULT_BINDINGS, 'decode', 'fling', 0);
+  const removed = removeKeyInGame(DEFAULT_BINDINGS, 'biobuzz', 'fling', 0);
   check('override: removing one is refused the same way', removed.perGame === undefined);
 }
 
@@ -25557,9 +16590,8 @@ const dumperSetup = (): RobotSetup => {
     J({ main: g.keys.bbPlace, ov: g.perGame?.biobuzz?.keys }),
   );
   check(
-    'conflict/game: the other games keep Shoot on SPACE',
-    J(effectiveBindings(g, 'chain').keys.fire) === J([' ']) && J(effectiveBindings(g, 'decode').keys.fire) === J([' ']) &&
-      !keyDesynced(g, 'chain', 'fire') && !keyDesynced(g, 'decode', 'fire'),
+    'conflict/game: the other game keeps Shoot on SPACE',
+    J(effectiveBindings(g, 'chain').keys.fire) === J([' ']) && !keyDesynced(g, 'chain', 'fire'),
   );
   check(
     'conflict/game: a steal never reaches an action the game does not use',
@@ -25647,12 +16679,12 @@ const dumperSetup = (): RobotSetup => {
         padButtons: { catalyst: [4], bbPlace: [9], fling: 'x' },
         padCombos: { catalyst: [[7, 12], [7], 'junk'], fire: [[5, 12], [5], 'junk'] },
       },
-      decode: 'not an object',
       atlantis: { keys: { fire: ['z'] } },
     },
   });
+  const notAnObject = mergeBindings({ perGame: { chain: 'not an object' } });
   check('perGame: an unknown game id is dropped', (corrupt.perGame as Record<string, unknown>)?.atlantis === undefined);
-  check('perGame: a game whose entry is not an object is dropped', corrupt.perGame?.decode === undefined);
+  check('perGame: a game whose entry is not an object is dropped', notAnObject.perGame === undefined);
   check('perGame: an unknown action is dropped', (corrupt.perGame?.biobuzz?.keys as Record<string, unknown>)?.nonsense === undefined);
   check(
     'perGame: an action the game does not use is dropped',
@@ -25690,7 +16722,7 @@ const dumperSetup = (): RobotSetup => {
   );
   check(
     'perGame: a perGame that validates to nothing leaves the field absent',
-    mergeBindings({ perGame: { decode: { keys: { catalyst: ['z'] } } } }).perGame === undefined,
+    mergeBindings({ perGame: { biobuzz: { keys: { catalyst: ['z'] } } } }).perGame === undefined,
   );
   check('perGame: a perGame that is not an object is ignored', mergeBindings({ perGame: 'yes' }).perGame === undefined);
   check(
@@ -25813,15 +16845,6 @@ const dumperSetup = (): RobotSetup => {
     );
   }
 
-  // The same in DECODE, which has neither of the season actions.
-  const inDec = effectiveBindings(main, 'decode');
-  const rd = new PadChordResolver();
-  const ds = rd.resolve([7, 12], inDec.pad, 0);
-  check(
-    'resolver/effective: DECODE fires only what DECODE has',
-    ds.fire === true && ds.catalyst === false && ds.bbPlace === false && ds.bbPlaceNectar === false,
-    J(ds),
-  );
 }
 
 // ---- THE THREE KINDS OF ACTION, and the Controls screen that follows them ----------
@@ -25839,9 +16862,14 @@ const dumperSetup = (): RobotSetup => {
     'kinds: every shared control is used by every game (otherwise it is not shared)',
     SHARED_ACTIONS.every((a) => GAME_IDS.every((g) => actionUsedBy(a, g))),
   );
+  // ...except a RESERVED preset, which no game uses yet and so is none of the three (it has its
+  // own card on the FTC25 controls, outside both scopes)
+  const reserved = (a: string): boolean => (RESERVED_ACTIONS as readonly string[]).includes(a);
   check(
-    'kinds: every action is exactly one of shared / season-only / overridable',
-    KEY_ACTIONS.every((a) => [actionIsShared(a), actionIsSeasonOnly(a), actionOverridable(a)].filter(Boolean).length === 1),
+    'kinds: every action is exactly one of shared / season-only / overridable, and a reserved preset none',
+    KEY_ACTIONS.every(
+      (a) => [actionIsShared(a), actionIsSeasonOnly(a), actionOverridable(a)].filter(Boolean).length === (reserved(a) ? 0 : 1),
+    ),
   );
   check(
     'kinds: the overridable mechanisms today are exactly Intake and Shoot',
@@ -25856,10 +16884,12 @@ const dumperSetup = (): RobotSetup => {
     'kinds: a season scope lists no shared control, on either device',
     GAME_IDS.every((g) => seasonKeyActions(g).every((a) => !actionIsShared(a)) && seasonPadActions(g).every((a) => !actionIsShared(a))),
   );
+  /* THE RESERVED PRESETS ARE NO SEASON'S (owner, 2026-10-12): DECODE's own actions were the FTC25
+     presets and colour buttons; the colour buttons went with DECODE and the presets are kept for
+     BIOBUZZ's launcher but listed under no game, so no season's scope shows them yet. */
   check(
-    'kinds: DECODE, with no mechanism of its own, lists Intake and Shoot and nothing else',
-    J(seasonKeyActions('decode')) === J(['intake', 'fire']),
-    J(seasonKeyActions('decode')),
+    'kinds: no season lists a reserved preset',
+    GAME_IDS.every((g) => !seasonKeyActions(g).some((a) => RESERVED_ACTIONS.includes(a))),
   );
 
   // -- the layout table covers every action exactly once per scope, and names each one
@@ -25868,13 +16898,13 @@ const dumperSetup = (): RobotSetup => {
   check(
     'layout: All games lists every shared and overridable key action, each once, and nothing else',
     new Set(allKeys).size === allKeys.length &&
-      J([...allKeys].sort()) === J(KEY_ACTIONS.filter((a) => !actionIsSeasonOnly(a)).sort()),
+      J([...allKeys].sort()) === J(KEY_ACTIONS.filter((a) => !actionIsSeasonOnly(a) && !reserved(a)).sort()),
     J(allKeys),
   );
   check(
     'layout: …and the same for the pad',
     new Set(allPads).size === allPads.length &&
-      J([...allPads].sort()) === J(PAD_ACTIONS.filter((a) => !actionIsSeasonOnly(a)).sort()),
+      J([...allPads].sort()) === J(PAD_ACTIONS.filter((a) => !actionIsSeasonOnly(a) && !reserved(a)).sort()),
     J(allPads),
   );
   check(
@@ -26109,9 +17139,8 @@ const dumperSetup = (): RobotSetup => {
   check('unbound: nothing is unbound on the defaults', GAME_IDS.every((g) => seasonUnbound(DEFAULT_BINDINGS, g).length === 0));
   const shootOnC = assignKey(DEFAULT_BINDINGS, 'fire', 0, 'c');
   check(
-    'unbound: Shoot on C (All games) leaves Catalyst and Place POLLEN without a key, and DECODE clean',
-    J(seasonUnbound(shootOnC, 'chain')) === J(['catalyst']) && J(seasonUnbound(shootOnC, 'biobuzz')) === J(['bbPlace']) &&
-      seasonUnbound(shootOnC, 'decode').length === 0,
+    'unbound: Shoot on C (All games) leaves Catalyst and Place POLLEN without a key',
+    J(seasonUnbound(shootOnC, 'chain')) === J(['catalyst']) && J(seasonUnbound(shootOnC, 'biobuzz')) === J(['bbPlace']),
     J({ chain: seasonUnbound(shootOnC, 'chain'), biobuzz: seasonUnbound(shootOnC, 'biobuzz') }),
   );
 }
@@ -26161,7 +17190,7 @@ const dumperSetup = (): RobotSetup => {
   {
     const a: ServerMsg[] = [];
     const b: ServerMsg[] = [];
-    const room = new Room('smoke-drivers-host', () => {}, { kind: 'versus' });
+    const room = new Room('smoke-drivers-host', () => {}, { kind: 'versus', game: 'chain' });
     room.add(mkD('ca', 'ashley', 'red', a));
     room.add(mkD('cb', 'bo', 'blue', b));
     room.onMessage('ca', { t: 'start' });
@@ -26227,7 +17256,7 @@ const dumperSetup = (): RobotSetup => {
       // no 'strategy' cap ⇒ the room starts immediately, which is the other path
       caps: withStrategy ? ['strategy'] : [],
     });
-    const room = new Room(`smoke-drivers-ranked-${withStrategy}`, () => {}, { kind: 'versus' });
+    const room = new Room(`smoke-drivers-ranked-${withStrategy}`, () => {}, { kind: 'versus', game: 'chain' });
     room.applyPending({
       code: 'iad-drivers',
       hostRegion: 'iad',
@@ -26257,7 +17286,7 @@ const dumperSetup = (): RobotSetup => {
   // the handshake only.
   {
     const a: ServerMsg[] = [];
-    const room = new Room('smoke-drivers-nosnap', () => {}, { kind: 'versus' });
+    const room = new Room('smoke-drivers-nosnap', () => {}, { kind: 'versus', game: 'chain' });
     room.add(mkD('cn', 'ashley', 'red', a));
     room.onMessage('cn', { t: 'start' });
     room.advanceForTest(8);
@@ -26572,13 +17601,13 @@ const dumperSetup = (): RobotSetup => {
 // the moment it was minted.
 {
   const row = (over: Partial<AwardRow> = {}): AwardRow => ({
-    game: 'decode', balanceVersion: 12, act: 2, seasonNo: 3,
+    game: 'biobuzz', balanceVersion: 12, act: 2, seasonNo: 3,
     kind: 'ranked', mode: '1v1', drivetrain: null, rank: 1, score: 1500, ...over,
   });
 
   check(
     'awards: the full sentence is season · act/season · board rank',
-    awardSentence(row()) === 'DECODE · Act 2 Season 3 · 1v1 Champion',
+    awardSentence(row()) === 'BIOBUZZ · Act 2 Season 3 · 1v1 Champion',
     awardSentence(row()),
   );
   check(
@@ -26634,7 +17663,7 @@ const dumperSetup = (): RobotSetup => {
       row({ rank: 2 }),
       row({ mode: '2v2' }),
       row({ balanceVersion: 13 }),
-      row({ game: 'biobuzz' }),
+      row({ game: 'chain' }),
       row({ kind: 'record_overall', mode: 'solo' }),
       row({ kind: 'record_overall', mode: 'duo' }),
       row({ kind: 'record_drivetrain', mode: 'solo', drivetrain: 'mecanum' }),
@@ -26693,9 +17722,9 @@ const dumperSetup = (): RobotSetup => {
   check('⚠️ rewards: WHY says the placement, the ladder and the period — "#2 in 1v1 ranked, BIOBUZZ Act 2."',
     rewardWhy(ranked)[0] === '#2 in 1v1 ranked, BIOBUZZ Act 2.' && rewardWhy(ranked)[1] === 'Final rating 1843.', rewardWhy(ranked).join(' | '));
   check('rewards: the headline is the placement in words', rewardHeadline(ranked) === '1v1 Finalist', rewardHeadline(ranked));
-  const rec = g({ source: 'record_season', reason: { kind: 'record_season', game: 'decode', act: 1, seasonNo: 3, balanceVersion: 9,
+  const rec = g({ source: 'record_season', reason: { kind: 'record_season', game: 'biobuzz', act: 1, seasonNo: 3, balanceVersion: 9,
     placements: [{ board: 'overall', rank: 1, score: 212 }, { board: 'mecanum', rank: 1, score: 212 }] } });
-  check('rewards: a record award says each board it placed on', rewardWhy(rec).length === 2 && rewardWhy(rec)[1].startsWith('#1 on the Mecanum record board, DECODE Act 1 Season 3.'), rewardWhy(rec).join(' | '));
+  check('rewards: a record award says each board it placed on', rewardWhy(rec).length === 2 && rewardWhy(rec)[1].startsWith('#1 on the Mecanum record board, BIOBUZZ Act 1 Season 3.'), rewardWhy(rec).join(' | '));
   check('rewards: ...and heads with its best placement', rewardHeadline(rec) === 'Record Champion', rewardHeadline(rec));
   const star = g({ source: 'stargazer', reason: { kind: 'stargazer' }, items: [{ kind: 'badge', id: 'stargazer' }, { kind: 'cosmetic', id: 'decal:star' }] });
   check('rewards: a non-competitive reward heads with its badge\'s name', rewardHeadline(star) === 'Stargazer', rewardHeadline(star));
@@ -26708,7 +17737,7 @@ const dumperSetup = (): RobotSetup => {
   check('rewards: ...and an item this build does not know is not carded', grantCards(g({ items: [{ kind: 'badge', id: 'from-the-future' as never }] })).length === 0);
   check('rewards: ...and one with no badge falls back to a plain word', rewardHeadline(g({ reason: { kind: 'other' }, items: [{ kind: 'cosmetic', id: 'decal:star' }] })) === 'Reward');
   // the queue: prestigious first, OLDEST first within a kind, so a backfilled counter counts up 1, 2, 3
-  const q = [star, g({ id: 'late', reason: { kind: 'ranked_act', game: 'decode', act: 3, mode: '2v2', rank: 1, rating: 0 } }), rec, g({ id: 'early', reason: { kind: 'ranked_act', game: 'decode', act: 1, mode: '1v1', rank: 1, rating: 0 } })].sort(compareGrants);
+  const q = [star, g({ id: 'late', reason: { kind: 'ranked_act', game: 'biobuzz', act: 3, mode: '2v2', rank: 1, rating: 0 } }), rec, g({ id: 'early', reason: { kind: 'ranked_act', game: 'biobuzz', act: 1, mode: '1v1', rank: 1, rating: 0 } })].sort(compareGrants);
   check('rewards: the queue shows the podium first, oldest act first, then records, then the rest',
     q.map((x) => x.id === 'x' ? x.reason.kind : x.id).join(',') === 'early,late,record_season,stargazer', q.map((x) => x.id === 'x' ? x.reason.kind : x.id).join(','));
 }
@@ -26753,11 +17782,6 @@ const dumperSetup = (): RobotSetup => {
   // the per-game SETS, spelled out — the coverage check above says nothing is missing, and
   // these say what each season's driver actually gets
   check(
-    'touch: DECODE is shoot, intake and the three utilities',
-    touchButtonsFor('decode').map((b) => b.action).join(',') === 'fire,intake,flipFront,driveMode,park',
-    touchButtonsFor('decode').map((b) => b.action).join(','),
-  );
-  check(
     'touch: Chain Reaction adds the catalyst and the catapult throw',
     touchButtonsFor('chain').map((b) => b.action).join(',') === 'fire,intake,catalyst,fling,flipFront,driveMode,park',
     touchButtonsFor('chain').map((b) => b.action).join(','),
@@ -26791,14 +17815,14 @@ const dumperSetup = (): RobotSetup => {
   // ── PRESENCE: a button for a mechanism this build does not have is never drawn ──
   const claw = { ...DEFAULT_SPEC, catalystType: 'arm' } as RobotSpec;
   const launcher = { ...DEFAULT_SPEC, catalystType: 'launcher' } as RobotSpec;
-  const has = (g: 'decode' | 'chain' | 'biobuzz', spec: RobotSpec, a: string): boolean =>
+  const has = (g: GameId, spec: RobotSpec, a: string): boolean =>
     visibleTouchButtons(g, ctx(spec)).some((b) => b.action === a);
   check('touch: a claw-only Chain build gets no THROW button', !has('chain', claw, 'fling'));
   check('touch: a catapult build does', has('chain', launcher, 'fling'));
   check(
     'touch: WHEELS is butterfly-only, in every game',
-    !has('decode', DEFAULT_SPEC as RobotSpec, 'driveMode') &&
-      has('decode', { ...DEFAULT_SPEC, drivetrain: 'butterfly' } as RobotSpec, 'driveMode'),
+    !has('chain', DEFAULT_SPEC as RobotSpec, 'driveMode') &&
+      has('chain', { ...DEFAULT_SPEC, drivetrain: 'butterfly' } as RobotSpec, 'driveMode'),
   );
   {
     const noTube = mech('turret', false, 'sweeper');
@@ -26878,32 +17902,25 @@ const dumperSetup = (): RobotSetup => {
     const acts = (g: GameId, spec: RobotSpec, over: Over): string[] =>
       visibleTouchButtons(g, { ...ctx(spec), ...over }).map((b) => b.action);
     const on = (g: GameId, spec: RobotSpec, over: Over, a: string): boolean => acts(g, spec, over).includes(a);
-    const decode = DEFAULT_SPEC as RobotSpec;
+    const plain = DEFAULT_SPEC as RobotSpec;
     const turret = { ...DEFAULT_SPEC, scoreMode: 'turret' } as RobotSpec;
     for (const g of GAME_IDS) {
-      const spec = g === 'biobuzz' ? bbSpec : decode;
+      const spec = g === 'biobuzz' ? bbSpec : plain;
       check(`touch: ${g} — auto intake removes INTAKE`, on(g, spec, {}, 'intake') && !on(g, spec, { autoIntake: true }, 'intake'));
       check(
         `touch: ${g} — field-centric drive removes FLIP (it only reverses robot-centric)`,
         on(g, spec, {}, 'flipFront') && !on(g, spec, { fieldCentric: true }, 'flipFront'),
       );
     }
-    check('touch: DECODE — auto fire removes SHOOT', on('decode', decode, {}, 'fire') && !on('decode', decode, { autoFire: true }, 'fire'));
-    const phone = acts('decode', decode, { ...PLAYER_ASSISTS });
-    check(
-      '⚠️ touch: a default DECODE phone (field-centric, both assists) is the sticks and PARK, and nothing dead',
-      phone.join(',') === 'park',
-      phone.join(','),
-    );
     check('touch: Chain turret — auto fire removes SHOOT', !on('chain', turret, { autoFire: true }, 'fire'));
     check(
       'touch: Chain drum and dumper keep SHOOT under auto fire while aim assist is on',
-      on('chain', { ...decode, scoreMode: 'drum' }, { autoFire: true }, 'fire') &&
-        on('chain', { ...decode, scoreMode: 'dumper' }, { autoFire: true }, 'fire'),
+      on('chain', { ...plain, scoreMode: 'drum' }, { autoFire: true }, 'fire') &&
+        on('chain', { ...plain, scoreMode: 'dumper' }, { autoFire: true }, 'fire'),
     );
     check(
       'touch: and lose it with aim assist off',
-      !on('chain', { ...decode, scoreMode: 'dumper' }, { autoFire: true, aimAssist: false }, 'fire'),
+      !on('chain', { ...plain, scoreMode: 'dumper' }, { autoFire: true, aimAssist: false }, 'fire'),
     );
     check('touch: BIOBUZZ keeps SHOOT whatever the flag says (it has no auto fire)', on('biobuzz', bbSpec, { autoFire: true }, 'fire'));
   }
@@ -26911,7 +17928,7 @@ const dumperSetup = (): RobotSetup => {
   // ── READINESS: a button that cannot act YET is drawn idle, in place ──
   {
     const btn = (a: string): TouchButton => allTouchButtons().find((b) => b.action === a)!;
-    const base: TouchLive = { enabled: true, parked: false, held: [], cap: 3, launchZoneOk: true };
+    const base: TouchLive = { enabled: true, parked: false, held: [], cap: 3 };
     const ready = (a: string, over: Partial<TouchLive>): boolean => touchReady(btn(a), { ...base, ...over });
     check(
       '⚠️ touch: every HELD button is idle while robots are disabled (countdown, transition, post)',
@@ -26925,7 +17942,6 @@ const dumperSetup = (): RobotSetup => {
       !ready('park', { enabled: false }) && ready('park', { enabled: false, parked: true }) && ready('park', {}),
     );
     check('touch: SHOOT is idle with an empty hopper', !ready('fire', {}) && ready('fire', { held: ['green'] }));
-    check("touch: SHOOT is idle outside DECODE's launch zone", !ready('fire', { held: ['green'], launchZoneOk: false }));
     check('touch: INTAKE is idle with the hopper full', !ready('intake', { held: ['green', 'green', 'purple'] }) && ready('intake', { held: ['green'] }));
     type Ring = NonNullable<TouchLive['chain']>['ringAction'];
     const ring = (carrying: boolean, ringAction: Ring): Partial<TouchLive> => ({ chain: { carrying, ringAction } });
@@ -26957,17 +17973,15 @@ const dumperSetup = (): RobotSetup => {
 
     // `touchLiveOf` reads each season's capacity, and its own half, from the right place
     const hud = (over: Record<string, unknown>): HudSnapshot =>
-      ({ game: 'decode', canPark: true, parked: false, hopper: [], inLaunchZone: false, alliance: 'blue', ...over }) as unknown as HudSnapshot;
-    const d = touchLiveOf(hud({}));
-    check('touch: DECODE live — the fixed hopper, and the launch zone gates SHOOT', d.cap === HOPPER_CAPACITY && !d.launchZoneOk && !d.chain && !d.bb);
+      ({ game: 'chain', canPark: true, parked: false, hopper: [], alliance: 'blue', ...over }) as unknown as HudSnapshot;
     const c = touchLiveOf(hud({ game: 'chain', chain: { storage: 7, carrying: true, ringAction: null } }));
-    check("touch: Chain live — the builder's storage, and no DECODE launch zone", c.cap === 7 && c.launchZoneOk && c.chain?.carrying === true);
+    check("touch: Chain live — the builder's storage", c.cap === 7 && c.chain?.carrying === true);
     const b = touchLiveOf(
       hud({ game: 'biobuzz', gameHud: { field: { nectarWhy: { red: 'locked', blue: 'ok' } }, robot: { cap: 5, flowerInReach: true } } }),
     );
     check(
       "touch: BIOBUZZ live — its own cap, the reach, and THIS alliance's nectar answer",
-      b.cap === 5 && b.launchZoneOk && b.bb?.flowerInReach === true && b.bb.nectarOk,
+      b.cap === 5 && b.bb?.flowerInReach === true && b.bb.nectarOk,
     );
   }
 
@@ -27018,7 +18032,7 @@ const dumperSetup = (): RobotSetup => {
     }
     // a DRAGGED control keeps exactly where the player put it; an untouched one arranges itself
     const dragged = { ...DEFAULT_MOBILE_LAYOUT, shoot: { x: 0.4, y: 0.6 } };
-    const out = packTouchControls(visibleTouchButtons('decode', ctx(DEFAULT_SPEC as RobotSpec)), dragged, { w: 400, h: 800 });
+    const out = packTouchControls(visibleTouchButtons('chain', ctx(DEFAULT_SPEC as RobotSpec)), dragged, { w: 400, h: 800 });
     const shoot = out.buttons.find((b) => b.button.action === 'fire')!;
     check(
       '⚠️ touch: a stored position is honoured the moment it differs from the default, and only then',
@@ -27128,7 +18142,6 @@ const dumperSetup = (): RobotSetup => {
     `css ${bg.join(',')} vs ${COLORS.backdrop},${COLORS.backdropDark}`,
   );
 }
-
 
 // CONTROLS: A TAKEN BIND IS REFUSED, NOT STOLEN, AND THE 3D VIEW KEYS ARE BINDINGS (owner,
 // 2026-09-24): "There are some controls that are not even in the controls menu, like pressing c
@@ -27308,7 +18321,6 @@ const dumperSetup = (): RobotSetup => {
   );
 }
 
-
 // DESKTOP GOOGLE SIGN-IN OPENS IN A POP-UP WINDOW, NOT IN THE APP'S OWN (owner, 2026-09-24: "clicking
 // on the log in with google button shows the google sign in screen on the app instead of opening
 // up a new tab on a browser or showing a pop up"). The flow itself needs a real Google account, so
@@ -27369,8 +18381,8 @@ const dumperSetup = (): RobotSetup => {
   g.localStorage = stub;
   try {
     check(
-      'discord activity: the APP-WIDE default season is still DECODE (the site is unchanged)',
-      defaultSettings().game === 'decode',
+      'discord activity: the APP-WIDE default season is BIOBUZZ, the same one the activity opens on',
+      defaultSettings().game === 'biobuzz',
       defaultSettings().game,
     );
     check('settings: an empty origin reports no stored settings', !hasStoredSettings());
@@ -27382,14 +18394,11 @@ const dumperSetup = (): RobotSetup => {
   }
 
   const app = readFileSync('src/ui/App.tsx', 'utf8').replace(/\r\n/g, '\n');
+  // the activity's own BIOBUZZ seed went with DECODE: BIOBUZZ is the app-wide default now, so the
+  // activity opens on it from plain `loadSettings()` and a stored pick is never overridden
   check(
-    'discord activity: the season is seeded to BIOBUZZ, and only inside the activity',
-    /inDiscordActivity\(\) && !hasStoredSettings\(\) \? switchGame\(stored, 'biobuzz'\)/.test(app),
-  );
-  check(
-    '⚠️ discord activity: the seed defers to a STORED pick, so a chosen season is never overridden',
-    /!hasStoredSettings\(\)/.test(app),
-    'without this the activity re-picks BIOBUZZ on every launch, including for somebody who chose DECODE',
+    'discord activity: no seed of its own — the activity opens on the stored pick or the app-wide default',
+    /const s = loadSettings\(\);/.test(app) && !/switchGame\(stored, 'biobuzz'\)/.test(app),
   );
   check(
     'discord activity: the lobby browser is still handed settings.game (no second source of truth)',
@@ -27664,7 +18673,7 @@ const dumperSetup = (): RobotSetup => {
     caps: ['recycle', 'seat'],
     userId: 'u-' + id,
   });
-  const room = new Room('smoke-recycle-seat', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-recycle-seat', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mk('a', 'red'));
   room.add(mk('b', 'blue'));
   const minted = (sink.a.find((m) => m.t === 'welcome') as Extract<ServerMsg, { t: 'welcome' }> | undefined)?.seatToken ?? '';
@@ -27726,7 +18735,7 @@ const dumperSetup = (): RobotSetup => {
  */
 {
   const sink: ServerMsg[] = [];
-  const room = new Room('smoke-mod-stale', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-mod-stale', () => {}, { kind: 'versus', game: 'chain' });
   room.add({
     id: 'a',
     send: (m) => sink.push(m),
@@ -28261,7 +19270,7 @@ const dumperSetup = (): RobotSetup => {
     player: { clientId: id, name: id, teamName: 'T', teamNumber: 1, alliance: id === 'h' ? 'red' : 'blue', startIndex: 0, ready, spec: { ...DEFAULT_SPEC }, assists: { ...DEFAULT_ASSISTS } },
     connected: true, disconnectAt: 0,
   });
-  const room = new Room('smoke-start-unready', () => {}, { kind: 'versus' });
+  const room = new Room('smoke-start-unready', () => {}, { kind: 'versus', game: 'chain' });
   room.add(mk('h', true));
   room.add(mk('late', false)); // walked in while the host's screen still said everyone was ready
   room.onMessage('h', { t: 'start' });
@@ -28281,7 +19290,7 @@ const dumperSetup = (): RobotSetup => {
 // its own room and sends START off the first roster without ever sending `ready`, on every
 // build in the fleet. The host's own seat is therefore exempt from the gate above.
 {
-  const rec = new Room('smoke-start-record-solo', () => {}, { kind: 'record', record: 'solo' }, () => {});
+  const rec = new Room('smoke-start-record-solo', () => {}, { kind: 'record', record: 'solo', game: 'chain' }, () => {});
   rec.add({
     id: 'p',
     send: () => {},
@@ -29301,13 +20310,6 @@ const dumperSetup = (): RobotSetup => {
     /if \(flushingPractice\.current\) \{\s*flushPracticeAgain\.current = true;\s*return;/.test(app) &&
       /\} while \(flushPracticeAgain\.current && signedInRef\.current\);/.test(app),
   );
-  const spe = rd('src/ui/StartPositionEditor.tsx');
-  const onMove = spe.match(/const onMove = \(e: React\.PointerEvent\) => \{[\s\S]*?\n  \};/);
-  check(
-    'start editor: a drag saves on release, not on every pointermove',
-    !!onMove && !/\bedit\(|commit\(/.test(onMove[0]) && /setDraft\(next\)/.test(onMove[0]),
-    'each save is a whole-settings localStorage write',
-  );
 }
 
 /**
@@ -29369,7 +20371,7 @@ const dumperSetup = (): RobotSetup => {
  */
 {
   const day = (): string => 'Sep 30';
-  const view = (kind: string, data: Record<string, unknown>, game: string | null = 'decode') =>
+  const view = (kind: string, data: Record<string, unknown>, game: string | null = 'biobuzz') =>
     noticeView({ kind, game, data }, day);
 
   // ---- the refund: only a LOSS, only to a player whose result got better, judged against the
@@ -29429,7 +20431,11 @@ const dumperSetup = (): RobotSetup => {
       fixed.tone === 'good',
     JSON.stringify(fixed.lines),
   );
-  check('notices: ...and names the match it is about', fixed.meta === 'Ranked 1v1 · DECODE · Sep 30', String(fixed.meta));
+  check('notices: ...and names the match it is about', fixed.meta === 'Ranked 1v1 · BIOBUZZ · Sep 30', String(fixed.meta));
+  // the account server still sends notices about DECODE matches, a game this fork does not list:
+  // the meta line drops the name it cannot resolve rather than printing an id or "undefined"
+  const retired = view('match.corrected', samples['match.corrected'], 'decode')!;
+  check('notices: a notice about a DECODE match leaves the game out of its meta line', retired.meta === 'Ranked 1v1 · Sep 30', String(retired.meta));
   const loser = view('match.corrected', { ...samples['match.corrected'], alliance: 'blue', refund: 0 })!;
   check(
     'notices: the other side is told it lost, and that its rating stays where it was',

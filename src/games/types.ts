@@ -16,7 +16,7 @@ import type { IntakeStyle } from '../types';
 /**
  * The GAME-ABSTRACTION seam (DOM-free core types).
  *
- * The simulator hosts more than one FTC-style game (DECODE, Chain Reaction, …).
+ * The simulator hosts more than one FTC-style game (Chain Reaction, BIOBUZZ).
  * Everything GENERIC — the drivetrain/motor model, the Rapier robot solver,
  * contact-torque square-up, the match phase machine, robot rendering — is shared.
  * Everything GAME-SPECIFIC lives behind a game module.
@@ -29,30 +29,41 @@ import type { IntakeStyle } from '../types';
  *   (canvas rendering). Client-only.
  *
  * Design rules:
- * - DECODE's existing `src/sim/*` + `src/render/*` are NOT relocated; the DECODE
- *   module just references them. A new game is a new `src/games/<id>/` tree.
+ * - A game is a `src/games/<id>/` tree. `src/sim/*` is the shared core; it still
+ *   carries DECODE-era names (`goals`, `motif`, `hopper`) where the remaining games and
+ *   the wire format read them — DECODE itself was removed from this fork on 2026-10-12.
  * - Modules produce PLAIN-NUMBER collider specs (`StaticSpec`) — never Rapier.
  *   `physicsEngine.ts` owns RAPIER and turns specs into bodies.
  * - The shared Rapier robot solve + camera are PARAMETERIZED on a module's
  *   `bounds`/`colliders`, so a game with a different field size just works.
  */
 
-export type GameId = 'decode' | 'chain' | 'biobuzz';
+export type GameId = 'chain' | 'biobuzz';
 
 /**
- * EVERY game id, in display order (DECODE first — it is also the fallback).
+ * THE FALLBACK GAME — what an absent or unknown `game` resolves to (a new install, settings
+ * saved when this fork still had DECODE, an unknown URL prefix). It was DECODE until DECODE
+ * was removed from this fork (owner, 2026-10-12); BIOBUZZ is the current season.
+ *
+ * ⚠️ It is NOT how a DECODE recording is read. Old worlds, snapshots and replays with no `game`
+ * field were DECODE's, and re-simulating one as BIOBUZZ would be a different match wearing its
+ * name — the replay/run loaders refuse those (`replayGameOf`) rather than fall back here.
+ */
+export const DEFAULT_GAME: GameId = 'biobuzz';
+
+/**
+ * EVERY game id, in display order (`DEFAULT_GAME` first).
  *
  * This list, not a hand-written literal, is what every "which games are there"
  * site must read: the route regex, the settings allowlists, the loadout archive
  * loop, the server's untrusted-`game` coercion. Before it existed those sites
- * were two-valued ternaries (`x === 'chain' ? 'chain' : 'decode'`), so a THIRD
- * id silently degraded to DECODE — a player queued for it, got a DECODE room,
- * and nothing anywhere said so.
+ * were two-valued ternaries, so a THIRD id silently degraded to the fallback — a
+ * player queued for it, got the wrong room, and nothing anywhere said so.
  */
-export const GAME_IDS: readonly GameId[] = ['decode', 'chain', 'biobuzz'] as const;
+export const GAME_IDS: readonly GameId[] = ['biobuzz', 'chain'] as const;
 
 /** is `x` a known game id? (the allowlist form — use it where an absent/unknown
- * value must stay absent rather than become DECODE) */
+ * value must stay absent rather than become `DEFAULT_GAME`) */
 export function isGameId(x: unknown): x is GameId {
   return typeof x === 'string' && (GAME_IDS as readonly string[]).includes(x);
 }
@@ -60,12 +71,11 @@ export function isGameId(x: unknown): x is GameId {
 /**
  * Force an untrusted value to a known game id.
  *
- * The DOWNGRADE form, and the one the wire/URL/query-string sites want: an
- * unknown or missing `game` becomes `fallback` (DECODE by default), which is the
- * repo's single back-compat rule — old worlds, snapshots and replays carry no
- * `game` field at all, and both module resolvers already answer DECODE for them.
+ * The DOWNGRADE form, and the one the URL/query-string/settings sites want: an
+ * unknown or missing `game` becomes `fallback` (`DEFAULT_GAME` by default). Not for a
+ * recorded world or replay — see `DEFAULT_GAME`.
  */
-export function coerceGameId(x: unknown, fallback: GameId = 'decode'): GameId {
+export function coerceGameId(x: unknown, fallback: GameId = DEFAULT_GAME): GameId {
   return isGameId(x) ? x : fallback;
 }
 
@@ -90,7 +100,7 @@ export type Physics = '2d' | '3d';
  * archives everybody's standings over a physics change they did not ask for.
  *
  * A game with no `'3d'` option is `'2d'` and is therefore byte-identical to what it always was,
- * which is DECODE and Chain Reaction.
+ * which is Chain Reaction.
  *
  * OFFLINE is the exception and is not this function's business: solo practice and free drive
  * still honour `GameSettings.practicePhysics`, because the 2D pipeline is permanent and a
@@ -124,9 +134,8 @@ export interface FieldBounds {
 
 /** a game's static field geometry plus any per-step dynamic colliders. */
 export interface FieldColliders {
-  /** perimeter walls + game structures (DECODE: goal-face hypotenuses +
-   * classifier channels). CONSTANT numbers → identical colliders each build →
-   * determinism preserved. Compute once at module load. */
+  /** perimeter walls + game structures. CONSTANT numbers → identical colliders each
+   * build → determinism preserved. Compute once at module load. */
   statics: StaticSpec[];
   /**
    * The PERIMETER, as a hard containment invariant rather than merely a collider.
@@ -138,10 +147,6 @@ export interface FieldColliders {
    * outflow mouth); containment keeps you in, it does not teleport you in.
    */
   bounds: { halfX: number; halfY: number };
-  /** per-step dynamic cuboids (DECODE: the physical gate handles). Omit for a
-   * game with no moving field geometry (CR shell). `gateCol` is DECODE's
-   * anticipated gate-lift fraction per alliance. */
-  dynamic?(world: World, dt: number, gateCol?: Record<'red' | 'blue', number>): StaticSpec[];
 }
 
 /** builder/HUD metadata: how the menu + in-match chrome adapt to this game.
@@ -165,16 +170,15 @@ export interface GameSimModule {
   /** false ⇒ a shell with no scoring: never persist ELO/records, minimal HUD.
    * (Still runs full multiplayer — the schema/protocol are game-keyed already.) */
   scored: boolean;
-  /** does this game have start-position LEGALITY (DECODE G304)? The server enforces
-   * it only for such games; a game without it (CR shell) skips the legality gate. */
+  /** does this game have start-position LEGALITY (BIOBUZZ G304)? The server enforces
+   * it only for such games; a game without it (Chain Reaction) skips the legality gate. */
   startLegality: boolean;
   /**
    * The competitive ACT this game's very first period opens in (`ensureSeason`).
    *
-   * DECODE keeps act 0 — the beta/pre-season bucket it actually ran in — and every
-   * later game starts in its own act. It lives on the MODULE because the two callers
-   * (`server/persist.ts` at match end, `/api/seasons` in `server/api.ts`) had it as
-   * `game === 'chain' ? 1 : 0`, which silently seeds a third game into DECODE's beta act.
+   * It lives on the MODULE because the two callers (`server/persist.ts` at match end,
+   * `/api/seasons` in `server/api.ts`) had it as `game === 'chain' ? 1 : 0`, which
+   * silently seeded a third game into the first game's beta act.
    */
   initialAct: number;
   /**
@@ -182,10 +186,9 @@ export interface GameSimModule {
    * `startIndex` (`0 .. startPoseCount - 1`).
    *
    * The clamps in `coerceStartIndex` (`src/net/sanitize.ts`), `coerceSetup`
-   * (`src/sim/spawn.ts`) and `coerceSettings` all read it. They used DECODE's
-   * `START_POSES.length` (5) for every game, which CR (4) survived only because 4 < 5 —
-   * a game with FEWER anchors than DECODE would accept an out-of-range index off
-   * localStorage or the wire and resolve it to whatever its own spawn does with a
+   * (`src/sim/spawn.ts`) and `coerceSettings` all read it. They once used one game's
+   * anchor count for every game, so a game with FEWER anchors would accept an out-of-range
+   * index off localStorage or the wire and resolve it to whatever its own spawn does with a
    * miss.
    */
   startPoseCount: number;
@@ -198,15 +201,12 @@ export interface GameSimModule {
    * no start rule and every pose is legal.
    *
    * It exists because both readers had grown a hand-written branch over the game id, which is
-   * the failure mode CLAUDE.md's seam section names: `startSelectionLegal` was
-   * `game === 'chain' ? chainStartLegal(…) : activeStartLegal(…)`, so a THIRD game fell into
-   * DECODE's arm and had its poses judged against DECODE's launch lines and goal triangles.
-   * That is a worse answer than no answer, and it is what kept BIOBUZZ's `startLegality` down
-   * after G304 was already modelled.
+   * the failure mode CLAUDE.md's seam section names: a THIRD game fell into another game's arm
+   * and had its poses judged against that game's field.
    *
    * THE POSE IS CANONICAL, not the one the robot will spawn on: every caller holds what is in
    * `RobotSetup.startPose` / `GameSettings.startPose`, and each game mirrors that onto the
-   * actual alliance its own way (DECODE reflects in x, BIOBUZZ rotates 180° about the origin).
+   * actual alliance its own way (BIOBUZZ rotates 180° about the origin).
    * An implementation that forgets to mirror judges red's pose in blue's frame and is wrong on
    * exactly half the field, silently — so mirror first, then assess.
    *
@@ -220,15 +220,15 @@ export interface GameSimModule {
    * `coerceSetup` calls it at the spawn chokepoint, so no path (localStorage, the wire, a staged
    * match, a replay) spawns an illegal robot. Absent ⇒ the pose is kept as structurally
    * validated and field-clamped, and the game's own spawn may fit it further (BIOBUZZ does).
-   * It used to be DECODE's `snapStartToLegal` for any game with `startLegality`, which seated a
-   * BIOBUZZ pose against DECODE's field and mirrored it in x.
    */
   startSnap?(spec: RobotSpec, a: Alliance, startPose: StartPose): StartPose;
   /**
    * THE START ROLES, for a game whose roles are not DECODE's CLOSE / FAR table. The shared
    * `StartCat` slots ('close' / 'far') carry whatever a game's two roles are; these say which
    * anchor belongs to which, which anchor a role defaults to, and what the roles and anchors are
-   * called on screen. Absent ⇒ DECODE's `START_POSES` table and CLOSE / FAR words.
+   * called on screen. Absent ⇒ the plain defaults (anchor 0, every anchor 'close', no names);
+   * DECODE's `START_POSES` table and CLOSE / FAR words, which these used to fall back to, went
+   * with DECODE.
    *
    * They exist for the same reason `startLegal` does: `startPositions.ts`, the role-swap bar and
    * the lobby/strategy start chips each branched `game === 'chain' ? … : <DECODE>`, so BIOBUZZ got
@@ -241,22 +241,6 @@ export interface GameSimModule {
    * for one alliance and the bottom for the other (BIOBUZZ). */
   startRoleLabel?(cat: import('../types').StartCat | undefined, alliance?: Alliance): string;
   startAnchorName?(index: number, alliance?: Alliance): string;
-  /**
-   * DOES THIS GAME RUN AUTO PATHS?
-   *
-   * Only DECODE's step drives path traversal — `initializePathTraversal` /
-   * `updatePathTraversal` are called from `src/sim/world.ts` and nowhere else, and Chain
-   * Reaction and BIOBUZZ have steps of their own. So a `.pp` path imported while one of
-   * those games was selected was accepted by the builder, saved to the library, reported
-   * "Auto path ON", rode the wire into the match — and then the robot sat still for the
-   * whole autonomous period with nothing anywhere saying why.
-   *
-   * Two readers, and they are the two ends of that path: the builder hides the section for
-   * a game that cannot run one (`MatchSetup`), and the spawn chokepoint drops `autoPath` /
-   * `autoPathEnabled` for it (`coerceSetup`) so a path already sitting in localStorage or
-   * arriving off the wire never reaches a world, a snapshot or a replay.
-   */
-  autoPaths: boolean;
   bounds: FieldBounds;
   colliders: FieldColliders;
   /**
@@ -272,8 +256,8 @@ export interface GameSimModule {
    * the room on both ends, so the server and every client in it build the same world.
    *
    * Absent ⇒ the game decides for itself (BIOBUZZ falls back to `settings.practicePhysics`,
-   * then `'2d'`). A game with no `physicsOptions` ignores it entirely, which is DECODE and
-   * Chain Reaction — their builders take four parameters and stay assignable to this type.
+   * then `'2d'`). A game with no `physicsOptions` ignores it entirely, which is Chain
+   * Reaction — its builder takes four parameters and stays assignable to this type.
    */
   createWorld(
     mode: GameMode,
@@ -336,8 +320,8 @@ export interface GameSimModule {
   /**
    * WHICH PHYSICS BACKENDS THIS GAME'S UI MAY OFFER, for a room or practice setup — absent ⇒
    * only `'2d'`, which is every game before BIOBUZZ's Day 1 seam. BIOBUZZ fills
-   * `['2d', '3d']` once `sim3d/` exists to step the second one; DECODE and Chain Reaction leave
-   * this empty rather than advertise a physics their `step` cannot run.
+   * `['2d', '3d']` once `sim3d/` exists to step the second one; Chain Reaction leaves this
+   * empty rather than advertise a physics its `step` cannot run.
    */
   physicsOptions?: readonly Physics[];
   /**
@@ -346,6 +330,14 @@ export interface GameSimModule {
    * can build toward it without a later type edit.
    */
   bot?: BotDriver;
+  /**
+   * THE HEADING THAT FACES ROBOT `r` AT THIS SEASON'S TARGET — what the FTC25 controls' target
+   * snap turns to (`DriverShaping`, owner 2026-10-12). `alt` is the snap's second button: a
+   * game with a second target answers it (BIOBUZZ, the other HIVE cell), one without answers the
+   * same. Absent, or null, ⇒ the snap does nothing in this game. Client-side input shaping only:
+   * the sim never reads it, so nothing on the wire, in a replay or on a server changes.
+   */
+  aimHeading?(world: World, r: RobotState, alt: boolean): number | null;
 }
 
 /**

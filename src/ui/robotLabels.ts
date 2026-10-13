@@ -16,34 +16,24 @@ import { DRIVETRAIN_LABELS, INTAKE_SHORT } from './labelData';
 export { DRIVETRAIN_LABELS, INTAKE_SHORT };
 
 /**
- * ONE LINE describing a build, in the terms that game actually has: DECODE names
- * the intake and the sorter, Chain Reaction names the archetype (it has no intake
- * styles and no sorter). Lives here rather than in a screen because THREE screens
+ * ONE LINE describing a build, in the terms that game actually has: Chain Reaction names
+ * the archetype, and a game with its own words fills `labels.configSummary` (BIOBUZZ does).
+ * Lives here rather than in a screen because THREE screens
  * print it now — the ranked strategy window, the custom-room lobby, and anywhere
  * else a roster card wants to say what somebody is bringing — and two hand-written
  * copies of one sentence drift the way any two drawings of one object do.
  */
 export function buildSummary(spec: RobotSpec, game: GameId): string {
-  // a game may own this sentence outright (the module's `labels.configSummary`
-  // slot); the two branches below are DECODE's and CR's, unchanged
+  // a game may own this sentence outright (the module's `labels.configSummary` slot); the
+  // inline sentence is Chain Reaction's (the other arm was DECODE's, removed 2026-10-12)
   const own = moduleFor(game).labels?.configSummary;
   if (own) return own(spec);
-  const parts =
-    game === 'chain'
-      ? [
-          DRIVETRAIN_LABELS[spec.drivetrain],
-          CHAIN_MODE_LABELS[spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE],
-          `${spec.driveRpm} rpm`,
-          `${spec.massLb} lb`,
-        ]
-      : [
-          DRIVETRAIN_LABELS[spec.drivetrain],
-          INTAKE_SHORT[spec.intake],
-          `${spec.driveRpm} rpm`,
-          `${spec.massLb} lb`,
-          ...(spec.canSort ? ['sorter'] : []),
-        ];
-  return parts.join(' · ');
+  return [
+    DRIVETRAIN_LABELS[spec.drivetrain],
+    CHAIN_MODE_LABELS[spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE],
+    `${spec.driveRpm} rpm`,
+    `${spec.massLb} lb`,
+  ].join(' · ');
 }
 
 /**
@@ -58,15 +48,15 @@ export function buildSummary(spec: RobotSpec, game: GameId): string {
  *
  * A game that fills `statTiles` gets ITS mechanisms, read through its own resolvers — the same
  * slot rule `buildSummary` follows for `labels.configSummary`, and for the same reason: an `else`
- * arm here is not a default, it is somebody else's game. DECODE and Chain Reaction fill nothing
- * and take the two inline arms.
+ * arm here is not a default, it is somebody else's game. Chain Reaction fills nothing and takes
+ * the inline arm.
  */
 export function buildWords(spec: RobotSpec, game: GameId): string[] {
   const words = [DRIVETRAIN_LABELS[spec.drivetrain]];
   const tiles = moduleFor(game).statTiles?.(spec);
   if (tiles) {
     for (const t of tiles) if (!t.absent) words.push(t.sub ? `${t.value}, ${t.sub}` : t.value);
-  } else if (game === 'chain') {
+  } else {
     const mode = spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE;
     // a turret aims itself from wherever it is bolted, so its mount says nothing
     words.push(
@@ -80,24 +70,8 @@ export function buildWords(spec: RobotSpec, game: GameId): string[] {
         swing ? ` swing ${swing === 'fb' ? '↕' : '↔'}` : ''
       }, ${CHAIN_CATALYST_MOUNT_LABELS[catalystMountOf(spec)]}`,
     );
-  } else {
-    words.push(`${INTAKE_SHORT[spec.intake]} intake`);
-    if (spec.canSort) words.push('sorter');
-    words.push(shotRange(spec.flywheelInertia));
   }
   return words;
-}
-
-/**
- * The shooting range a DECODE flywheel inertia is tuned for: a LOW-inertia wheel spins up fast
- * for close rapid-fire, a HIGH-inertia wheel holds speed to sustain long shots (matches the
- * flywheel-recovery cadence model). It was the chip on a DECODE preset card; it is a word in
- * `buildWords` now, so a saved robot and the hero say it too.
- */
-export function shotRange(inertia: number): string {
-  if (inertia <= 0.4) return 'Close range';
-  if (inertia <= 0.7) return 'Mid range';
-  return 'Long range';
 }
 
 /**

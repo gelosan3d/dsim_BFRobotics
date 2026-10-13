@@ -1,6 +1,8 @@
 import type { GameId } from '../types';
+import { DEFAULT_GAME, isGameId } from '../games/types';
 import { withLocalPatch, type Replay, type ReplayResult } from '../sim/replay';
 import { getViewPref } from '../games/biobuzz/graphics/store';
+import { replayIsFork } from './forkScope';
 
 /**
  * SOLO PRACTICE REPLAYS, kept on this device.
@@ -24,6 +26,18 @@ import { getViewPref } from '../games/biobuzz/graphics/store';
 
 import { PRACTICE_RUNS_KEY as KEY } from '../storageKeys';
 const bodyKey = (id: string): string => `${KEY}.${id}`;
+
+/** does the stored body of run `id` carry this fork's features (`replayIsFork`)? Fails CLOSED:
+ *  a body that cannot be read is not offered for upload either. */
+function bodyIsFork(id: string): boolean {
+  try {
+    const raw = localStorage.getItem(bodyKey(id));
+    if (!raw) return false; // nothing left to send, which the flush already skips
+    return replayIsFork(JSON.parse(raw) as Replay);
+  } catch {
+    return true;
+  }
+}
 
 /**
  * How many runs this device keeps. Ten is roughly a practice session's worth, and it bounds
@@ -67,6 +81,11 @@ export interface PracticeRunMeta {
    * one of the old all-three line-ups — unknown, so no mark.
    */
   others?: number;
+  /**
+   * PLAYED WITH THIS FORK'S FEATURES (FTC25 controls, or a Local versus): kept on this device and
+   * NEVER uploaded to DSIM's servers (`src/net/forkScope.ts`). Absent on every other run.
+   */
+  localOnly?: boolean;
 }
 
 const readIndex = (): PracticeRunMeta[] => {
@@ -98,9 +117,13 @@ const dropBody = (id: string): void => {
   }
 };
 
-/** newest first — the order both the local list and the Career feed show */
+/** newest first — the order both the local list and the Career feed show. A run of a game this
+ *  build does not have (DECODE, removed 2026-10-12) is left stored but not listed: it cannot be
+ *  played back here, and it ages out of the cap like any other run. */
 export function listPracticeRuns(): PracticeRunMeta[] {
-  return readIndex().sort((a, b) => b.at - a.at);
+  return readIndex()
+    .filter((m) => isGameId(m.game))
+    .sort((a, b) => b.at - a.at);
 }
 
 /** the stored input log for a run, or null if the body is gone (quota eviction, cleared site
@@ -131,13 +154,13 @@ export function deletePracticeRun(id: string): void {
  * runs are worth keeping; the quota is a hard limit that other things on the origin share, and
  * the newest run is the one the player just asked for.
  */
-export function savePracticeRun(replay: Replay, result: ReplayResult): PracticeRunMeta | null {
+export function savePracticeRun(replay: Replay, result: ReplayResult, localOnly = false): PracticeRunMeta | null {
   const id = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   const alliance = replay.setups[0]?.alliance ?? 'blue';
   const meta: PracticeRunMeta = {
     id,
     at: Date.now(),
-    game: replay.game ?? 'decode',
+    game: replay.game ?? DEFAULT_GAME,
     score: result.score[alliance] ?? 0,
     ticks: replay.ticks,
     balanceVersion: replay.balanceVersion,
@@ -146,6 +169,7 @@ export function savePracticeRun(replay: Replay, result: ReplayResult): PracticeR
     view: getViewPref(),
     others: Math.max(0, replay.setups.length - 1),
   };
+  if (localOnly || replayIsFork(replay)) meta.localOnly = true;
 
   const body = JSON.stringify(replay);
   let index = readIndex().sort((a, b) => b.at - a.at);
@@ -182,7 +206,12 @@ export function savePracticeRun(replay: Replay, result: ReplayResult): PracticeR
  */
 export function pendingPracticeUploads(): PracticeRunMeta[] {
   return readIndex()
-    .filter((m) => !m.remoteId)
+    // a fork run never goes to DSIM's servers — and the BODY is checked too, so a run kept by a
+    // build before `localOnly` existed cannot slip through on a missing flag
+    .filter((m) => !m.remoteId && !m.localOnly && !bodyIsFork(m.id))
+    // …and nor does a run of a game this build does not have (DECODE): it is the player's
+    // data, and this build sends nothing of DECODE anywhere
+    .filter((m) => isGameId(m.game))
     .sort((a, b) => a.at - b.at);
 }
 

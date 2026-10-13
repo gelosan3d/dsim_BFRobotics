@@ -1,16 +1,6 @@
 import type { Artifact, Alliance, RobotCommand, RobotState, Vec2, World } from '../types';
 import * as C from '../config';
-import {
-  baseZone,
-  classifierRect,
-  gateArmRect,
-  gateZoneTape,
-  goalLineValue,
-  loadZone,
-  other,
-  tunnelStrip,
-  inRect, goalSide,
-} from './field';
+import { inRect } from './field';
 import type { Rect } from './field';
 import {
   closestPointOnRobot,
@@ -20,54 +10,19 @@ import {
   robotIntersectsRect,
   robotPointVelocity,
 } from './physics';
-import { pushingGate, ZERO_CMD } from './goal';
-import { awardCard, awardFoul } from './scoring';
 import { hyp, rot } from '../math';
 
 /**
- * DECODE penalty engine (Competition Manual Section 11). Pure and
- * deterministic: it reads only world.time, robot positions/velocities, the
- * per-tick command map, and world.rrContacts (robot-robot contacts recorded by
- * the collision solver). All state lives in world.penalties as plain JSON, so
- * the sim stays serializable and locklockstep-safe for netcode.
+ * THE SHARED SECTION 11 TESTS — the CONTROL count behind over-control (`controlledArtifacts`) and
+ * the PINNING test (`isPinning`). BIOBUZZ's penalty engine (`src/games/biobuzz/penalties.ts`)
+ * calls both; Chain Reaction models only its contact rules and calls neither. Pure and
+ * deterministic, and every per-element clock lives in `world.penalties` as plain JSON.
  *
- * Fouls are awarded TO the victim alliance (awardFoul in scoring.ts). Most
- * rules trigger on a CROSS-alliance contact pair while a robot sits in a zone;
- * a per-episode debounce (PENALTY_CLEAR) makes a held contact fire once, not
- * every tick. Pinning (G422) owns a per-ordered-pair second-accumulator.
- *
- * Rules modeled here (numbers/severities per Competition Manual Section 11):
- *   G402  AUTO opponent interference   (MAJOR) — fully on the opponent's side
- *                                       (own side = goalSide: robots stage near
- *                                       their GOAL) while contacting an opponent
- *   G408  over-possession               (MINOR per artifact over the limit, + a
- *                                       YELLOW CARD if excessive) — CONTROLLING more
- *                                       than POSSESSION_LIMIT artifacts (hopper +
- *                                       herded loose balls) past a short grace
- *   G422  pinning ≥3 s                 (MINOR, and another every 3 s it is not corrected)
- *   G417  operating an OPPONENT's GATE  (MAJOR) — contacting/working their gate
- *   G418  artifact off an opponent RAMP (MAJOR per artifact) — each classified
- *                                       ball that leaves an opponent's ramp
- *                                       because you opened their gate (G418.B)
- *   G424  GATE ZONE off limits         (MINOR) — cross-alliance contact while a
- *                                       robot is in a gate zone; protects the
- *                                       gate OWNER's access to their own gate
- *   G425  SECRET TUNNEL                (MINOR) — contact while in the tunnel strip
- *   G426  LOADING ZONE protection      (MINOR)
- *   G427  BASE ZONE protection, endgame (MAJOR + counts the victim fully returned)
- *
- * Uniform "protected zone" model: gate/loading/base zones belong to the alliance
- * whose side they sit on (foul the OTHER alliance on contact); the secret-tunnel
- * strip on a wall belongs to the OPPOSING drive team (tunnelStrip(a) is owned by
- * other(a), so the intruder/offender is alliance a).
- *
- * Rules PHYSICALLY PREVENTED by construction (no code needed):
- *   G403/G417  transition freeze — robots are disabled outside auto/teleop.
- *   G416  out-of-zone launching — the shooter simply refuses (see robot.ts).
- * Deferrable (not yet modeled): G423 shutting down major gameplay (incl.
- * completely blocking the opponent's gate — needs "completely blocking" +
- * duration judgment) and displacing an opponent's pre-staged spike artifacts
- * (G402.B).
+ * DECODE's own engine (`updatePenalties`: G402, G408, G417/G418 at the gate, G422, G424–G427)
+ * lived here and was removed with DECODE on 2026-10-12. Both tests used to default their FIELD
+ * to DECODE's (the loading-zone carve-out, a 3-slot hopper, the 2.5 in artifact, the goal wedges
+ * and classifier channels as pin solids); BIOBUZZ always passed its own, so the geometry is a
+ * required argument now and nothing here knows any one field.
  */
 
 /**
@@ -94,336 +49,6 @@ import { hyp, rot } from '../math';
  */
 function robotInZone(r: RobotState, rect: Rect): boolean {
   return robotIntersectsRect(r, rect);
-}
-
-const ALLIANCES: Alliance[] = ['red', 'blue'];
-
-export function updatePenalties(
-  world: World,
-  dt: number,
-  commands: Map<number, RobotCommand>,
-): void {
-  const phase = world.match.phase;
-  const pen = world.penalties;
-  // fouls are only assessed while robots are competing under match rules. Drop the
-  // gate/ramp tracking on the way out: robots are frozen across the transition, so a
-  // ramp that keeps draining through it is nobody's foul, and a stale rampBallIds
-  // would otherwise bill the whole gap the instant play resumes.
-  /**
-   * FREE DRIVE COUNTS. `freeplay` is a live phase everywhere else in the sim — `robotsEnabled`
-   * says so, the human player restocks in it, the shooter fires in it — and penalties were the
-   * one subsystem that quietly excluded it. So the whole engine was OFF in the mode people
-   * actually practise in: measured on an identical six-clump herd, free drive drew 0 fouls
-   * where a match drew 13. That is why three rounds of "I'm still not getting the penalty" all
-   * came back negative no matter what the rule did.
-   *
-   * Free Drive is DRIVER PRACTICE, and practising without the fouls a match would give you is
-   * the opposite of practice. Phase-specific rules stay correctly inert here on their own
-   * terms: G402 tests `phase === 'auto'`, and `endgame` tests `phase === 'teleop'`, so neither
-   * fires in a mode that has no auto and no clock.
-   */
-  if (phase !== 'auto' && phase !== 'teleop' && phase !== 'freeplay') {
-    for (const a of ALLIANCES) {
-      pen.gateCulprit[a] = null;
-      pen.rampBallIds[a] = [];
-    }
-    /**
-     * ...and the same goes for G408's clocks, for the same reason. Robots are FROZEN across
-     * the eight-second transition, so nothing that happens in it is anybody's control: an
-     * artifact resting on a motionless bumper is exactly the case the rule excuses. Carrying
-     * the clocks through meant a violation that was live at the AUTO buzzer resumed at the
-     * TELEOP one with its grace already spent and its continuing tariff mid-interval —
-     * measured, a 0.52 s clock and four ball holds survived the whole gap untouched.
-     */
-    pen.possession = {};
-    pen.possessionBilled = {};
-    pen.possessionRebill = {};
-    pen.controlHeld = {};
-    pen.ballHold = {};
-    pen.ballAnchor = {};
-    pen.ballCarry = {};
-    return;
-  }
-  const byId = new Map(world.robots.map((r) => [r.id, r] as const));
-
-  /** EPISODE-debounced foul: fires once when `key`'s condition first holds, then
-   * stays quiet for as long as it keeps holding (`episodes[key]` is refreshed to
-   * `world.time` every active tick). It re-arms only after the condition has been
-   * CLEAR for PENALTY_CLEAR — so continuous contact is ONE foul, a 1-tick SAT
-   * flicker never re-fouls, and a real re-entry after the gap does. Idempotent
-   * within a tick (duplicate contact pair / two rules on one key award once). */
-  const fire = (
-    key: string,
-    offender: Alliance,
-    severity: 'minor' | 'major',
-    rule: string,
-  ): boolean => {
-    const last = pen.episodes[key];
-    let fired = false;
-    if (last === undefined || world.time - last > C.PENALTY_CLEAR) {
-      awardFoul(world, offender, severity, rule);
-      fired = true;
-    }
-    pen.episodes[key] = world.time;
-    return fired;
-  };
-
-  const endgame = phase === 'teleop' && world.match.phaseTimeLeft <= C.ENDGAME_START;
-
-  // ---- G402 AUTO interference: fully on the OPPONENT's side in AUTO --------
-  // A robot BELONGS on its own side; in this sim robots stage near their GOAL
-  // (startPose uses goalSide), so "own side" is goalSide(alliance) — blue -x,
-  // red +x. G402.A fires when the whole footprint has crossed to the opponent's
-  // side AND it contacts an opponent. (This uses goalSide, NOT driverSide: goals
-  // are cross-court, and the driverSide version was inverted — it fired when a
-  // robot sat on its OWN side and fouled the wrong alliance. G304.C ties the
-  // AUTO sides to the same columns each alliance starts in.)
-  if (phase === 'auto') {
-    for (const r of world.robots) {
-      const g = goalSide(r.alliance);
-      if (robotCorners(r).every((c) => g * c.x < 0) && touchingOpponent(world, r)) {
-        fire(`G402:${r.id}`, r.alliance, 'major', 'G402 auto interference');
-      }
-    }
-  }
-
-  // ---- contact-pair zone rules (gate / tunnel / loading / base) -----------
-  // Each protected zone is OWNED by one alliance. gate/loading/base sit on the
-  // owner's own side and a cross-alliance CONTACT while either robot occupies
-  // them fouls the NON-owner ("regardless of who initiates contact"). The
-  // secret-tunnel strip on a wall is owned by the OPPOSING drive team
-  // (tunnelStrip(a) belongs to other(a)), and — unlike the others — G425 fouls
-  // the INTRUDER, so it fires only when the intruder (the non-owner) is actually
-  // in the strip, not when the owner is merely defending inside its own tunnel.
-  //
-  // GATE↔TUNNEL overlap (G424.A): a robot's own gate zone and its opponent's
-  // secret tunnel share the classifier corner, so they can overlap. The two are
-  // MUTUALLY EXCLUSIVE — if the gate robot is ALSO in the opponent's tunnel the
-  // contact is a G425 (only), otherwise it is a G424 (only):
-  //   • X in own gate ∩ opponent tunnel, opponent in own tunnel  → G425 (on X)
-  //   • X in own gate, NOT opponent tunnel, opponent in own tunnel → G424 (on Y)
-  for (const { a, b } of world.rrContacts) {
-    const ra = byId.get(a);
-    const rb = byId.get(b);
-    if (!ra || !rb) continue;
-    if (ra.alliance === rb.alliance) continue; // same-alliance contact never fouls
-    const pairKey = `${Math.min(a, b)}-${Math.max(a, b)}`;
-
-    for (const O of ALLIANCES) {
-      const opp = other(O); // non-owner of O's own zones == the offender
-      const oBot = ra.alliance === O ? ra : rb; // the alliance-O robot of the pair
-      const oppBot = oBot === ra ? rb : ra; // its opponent (other(O))
-
-      // G424 GATE ZONE is off limits — protect the OWNER's access to their own
-      // gate. The rect is `gateZoneTape`, the 2.75x10 strip between the tape lines:
-      // `gateZone()` is the generous rect that decides whether a robot can WORK the
-      // gate, and a foul is not a feel knob. Exception G424.A: the owner's robot in
-      // its own gate zone AND in the opponent's secret tunnel (tunnelStrip(O) is
-      // other(O)'s tunnel) is not protected here — G425 governs instead, so skip the
-      // gate foul.
-      const oInGate = robotInZone(oBot, gateZoneTape(O));
-      const oppInGate = robotInZone(oppBot, gateZoneTape(O));
-      if (oInGate || oppInGate) {
-        const exception = oInGate && robotInZone(oBot, tunnelStrip(O));
-        if (!exception) fire(`G424:${pairKey}`, opp, 'minor', 'G424 contact in the gate zone');
-      }
-
-      // G426 LOADING ZONE protection — owner's own loading zone.
-      if (robotInZone(ra, loadZone(O)) || robotInZone(rb, loadZone(O))) {
-        fire(`G426:${pairKey}`, opp, 'minor', 'G426 contact in the loading zone');
-      }
-
-      // G427 BASE ZONE protection (endgame) — + credit the owner a full return.
-      if (endgame && (robotInZone(ra, baseZone(O)) || robotInZone(rb, baseZone(O)))) {
-        oBot.baseAwarded = true;
-        fire(`G427:${pairKey}`, opp, 'major', 'G427 contact in the base zone');
-      }
-
-      // G425 SECRET TUNNEL — tunnelStrip(O) sits under O's goal but is OWNED by
-      // other(O); the INTRUDER/offender is alliance O. Fires only when the
-      // intruder itself is in the strip (an owner defending its own tunnel is not
-      // a foul), which is also what makes G424/G425 mutually exclusive above.
-      if (robotInZone(oBot, tunnelStrip(O))) {
-        fire(`G425:${pairKey}`, O, 'minor', 'G425 contact in the secret tunnel');
-      }
-    }
-  }
-
-  // ---- G417 opponent gate + G418 artifacts off the opponent's ramp --------
-  updateGateFouls(world, commands, fire);
-
-  // ---- G408 over-possession / plowing (per robot, own second-accumulator) --
-  updatePossession(world, dt, commands, fire);
-
-  // ---- G422 pinning (ordered pairs, own second-accumulator) ---------------
-  updatePins(world, dt, commands);
-}
-
-/**
- * G408 — "No more than 3 at a time. A ROBOT may not simultaneously CONTROL more than 3
- * ARTIFACTS." Violation: MINOR FOUL **per ARTIFACT over the limit**.
- *
- * The per-artifact part is the manual's, and it matters: it is what makes shoving a wall of
- * nine artifacts down the field cost six times what carrying one extra does. This used to
- * award a single MINOR however far over you were, so a bulldozer paid the same as a robot
- * with one ball stuck to its bumper.
- *
- * ...and "YELLOW CARD if excessive", where the rule DEFINES excessive rather than leaving
- * it to taste:
- *   A. "simultaneous CONTROL of 5 or more ARTIFACTS", or
- *   B. "frequent (i.e., 3 or more separate [instances] in a MATCH), greater-than-MOMENTARY
- *      CONTROL of 4 or more ARTIFACTS" — MOMENTARY being "fewer than approximately 3
- *      seconds" per the glossary.
- * It also caps itself: "REPEATED excessive violations of this rule do not result in
- * additional YELLOW CARDS", so G408 cards a robot at most once per match. (A second card
- * from ANOTHER rule would escalate it to a red — that is `awardCard`'s job, not this one's.)
- *
- * `controlledArtifacts` decides the count; POSSESSION_GRACE is how much control has to
- * ACCUMULATE on the leaky clock below.
- */
-function updatePossession(
-  world: World,
-  dt: number,
-  commands: Map<number, RobotCommand>,
-  fire: FireFn,
-): void {
-  const pen = world.penalties;
-  /**
-   * SWEEP THE PER-(ROBOT,ARTIFACT) CLOCKS FIRST.
-   *
-   * `ballHold`/`ballAnchor` are keyed "robotId:ballId" and were only ever deleted along the
-   * NOT-TOUCHING path — so an artifact that left the ground state while in contact (the
-   * ordinary way one leaves: it gets intaken) kept its clock and its station for the rest of
-   * the match. Two consequences, and the second is the sharp one:
-   *   · the maps grow without bound inside `world.penalties`, which is plain JSON and rides
-   *     every 30 Hz snapshot and every stored replay;
-   *   · artifact ids are handed out as `max(id)+1` and `humanPlayer.ts` SPLICES balls out, so
-   *     ids are genuinely recycled. A stale key can therefore rebind to a DIFFERENT physical
-   *     artifact, which then arrives pre-latched and skips the confirm window entirely — the
-   *     one thing standing between herding and BULLDOZING.
-   * Iteration is over a snapshot of the keys, in insertion order, so it stays deterministic.
-   */
-  const live = new Set<string>();
-  for (const r of world.robots) {
-    for (const b of world.balls) if (b.state.kind === 'ground') live.add(`${r.id}:${b.id}`);
-  }
-  pen.ballCarry ??= {};
-  for (const key of Object.keys(pen.ballHold)) {
-    if (!live.has(key)) {
-      delete pen.ballHold[key];
-      delete pen.ballAnchor[key];
-      delete pen.ballCarry[key];
-    }
-  }
-  for (const key of Object.keys(pen.ballAnchor)) if (!live.has(key)) delete pen.ballAnchor[key];
-  for (const key of Object.keys(pen.ballCarry)) if (!live.has(key)) delete pen.ballCarry[key];
-
-  for (const r of world.robots) {
-    // `cmd.intake || r.autoIntake` is what actually RUNS the intake (robot.ts), and the
-    // acquire carve-out has to ask the same question. Reading the raw button alone meant the
-    // AUTO-INTAKE assist — a menu option, and forced on for an auto-path robot — silently
-    // turned the exemption off for everyone who used it: the assist made the rule HARSHER for
-    // its users than for a driver holding the button, which is the opposite of an assist.
-    const intaking = (commands.get(r.id)?.intake ?? false) || r.autoIntake;
-    const controlled = controlledArtifacts(world, r, dt, intaking);
-    const over = controlled - C.POSSESSION_LIMIT;
-
-    // CLAUSE B's clock: one continuous stretch of controlling 4+. The INSTANCE is counted
-    // on the tick the stretch crosses MOMENTARY, so a single long hold counts once however
-    // long it runs, and the count only grows by letting go and doing it again.
-    if (controlled >= C.CARD_CONTROL_FREQUENT) {
-      const prev = pen.controlHeld[r.id] ?? 0;
-      const now = prev + dt;
-      pen.controlHeld[r.id] = now;
-      if (prev < C.MOMENTARY_S && now >= C.MOMENTARY_S) {
-        pen.controlInstances[r.id] = (pen.controlInstances[r.id] ?? 0) + 1;
-      }
-    } else {
-      // ...and it DRAINS rather than snapping to zero, for the same reason the clock below
-      // does. A pile shuffling against a bumper dips under four for a tick or two constantly,
-      // and a hard reset let a single dropped frame wipe a nearly-complete instance.
-      pen.controlHeld[r.id] = Math.max(0, (pen.controlHeld[r.id] ?? 0) - dt * C.POSSESSION_LEAK);
-    }
-
-    // A LEAKY CLOCK, not a resetting one. It fills while over the limit and DRAINS at
-    // POSSESSION_LEAK while under, so a violation chopped into repeated FLICKS — bump the
-    // pile, back off, bump again — still climbs to the grace.
-    //
-    // With a resetting clock that technique was free AND better: measured in the sim, a
-    // flick-shuttle moved a six-artifact pile twice as far as a sustained shove (18" vs 9")
-    // for zero fouls, where the shove drew three and a card. A penalty the evasive version
-    // of the same act dodges is worse than no penalty — it does not deter the behaviour, it
-    // just selects for the technique.
-    let t = pen.possession[r.id] ?? 0;
-    if (over > 0) {
-      t += dt;
-    } else {
-      t = Math.max(0, t - dt * C.POSSESSION_LEAK);
-      if (t === 0) {
-        pen.possessionBilled[r.id] = 0; // fully drained — the next episode bills fresh
-        pen.possessionRebill[r.id] = 0;
-      }
-    }
-    pen.possession[r.id] = t;
-
-    // The foul only OPENS on a tick that is actually over the limit, so the first MINOR
-    // always corresponds to a real overage; the clock decides WHEN a violation stops being
-    // incidental, not what it is billed for.
-    if (over > 0 && t >= C.POSSESSION_GRACE) {
-      // ONE episode, but N fouls — `fire` owns the edge-debounce (a held violation is one
-      // episode, not a stream) and bills the first artifact over the limit.
-      if (fire(`G408:${r.id}`, r.alliance, 'minor', 'G408 over-possession')) {
-        pen.possessionBilled[r.id] = 1;
-      }
-      // ...and the rest of the tariff TOPS UP as the pile grows. Billing only at the
-      // episode edge meant scooping up more while already over was free: a robot that
-      // opened the violation at 4 could grow to 9 inside the same hold and still pay for
-      // one. It is a MINOR "per SCORING ELEMENT over the limit" — all of them.
-      const billed = pen.possessionBilled[r.id] ?? 0;
-      for (let i = billed; i < over; i++) {
-        awardFoul(world, r.alliance, 'minor', 'G408 over-possession');
-      }
-      if (over > billed) pen.possessionBilled[r.id] = over;
-
-      /**
-       * ...AND A VIOLATION THAT KEEPS GOING KEEPS COSTING.
-       *
-       * Billing once per episode meant the whole tariff for hoarding six artifacts was three
-       * MINORs, after which holding them for the rest of the match was free. G408 fouls the
-       * STATE of controlling too many, and a state that persists is a violation that
-       * persists — so the tariff is charged again every POSSESSION_REBILL_S the robot is
-       * still over the limit. The clocks in front of this (per-artifact confirm, then the
-       * grace) are what keep a legitimate pass through a clump from ever reaching a second
-       * billing.
-       */
-      // The cursor is ANCHORED at the opening tick and CLAMPED to the clock. It used to start
-      // at 0 and be guarded by `since > 0`, which quietly ate the first interval: the first
-      // continuing charge landed at TWICE POSSESSION_REBILL_S (measured, 6.02 s on a 3 s
-      // interval), and after a partial drain the cursor could sit AHEAD of the clock and bank
-      // a free window of hoarding until the clock climbed back past it.
-      let since = pen.possessionRebill[r.id] ?? 0;
-      if (since === 0 || since > t) {
-        since = t;
-        pen.possessionRebill[r.id] = t;
-      }
-      if (t - since >= C.POSSESSION_REBILL_S) {
-        pen.possessionRebill[r.id] = t;
-        {
-          for (let i = 0; i < over; i++) {
-            awardFoul(world, r.alliance, 'minor', 'G408 over-possession (continuing)');
-          }
-        }
-      }
-
-      // The CARD is likewise re-checked every tick the violation is live, not once at the
-      // edge — clause A is about what is controlled AT THE MOMENT, and a pile that grows
-      // past 5 after the episode opened is exactly the case it exists for.
-      const excessive =
-        controlled >= C.CARD_CONTROL_SIMULTANEOUS ||
-        (pen.controlInstances[r.id] ?? 0) >= C.CARD_CONTROL_INSTANCES;
-      if (excessive && !pen.carded[r.id]) awardCard(world, r, 'G408 excessive control');
-    }
-  }
 }
 
 /**
@@ -566,23 +191,23 @@ export interface ControlGeometry {
    * place; read against DECODE's, a BIOBUZZ robot collecting its own NECTAR is billed for
    * herding and a robot in DECODE's corner is excused for nothing.
    */
-  carveOut?(a: Alliance): Rect | null;
+  carveOut(a: Alliance): Rect | null;
   /**
-   * How many elements this robot's hopper holds, when that is not `C.HOPPER_CAPACITY`.
+   * How many elements this robot's hopper holds.
    *
    * It is the ceiling on the intake-MOUTH carve-out — an artifact on its way into a slot is
    * already charged against the limit by the slot waiting for it, so a robot with no room is
    * acquiring nothing and gets no exemption. Read against DECODE's 3, a BIOBUZZ robot carrying
    * its legal 4 reads as full and loses the carve-out entirely.
    */
-  hopperCap?(r: RobotState): number;
+  hopperCap(r: RobotState): number;
   /**
    * The artifact radius to assume for an artifact that does not carry its own (`Artifact.r`).
    * It sets how close counts as TOUCHING and how far the transitive chain reaches, so
    * DECODE's 2.5 in applied to a 2.8 in BIOBUZZ POLLEN makes both too generous by more than
    * an inch — the chain by twice that.
    */
-  radius?: number;
+  radius: number;
   /**
    * WHICH ARTIFACTS ARE LOOSE ON THE FLOOR, i.e. the set this rule is allowed to count at all.
    *
@@ -597,7 +222,7 @@ export interface ControlGeometry {
    * so the rule could neither count it nor keep a clock on it. A game whose tag flickers
    * supplies its own answer here; the ones whose tag does not, say nothing and are unchanged.
    */
-  loose?(b: Artifact): boolean;
+  loose(b: Artifact): boolean;
 }
 
 export function controlledArtifacts(
@@ -605,11 +230,11 @@ export function controlledArtifacts(
   r: RobotState,
   dt: number,
   intaking: boolean,
-  geom?: ControlGeometry,
+  geom: ControlGeometry,
 ): number {
   const pen = world.penalties;
-  const home = geom?.carveOut ? geom.carveOut(r.alliance) : loadZone(r.alliance);
-  const R0 = geom?.radius ?? C.BALL_RADIUS;
+  const home = geom.carveOut(r.alliance);
+  const R0 = geom.radius;
   /**
    * This artifact's own radius. TOUCHING the footprint is one of these plus the margin, and
    * the transitive chain is TWO of them — which is why both tests read it per artifact rather
@@ -618,7 +243,7 @@ export function controlledArtifacts(
    * collapse to exactly the constants they replace.
    */
   const rad = (b: Artifact): number => b.r ?? R0;
-  const isLoose = geom?.loose ?? ((b: Artifact): boolean => b.state.kind === 'ground');
+  const isLoose = geom.loose;
   const loose = world.balls.filter(isLoose);
 
   const held = new Set<number>();
@@ -794,7 +419,7 @@ export function controlledArtifacts(
    * An intake takes one per cycle; excusing a hopper's worth at once modelled nothing.
    */
   const perCycle = C.INTAKE_PRESETS[r.spec.intake].mouth.dual ? 2 : 1;
-  const cap = geom?.hopperCap ? geom.hopperCap(r) : C.HOPPER_CAPACITY;
+  const cap = geom.hopperCap(r);
   let room = Math.min(perCycle, Math.max(0, cap - r.hopper.length));
   if (room > 0 && intaking) {
     const mouth = [...held]
@@ -912,85 +537,6 @@ export function controlledArtifacts(
   return r.hopper.length + controlled;
 }
 
-type FireFn = (key: string, offender: Alliance, severity: 'minor' | 'major', rule: string) => boolean;
-
-/** G417 (TOUCHING an OPPOSING GATE — MAJOR) + G418.B (each classified ARTIFACT that
- * leaves an opponent's RAMP because their gate was opened — MAJOR per artifact).
- *
- * G417 fires when an opponent is TOUCHING the gate arm (`gateArmRect`): merely
- * touching the opponent's gate is a foul even if the robot never opens it (you don't
- * have to succeed in opening it — contact with the arm is the violation).
- *
- * G418.B is billed on the DRAIN, not on the touch: `rampBallIds` remembers which
- * classified artifacts were resting on each ramp last tick, and every one that has
- * LEFT this tick costs the responsible opponent a MAJOR. So a TAP that never lifts
- * the arm past the pass fraction drains nothing and costs G417 alone (billing the
- * whole standing column on contact was the old bug), while a real opening is billed
- * artifact-by-artifact as the column empties — including after the offender drives
- * away, since the flow finishes the drain on its own.
- *
- * Responsibility (`gateCulprit`) is pinned to an opponent who actually WORKS the arm
- * (`pushingGate` — the physical push that lifts it), not to anyone merely brushing
- * it: an owner draining their own ramp while an opponent leans on the lever is the
- * owner's own doing, and stays unbilled. It clears once the gate shuts.
- *
- * Touching your OWN gate is legal (that is how an alliance clears its own overflow).
- * Matches the manual's Example 3: work the opponent gate => 1 G417 + one G418 per
- * artifact that leaves. */
-function updateGateFouls(
-  world: World,
-  commands: Map<number, RobotCommand>,
-  fire: FireFn,
-): void {
-  const pen = world.penalties;
-  for (const a of ALLIANCES) {
-    const goal = world.goals[a];
-
-    // opponents TOUCHING gate a's arm (contact with the physical gate, not merely
-    // loitering in the gate zone). Touching your own gate is legal, so only the
-    // owner's opponents are flagged — and no push/opening is required.
-    let opener: Alliance | null = null; // an opponent actually working it OPEN
-    for (const r of world.robots) {
-      if (r.alliance === a) continue;
-      if (!robotIntersectsRect(r, gateArmRect(a))) continue;
-      fire(`G417:${a}:${r.id}`, r.alliance, 'major', 'G417 opponent gate');
-      if (pushingGate(r, commands.get(r.id) ?? ZERO_CMD, a)) opener = r.alliance;
-    }
-
-    // update who is responsible for gate a being open: an opponent who pushes it
-    // takes the blame and keeps it through the drain; it clears once the gate is
-    // shut (opened legally by the owner, or never opened at all => stays null)
-    if (opener) pen.gateCulprit[a] = opener;
-    else if (!goal.gateOpen) pen.gateCulprit[a] = null;
-
-    // G418.B — bill the artifacts that actually LEFT the ramp since last tick
-    const onRamp: number[] = [];
-    for (const b of world.balls) {
-      const st = b.state;
-      if (st.kind === 'rail' && st.goal === a && !st.overflow && !st.pending) onRamp.push(b.id);
-    }
-    const culprit = pen.gateCulprit[a];
-    if (culprit) {
-      const still = new Set(onRamp);
-      for (const id of pen.rampBallIds[a]) {
-        if (!still.has(id)) awardFoul(world, culprit, 'major', 'G418 artifact off opponent ramp');
-      }
-    }
-    pen.rampBallIds[a] = onRamp;
-  }
-}
-
-/** does robot r share a recorded contact with any opposing robot this tick? */
-function touchingOpponent(world: World, r: RobotState): boolean {
-  for (const { a, b } of world.rrContacts) {
-    if (a !== r.id && b !== r.id) continue;
-    const otherId = a === r.id ? b : a;
-    const o = world.robots.find((x) => x.id === otherId);
-    if (o && o.alliance !== r.alliance) return true;
-  }
-  return false;
-}
-
 /** the ESCAPE direction for a pin: the unit vector from the pinner to the pinned
  * robot, i.e. the way the victim would have to go to get out. Null when the two are
  * coincident, where "away" is undefined. */
@@ -1033,7 +579,7 @@ export type PinSolid = (p: Vec2) => boolean;
  * and it reports open floor wherever that game's own structures actually stand. On BIOBUZZ
  * that is the four FLOWER feet and the two HIVE frame bars, i.e. most of where a pin happens.
  */
-function pinnedAgainstWall(pinner: RobotState, pinned: RobotState, solid?: PinSolid): boolean {
+function pinnedAgainstWall(pinner: RobotState, pinned: RobotState, solid: PinSolid): boolean {
   const e = escapeDir(pinner, pinned);
   if (!e) return false;
   let reach = 0;
@@ -1044,15 +590,7 @@ function pinnedAgainstWall(pinner: RobotState, pinned: RobotState, solid?: PinSo
     x: pinned.pos.x + e.x * (reach + C.PIN_WALL_SLOP),
     y: pinned.pos.y + e.y * (reach + C.PIN_WALL_SLOP),
   };
-  if (solid) return solid(p);
-  if (Math.abs(p.x) >= C.FIELD_HALF || Math.abs(p.y) >= C.FIELD_HALF) return true; // perimeter
-  for (const a of ['red', 'blue'] as Alliance[]) {
-    // goalLineValue > 0 is BEHIND the goal face — inside the wedge. The probe point
-    // is inside the field by the test above, so that alone places it in the footprint.
-    if (goalLineValue(p, a) > 0) return true;
-    if (inRect(p, classifierRect(a))) return true;
-  }
-  return false;
+  return solid(p);
 }
 
 /**
@@ -1092,7 +630,7 @@ export function isPinning(
   contact: boolean,
   cmd: RobotCommand | undefined,
   pinnerCmd: RobotCommand | undefined,
-  solid?: PinSolid,
+  solid: PinSolid,
 ): boolean {
   if (!contact) return false;
   const e = escapeDir(pinner, pinned);
@@ -1174,115 +712,4 @@ export function isPinning(
    */
   if (!pinnedAgainstWall(pinner, pinned, solid)) return true;
   return e.x * want.x + e.y * want.y < C.PIN_INTO_TRAP_COS;
-}
-
-function updatePins(world: World, dt: number, commands: Map<number, RobotCommand>): void {
-  const pen = world.penalties;
-  // contacts this tick, as an undirected id-pair set
-  const contacts = new Set(world.rrContacts.map(({ a, b }) => `${a}-${b}`));
-  const inContact = (i: number, j: number): boolean =>
-    contacts.has(`${Math.min(i, j)}-${Math.max(i, j)}`);
-
-  // every ordered opposing pair's verdict FIRST, because criterion C is about both of them
-  const pinning = new Map<string, boolean>();
-  for (const pinner of world.robots) {
-    for (const pinned of world.robots) {
-      if (pinner.id === pinned.id || pinner.alliance === pinned.alliance) continue;
-      pinning.set(
-        `${pinner.id}-${pinned.id}`,
-        isPinning(
-          pinner,
-          pinned,
-          inContact(pinner.id, pinned.id),
-          commands.get(pinned.id),
-          commands.get(pinner.id),
-        ),
-      );
-    }
-  }
-
-  for (const pinner of world.robots) {
-    for (const pinned of world.robots) {
-      if (pinner.id === pinned.id || pinner.alliance === pinned.alliance) continue;
-      const key = `${pinner.id}-${pinned.id}`;
-      const held = pinning.get(key) === true;
-      /** criterion C: "the PINNING ROBOT gets PINNED" — a mutual hold is nobody's foul */
-      const mutual = held && pinning.get(`${pinned.id}-${pinner.id}`) === true;
-
-      let st = pen.pins[key];
-      if (!st) {
-        if (!held || mutual) continue;
-        st = {
-          seconds: 0,
-          ox: pinned.pos.x,
-          oy: pinned.pos.y,
-          pox: pinner.pos.x,
-          poy: pinner.pos.y,
-          px: pinned.pos.x,
-          py: pinned.pos.y,
-          billed: 0,
-          sepFor: 0,
-          awayFor: 0,
-        };
-        pen.pins[key] = st;
-      }
-
-      if (mutual) {
-        delete pen.pins[key]; // C
-        continue;
-      }
-
-      /**
-       * A and B, which are the ONLY things that end a pin.
-       *
-       * Both are distances held for MORE THAN THREE SECONDS, and both PAUSE the count in the
-       * meantime rather than resetting it — the rule says so twice, and it is the whole
-       * difference between a pin you can shrug off and one you cannot. The sim used to end a pin
-       * after 0.6 s of the hold merely LAPSING, for any reason at all, which let a pinner wipe a
-       * two-and-a-half-second count by easing off for seven tenths of a second.
-       */
-      const apart = hyp(pinned.pos.x - pinner.pos.x, pinned.pos.y - pinner.pos.y) >= C.PIN_ESCAPE_DIST;
-      const movedPinned = hyp(pinned.pos.x - st.ox, pinned.pos.y - st.oy) >= C.PIN_ESCAPE_DIST;
-      const movedPinner = hyp(pinner.pos.x - st.pox, pinner.pos.y - st.poy) >= C.PIN_ESCAPE_DIST;
-      st.sepFor = apart ? st.sepFor + dt : 0;
-      // "...until the PIN ends or until BOTH ROBOTS move back within 2ft"
-      st.awayFor = movedPinned || movedPinner ? st.awayFor + dt : 0;
-      if (st.sepFor > C.PIN_END_S || st.awayFor > C.PIN_END_S) {
-        delete pen.pins[key];
-        continue;
-      }
-
-      // last tick's pose, captured BEFORE it is overwritten — the escape measurement below
-      // needs the delta, and the pose must advance on paused ticks too or the first tick after
-      // a pause reads a whole pause's worth of travel as one tick of escape.
-      const prevX = st.px;
-      const prevY = st.py;
-      st.px = pinned.pos.x;
-      st.py = pinned.pos.y;
-      if (apart || movedPinned || movedPinner || !held) continue; // paused, not ended
-
-      /**
-       * "...preventing the movement..." measured rather than assumed: progress AWAY from the
-       * pinner, taken from the actual post-solver position delta, so it holds whether or not a
-       * blocked robot's velocity was zeroed. Along the ESCAPE direction rather than as raw speed
-       * — a victim bulldozed sideways along a wall is moving quickly and is no less pinned.
-       * PIN_STUCK_SPEED is the sim's own number; the rule leaves this to a referee's eye.
-       */
-      const e = escapeDir(pinner, pinned);
-      const escapeSpeed = e ? ((pinned.pos.x - prevX) * e.x + (pinned.pos.y - prevY) * e.y) / dt : 0;
-      if (escapeSpeed >= C.PIN_STUCK_SPEED) continue; // getting away under its own power
-
-      st.seconds += dt;
-      /**
-       * "Violation: MINOR FOUL and an additional MINOR FOUL for every 3 seconds in which the
-       * situation is not corrected." Nine seconds of pinning is three MINORs. It is never a
-       * MAJOR — the sim used to escalate a repeat pin to one, which the rule does not describe.
-       */
-      while (st.seconds >= C.PIN_SECONDS * (st.billed + 1)) {
-        st.billed += 1;
-        awardFoul(world, pinner.alliance, 'minor', 'G422 pinning');
-        pen.pinFouls[pinner.id] = (pen.pinFouls[pinner.id] ?? 0) + 1;
-      }
-    }
-  }
 }

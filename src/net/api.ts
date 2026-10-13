@@ -1,4 +1,5 @@
 import type { Replay } from '../sim/replay';
+import { DEFAULT_GAME } from '../games/types';
 import type { AwardRow } from '../awards';
 import type { EquippedBadge } from '../badges';
 import type { RewardGrant } from '../rewards';
@@ -17,13 +18,11 @@ import { getViewPref } from '../games/biobuzz/graphics/store';
 import { setPracticeUploadBlocked } from './practiceRuns';
 
 /**
- * Boards + periods are per-game. DECODE is the server's default for a MISSING
- * `game`, so it is the one id we leave OUT of the URL — every DECODE request
- * stays byte-identical to what it was before there was more than one game, and
- * every other game names itself. `needsGameParam` is the shared predicate so the
- * four query builders below cannot disagree about which ids are implicit.
+ * Boards + periods are per-game. DSIM's server reads a MISSING `game` as DECODE, which upstream
+ * left out of the URL; this fork has no DECODE (2026-10-12), so every game it has names itself.
+ * `needsGameParam` is the shared predicate so the query builders below cannot disagree.
  */
-const needsGameParam = (game?: GameId): boolean => game !== undefined && game !== 'decode';
+const needsGameParam = (game?: GameId): boolean => game !== undefined;
 const gameParam = (game?: GameId): string => (needsGameParam(game) ? `&game=${game}` : '');
 
 /**
@@ -791,7 +790,7 @@ export async function uploadPracticeRun(
      * An older server ignores the extra key entirely, which is what makes this safe to send
      * unconditionally — one Fly app serves every client version.
      */
-    const res = await fetchAuthed(token, `${base}/api/practice?game=${game ?? 'decode'}`, {
+    const res = await fetchAuthed(token, `${base}/api/practice?game=${game ?? DEFAULT_GAME}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ replay, score, view: getViewPref() }),
@@ -818,7 +817,7 @@ export async function fetchPracticeRuns(game?: GameId): Promise<PracticeRun[] | 
   const token = await getAuthToken();
   if (!base || !token) return null;
   try {
-    const res = await fetchAuthed(token, `${base}/api/practice?game=${game ?? 'decode'}`, {
+    const res = await fetchAuthed(token, `${base}/api/practice?game=${game ?? DEFAULT_GAME}`, {
       cache: 'no-store',
     });
     if (!res.ok) return null;
@@ -884,7 +883,7 @@ export async function uploadLanRun(
   const token = await getAuthToken();
   if (!base || !token) return null;
   try {
-    const res = await fetchAuthed(token, `${base}/api/lan?game=${game ?? 'decode'}`, {
+    const res = await fetchAuthed(token, `${base}/api/lan?game=${game ?? DEFAULT_GAME}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ matchId, replay, score, participants }),
@@ -907,7 +906,7 @@ export async function fetchLanRuns(game?: GameId): Promise<LanRun[] | null> {
   const token = await getAuthToken();
   if (!base || !token) return null;
   try {
-    const res = await fetchAuthed(token, `${base}/api/lan?game=${game ?? 'decode'}`, {
+    const res = await fetchAuthed(token, `${base}/api/lan?game=${game ?? DEFAULT_GAME}`, {
       cache: 'no-store',
     });
     if (!res.ok) return null;

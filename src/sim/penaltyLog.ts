@@ -67,14 +67,6 @@ export const foulEventText = (
   rule: string,
 ): string => `${severity === 'major' ? 'MAJOR' : 'MINOR'} FOUL - ${SIDE(victim)} +${points} (${rule})`;
 
-/** `YELLOW CARD - RED #4239 (G408 excessive control)` */
-export const cardEventText = (
-  colour: CardColor,
-  alliance: Alliance,
-  who: string,
-  rule: string,
-): string => `${colour.toUpperCase()} CARD - ${SIDE(alliance)} ${who} (${rule})`;
-
 /** `WARNING - RED (G407 …)` */
 export const warningEventText = (alliance: Alliance, rule: string): string =>
   `WARNING - ${SIDE(alliance)} (${rule})`;

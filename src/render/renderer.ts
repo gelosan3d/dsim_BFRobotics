@@ -1,7 +1,6 @@
-import type { Artifact, RobotCommand, World, PathPoint, RobotState } from '../types';
+import type { Artifact, RobotCommand, World, RobotState } from '../types';
 import { COLORS } from '../config';
 import { Camera } from './camera';
-import { drawRobot } from './drawRobot';
 import { gameOf } from '../games';
 import { robotsEnabled } from '../sim/match';
 import type { GameModule, GameScene } from '../games/module';
@@ -163,11 +162,6 @@ export class Renderer {
       }
 
       for (const r of world.robots) {
-        // Draw auto paths if active for this robot
-        if (r.autoPathActive && r.autoPath) {
-          this.drawAutoPath(ctx, r);
-        }
-
         // A DISABLED robot's intake is not running (pre-match, the auto→teleop transition, after the
         // buzzer): the sim zeroes its command and refuses every capture, so a held button or
         // auto-intake must not draw it live either.
@@ -176,7 +170,7 @@ export class Renderer {
           ((r.id === localRobotId && (lastCommand?.intake ?? false)) || (r.autoIntake && r.hopper.length < 3));
         // NO_HELD is shared and never written to — every `drawRobot` treats `held` as read-only.
         const held = heldBy.get(r.id) ?? NO_HELD;
-        (mod.drawRobot ?? drawRobot)(ctx, r, intakeOn, held, screenUp, world);
+        mod.drawRobot(ctx, r, intakeOn, held, screenUp, world);
       }
       mod.drawBalls(ctx, world, screenUp, localRobotId);
     }
@@ -274,12 +268,6 @@ export class Renderer {
       ctx.setTransform(this.camera.dpr, 0, 0, this.camera.dpr, 0, 0);
     }
 
-    // AUTO PATHS first, so a label is never drawn under one.
-    for (const r of world.robots) {
-      if (!r.autoPathActive || !r.autoPath) continue;
-      this.drawAutoPathProjected(ctx, r, scene);
-    }
-
     if (world.robots.length < 2) return;
     ctx.font = '600 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -301,169 +289,4 @@ export class Renderer {
       ctx.fillText(label, out.x, out.y - LABEL_SCREEN_LIFT);
     }
   }
-
-  /**
-   * One robot's auto path, projected. Bezier segments are FLATTENED to short line segments and
-   * each sample projected on its own, for the reason above: `quadraticCurveTo` in screen space
-   * would draw the curve through the wrong interior points, because a projection does not
-   * preserve the control polygon.
-   */
-  private drawAutoPathProjected(ctx: CanvasRenderingContext2D, robot: RobotState, scene: GameScene): void {
-    const path = robot.autoPath!;
-    const out = this.projOut;
-    const alliance = robot.alliance;
-    ctx.save();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = alliance === 'red' ? 'rgba(200, 50, 50, 0.75)' : 'rgba(50, 50, 200, 0.75)';
-    ctx.beginPath();
-    let started = false;
-    const step = (x: number, y: number): void => {
-      scene.project!(x, y, 0.5, out);
-      if (!out.visible) {
-        started = false; // a path that leaves the frame resumes rather than drawing a chord
-        return;
-      }
-      if (started) ctx.lineTo(out.x, out.y);
-      else ctx.moveTo(out.x, out.y);
-      started = true;
-    };
-    /** 12 samples a segment — a smooth curve at any zoom this camera reaches, and 12 projections
-     * is nothing next to a frame of scene geometry. */
-    const SEG = 12;
-    let cur: PathPoint = path.startPoint;
-    step(cur.x, cur.y);
-    for (const line of path.lines) {
-      const cps = line.controlPoints ?? [];
-      for (let i = 1; i <= SEG; i++) {
-        const t = i / SEG;
-        const u = 1 - t;
-        let x: number;
-        let y: number;
-        if (cps.length === 1) {
-          x = u * u * cur.x + 2 * u * t * cps[0].x + t * t * line.endPoint.x;
-          y = u * u * cur.y + 2 * u * t * cps[0].y + t * t * line.endPoint.y;
-        } else if (cps.length >= 2) {
-          x = u * u * u * cur.x + 3 * u * u * t * cps[0].x + 3 * u * t * t * cps[1].x + t * t * t * line.endPoint.x;
-          y = u * u * u * cur.y + 3 * u * u * t * cps[0].y + 3 * u * t * t * cps[1].y + t * t * t * line.endPoint.y;
-        } else {
-          x = cur.x + (line.endPoint.x - cur.x) * t;
-          y = cur.y + (line.endPoint.y - cur.y) * t;
-        }
-        step(x, y);
-      }
-      cur = line.endPoint;
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  private drawAutoPath(ctx: CanvasRenderingContext2D, robot: RobotState): void {
-    const autoPath = robot.autoPath!; // We already checked for existence
-    const alliance = robot.alliance;
-
-    ctx.save();
-    ctx.lineWidth = 0.5;
-    ctx.strokeStyle = alliance === 'red' ? 'rgba(200, 50, 50, 0.7)' : 'rgba(50, 50, 200, 0.7)'; // Desaturated alliance color
-    ctx.fillStyle = alliance === 'red' ? 'rgba(200, 50, 50, 0.5)' : 'rgba(50, 50, 200, 0.5)'; // Desaturated alliance color
-
-    // Draw start point
-    ctx.beginPath();
-    ctx.arc(autoPath.startPoint.x, autoPath.startPoint.y, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Draw path lines
-    let currentPoint: PathPoint = autoPath.startPoint;
-    for (const line of autoPath.lines) {
-      ctx.beginPath();
-      ctx.moveTo(currentPoint.x, currentPoint.y);
-
-      if (line.controlPoints && line.controlPoints.length > 0) {
-        if (line.controlPoints.length === 1) {
-          // Quadratic Bezier
-          ctx.quadraticCurveTo(
-            line.controlPoints[0].x,
-            line.controlPoints[0].y,
-            line.endPoint.x,
-            line.endPoint.y,
-          );
-        } else if (line.controlPoints.length === 2) {
-          // Cubic Bezier
-          ctx.bezierCurveTo(
-            line.controlPoints[0].x,
-            line.controlPoints[0].y,
-            line.controlPoints[1].x,
-            line.controlPoints[1].y,
-            line.endPoint.x,
-            line.endPoint.y,
-          );
-        }
-      } else {
-        // Linear
-        ctx.lineTo(line.endPoint.x, line.endPoint.y);
-      }
-      ctx.stroke();
-
-      // Draw control points
-      if (line.controlPoints) {
-        ctx.fillStyle = 'rgba(180, 180, 180, 0.7)'; // Light grey for control points
-        for (const cp of line.controlPoints) {
-          ctx.beginPath();
-          ctx.arc(cp.x, cp.y, 1, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Draw end point of segment
-      ctx.beginPath();
-      ctx.arc(line.endPoint.x, line.endPoint.y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      currentPoint = line.endPoint;
-    }
-    ctx.restore();
-  }
-
-  // private drawRobotPathState(ctx: CanvasRenderingContext2D, robot: RobotState): void {
-  //   ctx.save();
-  //   ctx.lineWidth = 1;
-  //   ctx.strokeStyle = 'lime'; // Green for target visuals
-  //   ctx.fillStyle = 'lime';
-  //
-  //   // // Draw target point
-  //   // if (robot.pathTargetPoint) {
-  //   //   ctx.beginPath();
-  //   //   ctx.arc(robot.pathTargetPoint.x, robot.pathTargetPoint.y, 3, 0, Math.PI * 2);
-  //   //   ctx.fill();
-  //   //   ctx.stroke();
-  //   //
-  //   //   // Draw line from robot to target point
-  //   //   ctx.beginPath();
-  //   //   ctx.moveTo(robot.pos.x, robot.pos.y);
-  //   //   ctx.lineTo(robot.pathTargetPoint.x, robot.pathTargetPoint.y);
-  //   //   ctx.stroke();
-  //   // }
-  //
-  //   // // Draw target heading
-  //   // if (robot.pathTargetHeading !== null) {
-  //   //   const arrowLength = 10;
-  //   //   const arrowX = robot.pos.x + dcos(robot.pathTargetHeading) * arrowLength;
-  //   //   const arrowY = robot.pos.y + dsin(robot.pathTargetHeading) * arrowLength;
-  //   //
-  //   //   ctx.beginPath();
-  //   //   ctx.moveTo(robot.pos.x, robot.pos.y);
-  //   //   ctx.lineTo(arrowX, arrowY);
-  //   //   ctx.stroke();
-  //   //
-  //   //   // Draw arrow head
-  //   //   ctx.beginPath();
-  //   //   ctx.moveTo(arrowX, arrowY);
-  //   //   ctx.lineTo(arrowX - dcos(robot.pathTargetHeading - Math.PI / 6) * 3, arrowY - dsin(robot.pathTargetHeading - Math.PI / 6) * 3);
-  //   //   ctx.moveTo(arrowX, arrowY);
-  //   //   ctx.lineTo(arrowX - dcos(robot.pathTargetHeading + Math.PI / 6) * 3, arrowY - dsin(robot.pathTargetHeading + Math.PI / 6) * 3);
-  //   //   ctx.stroke();
-  //   // }
-  //   ctx.restore();
-  // }
 }

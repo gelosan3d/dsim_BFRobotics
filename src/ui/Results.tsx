@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { HudSnapshot, EloResultRow } from '../game';
 import { appChannel, lanActive } from '../net/env';
-import { PTS_FOUL_MINOR, PTS_FOUL_MAJOR } from '../config';
 import { ResultsAd } from './AdSlot';
 import { ReportDialog } from './ReportDialog';
 import { ScoreReportDialog } from './ScoreReportDialog';
@@ -770,10 +769,6 @@ export function Results({
     );
   }
 
-  const cr = hud.game === 'chain';
-  const f = hud.fouls; // fouls COMMITTED by each alliance
-  const val = (get: (s: ScoreBreakdown) => number): [number, number] => [get(red), get(blue)];
-
   // Chain Reaction has its own scoring: Particle points (catalyst multiplier folded in) +
   // End Game (park 5 / ascend 100) + penalty points awarded from the OPPONENT's fouls.
   const crSections = (): VersusSection[] => {
@@ -802,45 +797,8 @@ export function Results({
       ) as (readonly [string, number, number])[],
     ]);
 
-  const sections: VersusSection[] = own
-    ? ownSections()
-    : cr
-    ? crSections()
-    : [
-        [
-          'AUTONOMOUS',
-          [
-            ['Leave', ...val((s) => s.leave)],
-            ['Classified', ...val((s) => s.autoClassified)],
-            ['Overflow', ...val((s) => s.autoOverflow)],
-            ['Pattern', ...val((s) => s.autoPattern)],
-          ],
-        ],
-        [
-          'DRIVER-CONTROLLED',
-          [
-            ['Classified', ...val((s) => s.teleClassified)],
-            ['Overflow', ...val((s) => s.teleOverflow)],
-            ['Pattern', ...val((s) => s.telePattern)],
-          ],
-        ],
-        [
-          'END OF MATCH',
-          [
-            ['Depot', ...val((s) => s.depot)],
-            ['Base return', ...val((s) => s.base)],
-          ],
-        ],
-        [
-          // penalty POINTS awarded to each alliance (from the OPPONENT's fouls) —
-          // shown as points, not counts, so the breakdown reconciles with each TOTAL
-          'PENALTIES',
-          [
-            ['Minor', f.blue.minor * PTS_FOUL_MINOR, f.red.minor * PTS_FOUL_MINOR],
-            ['Major', f.blue.major * PTS_FOUL_MAJOR, f.red.major * PTS_FOUL_MAJOR],
-          ],
-        ],
-      ];
+  // a game with no slot is Chain Reaction (the third arm here was DECODE's, removed 2026-10-12)
+  const sections: VersusSection[] = own ? ownSections() : crSections();
 
   // SOLO means NOBODY TO SHOW AN OPPOSING HALF FOR, which is not the same as "no session".
   // `canRematch` (`!session` at the call site) only says the run was local: a BIOBUZZ solo
@@ -1235,31 +1193,15 @@ function RecordResults({
         title,
         rows.map(([label, v]) => [label, v] as [string, number]),
       ])
-    : cr && hud.chain
+    : hud.chain
       ? [
           ['SCORING', [['Particles ×mult', hud.chain.particlePts]]],
           ['END GAME', [['Park / Ascend', mine.total - hud.chain.particlePts - hud.chain.foulPts]]],
         ]
-      : [
-          ['AUTONOMOUS', [
-            ['Leave', mine.leave],
-            ['Classified', mine.autoClassified],
-            ['Overflow', mine.autoOverflow],
-            ['Pattern', mine.autoPattern],
-          ]],
-          ['DRIVER-CONTROLLED', [
-            ['Classified', mine.teleClassified],
-            ['Overflow', mine.teleOverflow],
-            ['Pattern', mine.telePattern],
-          ]],
-          ['END OF MATCH', [
-            ['Depot', mine.depot],
-            ['Base return', mine.base],
-          ]],
-        ];
+      : [];
   // PENALTIES belongs to whoever owns the breakdown: a game with its own `resultsRows`
   // puts its penalty row in `sections`, and printing this one too would show the
-  // heading twice. `!own` is `!cr` for both games that existed - neither filled the slot.
+  // heading twice. `!own` is Chain Reaction, the one game without the slot.
   if (!own) {
     sections.push([
       'PENALTIES',

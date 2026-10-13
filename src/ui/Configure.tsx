@@ -7,6 +7,7 @@ import { ControlsSection } from './ControlsSection';
 import { AudioSection } from './AudioSection';
 import { NetworkSection } from './NetworkSection';
 import { moduleFor } from '../games';
+import { activeBindings, withActiveBindings } from '../settings';
 /**
  * LAZY, unlike its five siblings — and the reason is the bundle, not the screen.
  *
@@ -48,7 +49,7 @@ export function isConfigureSection(s: string | null): s is ConfigureSection {
 const LABELS: Record<ConfigureSection, { label: string; hint: string }> = {
   robot: { label: 'Robot', hint: 'Presets, build, intake' },
   controls: { label: 'Controls', hint: 'Keyboard & gamepad' },
-  match: { label: 'Match', hint: 'Alliance, start, autos' },
+  match: { label: 'Match', hint: 'Alliance and start position' },
   // route key stays 'audio' — /configure/audio is deep-linkable and already shipped
   audio: { label: 'Audio and visual', hint: 'Sounds, voice & theme' },
   graphics: { label: 'Graphics', hint: '3D view quality' },
@@ -122,8 +123,14 @@ export function Configure({
           {section === 'controls' && (
             <ControlsSection
               activeGame={settings.game}
-              bindings={settings.bindings}
-              onChange={(bindings) => onChange({ ...settings, bindings })}
+              bindings={activeBindings(settings)}
+              onChange={(bindings) => onChange(withActiveBindings(settings, bindings))}
+              scheme={settings.controlScheme}
+              onScheme={(controlScheme) => onChange({ ...settings, controlScheme })}
+              pads={settings.ftc25Pads}
+              onPads={(ftc25Pads) => onChange({ ...settings, ftc25Pads })}
+              powers={settings.ftc25Powers}
+              onPowers={(ftc25Powers) => onChange({ ...settings, ftc25Powers })}
               onEditTouchControls={onEditTouchControls}
               onTutorial={onTutorial}
             />

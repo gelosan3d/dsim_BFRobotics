@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ACTION_GAMES,
   BIND_SLOTS_MAX,
-  DEFAULT_BINDINGS,
+  FTC25_ONLY,
+  FTC25_PRESET_ACTIONS,
   PAD_ACTIONS,
   PAD_TRIGGERS,
   PAD_CHORD_GRACE_MAX_MS,
@@ -16,6 +17,7 @@ import {
   chordKey,
   cloneBindings,
   effectiveBindings,
+  fromPad2View,
   keyConflict,
   keyDesynced,
   keyLabel,
@@ -26,22 +28,27 @@ import {
   padButtonLabel,
   padConflict,
   padDesynced,
+  pad2View,
   removeKey,
   removeKeyInGame,
   removePadBind,
   removePadBindInGame,
   resetGame,
+  schemeDefaults,
   seasonUnbound,
   syncKeyInGame,
   syncPadInGame,
   type BindConflict,
   type ControlBindings,
+  type ControlScheme,
+  type Ftc25Pads,
   type KeyAction,
   type PadAction,
   type PadChord,
   type PadBindings,
 } from '../input/bindings';
 import { PadCapture } from '../input/padChords';
+import { FTC25_MIN_POWER } from '../config';
 import { padButtonDown } from '../input/gamepad';
 import { resumePadNav, suspendPadNav } from '../input/padNav';
 import type { GameId } from '../games/types';
@@ -89,6 +96,16 @@ interface Props {
   /** the season the player has picked. All games lists its own mechanisms, and the tutorial row
    *  runs its tutorial and names it (design review 12-20). */
   activeGame: GameId;
+  /** which controls `bindings` is the map of (`GameSettings.controlScheme`) */
+  scheme: ControlScheme;
+  /** switch scheme — the other map is kept whole, so nothing is lost either way */
+  onScheme: (s: ControlScheme) => void;
+  /** FTC25 controls on one controller or two (`GameSettings.ftc25Pads`) */
+  pads: Ftc25Pads;
+  onPads: (p: Ftc25Pads) => void;
+  /** the four FTC25 shooter presets, in percent (`GameSettings.ftc25Powers`) */
+  powers: [number, number, number, number];
+  onPowers: (p: [number, number, number, number]) => void;
 }
 
 /**
@@ -193,7 +210,34 @@ function PadSlider({
   );
 }
 
-export function ControlsSection({ bindings, onChange, onEditTouchControls, onTutorial, activeGame }: Props) {
+/** the editor proper, run against ONE map: the scheme's, or gamepad 2's view of it (`pad2View`) */
+interface EditorProps extends Omit<Props, 'onScheme' | 'onPads' | 'onPowers'> {
+  /** the scheme's own defaults (`schemeDefaults`) — what a season Reset puts back */
+  defaults: ControlBindings;
+  /** editing GAMEPAD 2: no season scopes (it has no overrides), and none of the pad's settings,
+   *  which are gamepad 1's for both pads */
+  secondPad: boolean;
+  /** Reset to defaults: the WHOLE scheme map, whichever pad is on screen */
+  onReset: () => void;
+}
+
+const FTC25_SET: ReadonlySet<KeyAction> = new Set(FTC25_ONLY);
+const NO_ACTIONS: ReadonlySet<KeyAction> = new Set();
+
+function BindEditor({
+  bindings,
+  onChange,
+  onEditTouchControls,
+  onTutorial,
+  activeGame,
+  scheme,
+  defaults,
+  secondPad,
+  onReset,
+}: EditorProps) {
+  /** the FTC25 controls' own rows are not on the DSim screen: unbound there, and the power
+   *  presets would do nothing (`FTC25_ONLY`) */
+  const hidden = scheme === 'dsim' ? FTC25_SET : NO_ACTIONS;
   const [scope, setScope] = useState<Scope>('all');
   const coarse = useCoarsePointer();
   const [capture, setCapture] = useState<Capture | null>(null);
@@ -676,7 +720,13 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
 
   /** a bind panel: the keyboard and the gamepad side by side, one column each (stacked on a
    *  phone, where `.ds-binds` drops to one track) */
-  const bindPanel = (p: BindPanel) => {
+  const bindPanel = (whole: BindPanel) => {
+    const p: BindPanel = {
+      ...whole,
+      keys: whole.keys.filter((a) => !hidden.has(a)),
+      pads: whole.pads.filter((a) => !hidden.has(a)),
+    };
+    if (p.keys.length === 0 && p.pads.length === 0) return null;
     const msg = live?.panel === p.id ? live.text : null;
     return (
     <section className="ds-panel" key={`${p.id}-${game ?? 'all'}`}>
@@ -706,11 +756,12 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
           {/* the 3D view card is keyboard-only: a camera key has no pad action (`VIEW_ACTIONS`) */}
           {p.id !== 'view' && (
             <div className="ds-bind-col">
-              <h3>Gamepad</h3>
+              <h3>{secondPad ? 'Gamepad 2' : 'Gamepad'}</h3>
               {/* HOW A PAD DRIVES, at the head of its column, level with the drive keys: the stick
                   role and the two settings that shape it are the pad's half of this panel, and they
                   left the right-hand column two-thirds empty while they lived a panel further down. */}
-              {p.id === 'driving' && (
+              {/* gamepad 2 drives nothing with its sticks, and shares gamepad 1's settings */}
+              {p.id === 'driving' && !secondPad && (
                 <>
                   <OptRow<PadBindings['driveStick']>
                     label="Drive stick"
@@ -767,7 +818,8 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
                 </>
               )}
               {p.pads.map(padRow)}
-              {p.id === 'match' && (
+              {/* the menu is watched on gamepad 1 alone (`PadNavLayer`) */}
+              {p.id === 'match' && !secondPad && (
                 <div className="ds-bind-row">
                   <span className="ds-bind-label">Menu</span>
                   <span className="ds-keys">
@@ -834,7 +886,7 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
           All games
         </button>
         {seasons.map((s) => {
-          const unbound = seasonUnbound(bindings, s.key).length;
+          const unbound = seasonUnbound(bindings, s.key, scheme).length;
           return (
             <button
               key={s.key}
@@ -857,6 +909,9 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
       <>
         {allGamesPanels(activeGame).map(bindPanel)}
 
+        {/* gamepad 2 plays on gamepad 1's threshold and combo wait, and never drives a menu */}
+        {!secondPad && (
+        <>
         {/* THE PAD'S BUTTONS — when a trigger counts as pressed, how long a combo's buttons wait,
             and whether the pad drives the menus. How a hand works, not what a button means, so
             every one is the same in every season. The `.ds-field` rows Audio and Graphics use:
@@ -901,6 +956,8 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
             />
           </div>
         </section>
+        </>
+        )}
       </>
     ) : (
       seasonPanels(game).map(bindPanel)
@@ -918,14 +975,14 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
           <details className="ds-fold ds-bind-fold">
             <summary>Keyboard &amp; gamepad bindings</summary>
             <div className="ds-fold-body">
-              {scopeSwitch}
+              {!secondPad && scopeSwitch}
               {panels}
             </div>
           </details>
         </>
       ) : (
         <>
-          {scopeSwitch}
+          {!secondPad && scopeSwitch}
           {game === null && startPanel}
           {panels}
         </>
@@ -938,12 +995,12 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
             onClick={() => {
               if (
                 !window.confirm(
-                  'Reset all controls? Every keyboard and gamepad bind, in every game, goes back to its default.',
+                  `Reset ${scheme === 'ftc25' ? 'FTC25' : 'DSim'} controls? Every keyboard and gamepad bind in them, in every game, goes back to its default.`,
                 )
               )
                 return;
               setNotice(null);
-              onChange(cloneBindings(DEFAULT_BINDINGS));
+              onReset();
             }}
           >
             Reset to defaults
@@ -957,13 +1014,132 @@ export function ControlsSection({ bindings, onChange, onEditTouchControls, onTut
               if (!window.confirm(`Reset ${name} controls? Its own binds go back to their defaults, and Intake and Shoot back to All games.`))
                 return;
               setNotice(null);
-              onChange(resetGame(bindings, game));
+              onChange(resetGame(bindings, game, defaults));
             }}
           >
             Reset {seasonFor(game).name}
           </button>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * THE CONTROLS SCREEN: which controls are in use, how many controllers, which pad is being
+ * edited, the FTC25 shooter presets, then the editor.
+ *
+ * TWO SCHEMES (`GameSettings.controlScheme`). "DSim controls" is DSIM's own map. "FTC25 controls"
+ * is team 2627's DECODE-season TeleOp (moorlacks/FTC2627), on TWO controllers (their driver + operator)
+ * or ONE (both on a single pad) — three maps in all, each kept whole, so switching is free in
+ * every direction. The FTC25 controls' own rows (`FTC25_ONLY`) are not on the DSim screen.
+ *
+ * GAMEPAD 2 is edited with the same editor, through `pad2View` / `fromPad2View`: the editor sees
+ * a map whose pad lists ARE gamepad 2's, so every rule — refuse a taken bind, combos, the
+ * eight-slot cap — holds within gamepad 2 without a second copy of any of it. A new editor mounts
+ * per scheme, layout and pad (`key`), so an armed slot never carries across.
+ */
+export function ControlsSection(props: Props) {
+  const { bindings, onChange, scheme, onScheme, pads, onPads, powers, onPowers } = props;
+  const [device, setDevice] = useState<1 | 2>(1);
+  const onePad = scheme === 'ftc25' && pads === 1;
+  // one controller has no gamepad 2 to edit
+  const second = device === 2 && !onePad;
+  const shown = useMemo(() => (second ? pad2View(bindings) : bindings), [second, bindings]);
+  /** the buttons a preset sits on, as the player reads them: the pad it is on, then the button */
+  const presetButtons = (a: (typeof FTC25_PRESET_ACTIONS)[number]): string => {
+    const one = padBinds(bindings.pad, a).map(padBindLabel);
+    const two = bindings.pad2 ? padBinds({ ...bindings.pad, ...bindings.pad2 }, a).map(padBindLabel) : [];
+    const all = [...one.map((x) => (two.length ? `Gamepad 1 ${x}` : x)), ...two.map((x) => `Gamepad 2 ${x}`)];
+    return all.length ? all.join(', ') : 'unbound';
+  };
+  return (
+    <>
+      <section className="ds-panel">
+        <div className="ds-panel-body stack">
+          <OptRow<ControlScheme>
+            label="Control scheme"
+            value={scheme}
+            cols="two"
+            onPick={onScheme}
+            options={[
+              { v: 'dsim', t: 'DSim controls', d: 'DSIM’s own layout.' },
+              {
+                v: 'ftc25',
+                t: 'FTC25 controls',
+                d: 'Team 2627’s TeleOp layout.',
+              },
+            ]}
+          />
+          {scheme === 'ftc25' && (
+            <OptRow<1 | 2>
+              label="Controllers"
+              value={pads}
+              cols="two"
+              onPick={onPads}
+              options={[
+                { v: 1, t: 'One', d: 'Driving and shooting on one controller.' },
+                { v: 2, t: 'Two', d: 'Their driver on gamepad 1, their operator on gamepad 2.' },
+              ]}
+            />
+          )}
+          {!onePad && (
+            <OptRow<1 | 2>
+              label="Binds for"
+              value={second ? 2 : 1}
+              cols="two"
+              mini
+              hint={second ? 'The second controller, for an operator' : undefined}
+              onPick={setDevice}
+              options={[
+                { v: 1, t: 'Gamepad 1' },
+                { v: 2, t: 'Gamepad 2' },
+              ]}
+            />
+          )}
+        </div>
+      </section>
+      {/* WHAT EACH PRESET DOES (owner, 2026-10-12). Under FTC25 only: DSim controls have no
+          presets. The button each one is on is named beside it, read off the map in use. They
+          drove DECODE's shooter; with DECODE gone (same day) they are kept for BIOBUZZ's launcher
+          and no game reads them yet (`RESERVED_ACTIONS`), which the hint says. */}
+      {scheme === 'ftc25' && (
+        <section className="ds-panel">
+          <div className="ds-panel-h">
+            <h2 className="ds-panel-title">Shooter presets</h2>
+          </div>
+          <div className="ds-panel-body stack">
+            {FTC25_PRESET_ACTIONS.map((a, i) => (
+              <PadSlider
+                key={a}
+                label={`Preset ${i + 1} (${presetButtons(a)})`}
+                shown={`${powers[i]}%`}
+                value={powers[i]}
+                min={Math.round(FTC25_MIN_POWER * 100)}
+                max={100}
+                step={5}
+                onChange={(v) => {
+                  const next = [...powers] as typeof powers;
+                  next[i] = v;
+                  onPowers(next);
+                }}
+              />
+            ))}
+            <p className="ds-hint">
+              Kept for BIOBUZZ’s launcher, which does not use them yet.
+            </p>
+          </div>
+        </section>
+      )}
+      <BindEditor
+        key={`${scheme}-${onePad ? 1 : 2}-${second ? 2 : 1}`}
+        {...props}
+        bindings={shown}
+        onChange={(b) => onChange(second ? fromPad2View(bindings, b) : b)}
+        defaults={schemeDefaults(scheme, pads)}
+        secondPad={second}
+        onReset={() => onChange(cloneBindings(schemeDefaults(scheme, pads)))}
+      />
     </>
   );
 }

@@ -431,11 +431,6 @@ button {
   }
 }
 
-.timer-motif {
-  display: flex;
-  align-items: center;
-}
-
 /* ⚠️ A RESERVED SLOT, NOT A ROW THAT GROWS.
    Every `[data-hud-band]` is measured by `GameController.refreshHudInsets` and the 3D camera
    fits the field into what is left, so a band that changes size mid-match MOVES THE FIELD. The
@@ -560,28 +555,8 @@ button {
   font-weight: 700;
 }
 
-.motif-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 3px;
-}
-
 /* `.chip.net-quality` and `.net-dot` are gone with the connection chip — the ping, the
    snapshot rate and the jitter are on `.perf-hud` now, beside the frame rate. */
-
-.motif-dot.purple {
-  background: var(--ds-purple);
-}
-
-/* GREEN IS SQUARE (design review 17-06): purple-vs-green at 10px is the whole motif, and a
-   colour-blind driver has only their luminance to go on. A shape difference carries it
-   without widening the timer panel; `MotifDots` in GameView gives the reader the words. */
-.motif-dot.green {
-  background: var(--ds-green);
-  border-radius: 0;
-}
 
 .status-wrap {
   position: absolute;
@@ -1101,7 +1076,7 @@ button {
 }
 
 /* drive power-draw gauge in the top-right status bar — vertical, bar on top of its
-   percentage, to sit beside DECODE's storage+gate column (`.dec-hud-right`). */
+   percentage. (It sat beside DECODE's storage + gate column, removed 2026-10-12.) */
 .power-gauge {
   display: flex;
   flex-direction: column;
@@ -1121,14 +1096,12 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* shared vertical fill gauge (DECODE's power draw, CR's storage) — the horizontal
+/* shared vertical fill gauge (CR's storage, and the power draw) — the horizontal
    `.power-gauge .pg-bar`/`.pg-fill` mechanic (chunky bar, rounded caps, recessed track,
    DESIGN.md "Progress Bars"), rotated: clipped from the TOP so the fill rises from the
    bottom instead of growing from the left. Empty track vs card is ~1.03:1, so the ring
-   carries it, as on `.hopper-pip`. This base height is DECODE's — sets `.dec-hud-left`'s
-   stretched height too (`align-items: stretch` on `.dec-hud`), so shrinking it is what
-   shrinks the storage/gate column; CR overrides it shorter still in `.cr-hud-right
-   .v-gauge` to leave room for the fraction readout below its own bar. */
+   carries it, as on `.hopper-pip`. CR overrides it shorter in `.cr-hud-right .v-gauge` to
+   leave room for the fraction readout below its own bar. */
 .v-gauge {
   width: 14px;
   height: 92px;
@@ -1169,93 +1142,9 @@ button {
   background: color-mix(in srgb, var(--ds-red) calc((1 - var(--vg, 0)) * 100%), var(--ds-ink));
 }
 
-/* DECODE's two-column HUD block: storage dots atop the gate lever on the left, the
-   vertical power gauge + its percentage on the right — the same `align-items: stretch`
-   trick as `.bb-hud` so the fixed-height gauge sets the block's height. The left column
-   used to `space-between` the dots and the lever, which pinned the lever to the very
-   bottom of that height with a lot of dead air above it; `justify-content: center` groups
-   them together and centers that group in the height the (now shorter) gauge sets. */
-.dec-hud {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-}
-
-.dec-hud-left {
-  display: flex;
-  flex-direction: column;
-  /* flush top, not spread apart — the gate icon sits right under the dots rather than
-     pinned to the bottom of the (gauge-height) column with dead air above it. */
-  justify-content: flex-start;
-  /* flex-start, not center: the gate icon is the widest child (22px vs the dots' 18px),
-     so it already sits at the column's own left edge and `align-items: center` only
-     moved the narrower dots — this puts both on the same left edge instead. */
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.dec-hud-right {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-/* DECODE's storage dots read bigger than the shared `.hopper-pip` base (BIOBUZZ's own
-   hopper/nectar columns use that base size and stay untouched) — scoped to this one
-   instance rather than the shared class. */
-.dec-hud-left .hopper-pip {
-  width: 18px;
-  height: 18px;
-}
-
-/* the DECODE gate lever (manual Fig. 9-16): a rod hinged at its base, rotating between a
-   near-flat CLOSED pose and a near-vertical OPEN one. The container is fixed-size so the
-   rotating rod never reflows the column around it; the rod is the ::before, pivoting from
-   its own bottom-centre. 50deg off the rod's upright rest pose closed (40 deg off
-   horizontal, per the manual figure), swinging up to 5deg open. */
-.gate-icon {
-  position: relative;
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  flex: none;
-  /* the icon's own box is already the column's widest element (see `.dec-hud-left`), so
-     shifting it further left means past that edge, not just flush with it — the closed
-     rod (`::before`, rotate(50deg) off vertical) also leans visually right within its
-     own box, which this offsets. */
-  margin-left: -6px;
-}
-
-.gate-icon::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 1px;
-  width: 4px;
-  height: 19px;
-  border-radius: var(--ds-round-full);
-  background: var(--ds-ink);
-  border: 1px solid var(--ds-mut);
-  transform-origin: bottom center;
-  transform: translateX(-50%) rotate(50deg);
-  transition: transform 0.25s ease, background 0.15s;
-}
-
-/* open, own alliance worked the lever */
-.gate-icon.open::before {
-  transform: translateX(-50%) rotate(5deg);
-  background: var(--ds-green);
-}
-
-/* open, but the OPPONENT is the one holding it (`HudSnapshot.gateForced`) */
-.gate-icon.open.forced::before {
-  background: var(--ds-red);
-}
-
 /* Chain Reaction's two-column HUD block: multiplier badge + 4 catalyst pips + a holding
-   indicator on the left, the vertical storage-fill gauge on the right — same `.bb-hud`
-   stretch trick as DECODE's block above. */
+   indicator on the left, the vertical storage-fill gauge on the right — the same
+   `align-items: stretch` trick as `.bb-hud`. */
 .cr-hud {
   display: flex;
   align-items: stretch;
@@ -1277,8 +1166,7 @@ button {
 }
 
 /* CR's bar shrinks from the shared 132px so the bar + fraction below it still total
-   .cr-hud-left's max height (mult badge + vertical 4-pip column + holding indicator).
-   DECODE's .v-gauge (in .dec-hud-right) is untouched. */
+   .cr-hud-left's max height (mult badge + vertical 4-pip column + holding indicator). */
 .cr-hud-right .v-gauge {
   height: 96px;
 }
@@ -3198,10 +3086,6 @@ button {
     width: 10px;
     height: 10px;
   }
-  .dec-hud-left .hopper-pip {
-    width: 14px;
-    height: 14px;
-  }
   .catalyst-pip {
     width: 12px;
     height: 12px;
@@ -3373,10 +3257,6 @@ button {
   .hopper-pip {
     width: 8px;
     height: 8px;
-  }
-  .dec-hud-left .hopper-pip {
-    width: 12px;
-    height: 12px;
   }
   .catalyst-pip {
     width: 10px;

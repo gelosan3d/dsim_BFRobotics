@@ -44,7 +44,7 @@ function rng(seed: number): () => number {
 const REGIONS = ['iad', 'ord', 'sjc', 'lhr', 'syd', 'nrt', 'gru', 'jnb', 'fra', ''];
 const BUILDS = ['b1', 'b1', 'b1', 'b2', 'b3']; // weighted: mostly one build, sometimes a rollout
 const CHANNELS = ['stable', 'stable', 'alpha'];
-const GAMES = ['decode', 'decode', 'chain'] as const;
+const GAMES = ['biobuzz', 'biobuzz', 'chain'] as const;
 
 /** one randomised queue + clock schedule */
 function scene(rand: () => number, n: number): { entries: QueueEntry[]; mode: QueueMode; clocks: number[] } {

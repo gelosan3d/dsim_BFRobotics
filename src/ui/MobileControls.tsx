@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
+import { DEFAULT_GAME } from '../games/types';
 import type { HudSnapshot } from '../game';
 import type { InputManager } from '../input/input';
 import type { MobileLayout, RobotSpec } from '../types';
@@ -215,7 +216,7 @@ export function MobileControls({
   // keyboard and works immediately on one that does (a tablet with a case, a Chromebook in
   // tablet mode) without waiting on a mount somewhere else
   useEffect(() => installViewKey(), []);
-  const game = hud?.game ?? 'decode';
+  const game = hud?.game ?? DEFAULT_GAME;
   const showView = !editing && game === 'biobuzz';
 
   // live-editable working copy while in edit mode (persist on release)

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GameSettings } from '../game';
-import type { Alliance, GameSettings as GS, RobotSpec } from '../types';
-import { START_POSES } from '../config';
+import type { Alliance, AssistConfig, GameSettings as GS, RobotSpec } from '../types';
+import { seatAssists } from '../settings';
+import { markLanSession } from '../net/forkScope';
 import { CHAIN_START_POSES } from '../games/chain/config';
-import { StartPositionEditor } from './StartPositionEditor';
 import { savedStartCap } from './startPositions';
 import { useAds } from '../ads/AdsProvider';
 import { ChainStartEditor } from './ChainStartEditor';
@@ -310,6 +310,8 @@ export function Lobby({
   const [building, setBuilding] = useState(false);
 
   const lobbyRef = useRef<LobbyClient | null>(null);
+  /** is the room this lobby is connected to a LAN room? Set on every connect (`src/net/forkScope.ts`) */
+  const lanConn = useRef(false);
   const startedRef = useRef(false);
   /** the room said no (an `error` frame) — a close that follows is the same event, not a new one */
   const refusedRef = useRef(false);
@@ -411,7 +413,10 @@ export function Lobby({
     if (!lobby) return;
     startedRef.current = true;
     // pass the identity + room so the session can reclaim its slot on a reconnect
-    onStart(new ServerSession(lobby.transport, lobby.isHost(), m, lobby.clientId, roomCode, false, lobby.seatToken));
+    const sess = new ServerSession(lobby.transport, lobby.isHost(), m, lobby.clientId, roomCode, false, lobby.seatToken);
+    // a LAN room's match may use this fork's features; a room on DSIM's servers may not
+    if (lanConn.current) markLanSession(sess);
+    onStart(sess);
   }
 
   /** create a brand-new room with a freshly generated code (you host it) */
@@ -463,6 +468,9 @@ export function Lobby({
      * point of the seam — the lobby does not know or care that its far end is another laptop.
      */
     const adopted = takePendingLanRoom();
+    // THIS FORK'S FEATURES ACT IN A LAN ROOM AND NOWHERE ELSE ONLINE (`src/net/forkScope.ts`):
+    // note which this is, on every connect, so it can never be left over from the last room
+    lanConn.current = !!adopted || lanActive();
     if (!adopted && !roomServerUrl()) {
       setError('Couldn’t open a custom room: this build has no game server.');
       setPhase('error');
@@ -518,8 +526,14 @@ export function Lobby({
       startPose: settings.startPose ?? null,
       ready: false,
       spec: settings.spec,
-      assists: settings.assists,
+      assists: roomAssists(),
     };
+  }
+
+  /** the assists this player's robot is sent with: under FTC25 controls a LAN room also gets the
+   *  shooter preset table (`seatAssists`); a room on DSIM's servers never does (`forkScope`) */
+  function roomAssists(): AssistConfig {
+    return lanConn.current ? seatAssists(settings) : settings.assists;
   }
 
   /** carry the selected game so the room builds the right world (defaults to the caller's
@@ -817,13 +831,13 @@ export function Lobby({
    */
   const pickSpec = (spec: RobotSpec): void => {
     onSettingsChange({ ...settings, spec });
-    lobbyRef.current?.update({ spec, assists: settings.assists });
+    lobbyRef.current?.update({ spec, assists: roomAssists() });
   };
 
   /** the full builder edits settings.spec live; mirror every change to the server */
   const onBuilderChange = (next: GS): void => {
     onSettingsChange(next);
-    lobbyRef.current?.update({ spec: next.spec, assists: next.assists });
+    lobbyRef.current?.update({ spec: next.spec, assists: lanConn.current ? seatAssists(next) : next.assists });
   };
 
   const mySpec = me?.spec ?? settings.spec;
@@ -1308,9 +1322,7 @@ export function Lobby({
                       ? 'CUSTOM'
                       : settings.game === 'chain'
                         ? (CHAIN_START_POSES[p.startIndex]?.name ?? '—')
-                        : (moduleFor(settings.game).startAnchorName?.(p.startIndex, p.alliance) ??
-                          START_POSES[p.startIndex]?.label ??
-                          '—')}
+                        : (moduleFor(settings.game).startAnchorName?.(p.startIndex, p.alliance) ?? '—')}
                   </span>
                   <span className={`ds-chip ${p.ready ? 'on' : 'off'}`}>
                     {p.ready ? 'READY' : 'NOT READY'}
@@ -1424,7 +1436,7 @@ export function Lobby({
                   />
                 );
               })()
-            ) : settings.game === 'chain' ? (
+            ) : (
               <ChainStartEditor
                 spec={me.spec}
                 alliance={me.alliance}
@@ -1434,21 +1446,6 @@ export function Lobby({
                 saved={settings.savedStartPoses}
                 lockedCategory={startRole}
                 onChange={(startPose) => applyStart(selectStart(sCat, { index: -1, pose: startPose }))}
-                onPickPreset={(i) => applyStart(selectStart(sCat, { index: i, pose: null }))}
-                onCategory={(c) => applyStart(switchCategory(settings, c))}
-                onSave={(pose) => applyStart(saveStart(sCat, pose))}
-                onDeleteSaved={(c, i) => applyStart(deleteSavedStart(sCat, c, i))}
-              />
-            ) : (
-              <StartPositionEditor
-                spec={me.spec}
-                alliance={me.alliance}
-                value={me.startPose}
-                startIndex={me.startIndex}
-                category={startRole ?? settings.startCat}
-                saved={settings.savedStartPoses}
-                lockedCategory={startRole}
-                onChange={(startPose) => startPose && applyStart(selectStart(sCat, { index: -1, pose: startPose }))}
                 onPickPreset={(i) => applyStart(selectStart(sCat, { index: i, pose: null }))}
                 onCategory={(c) => applyStart(switchCategory(settings, c))}
                 onSave={(pose) => applyStart(saveStart(sCat, pose))}

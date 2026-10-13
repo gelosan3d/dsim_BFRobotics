@@ -1,17 +1,16 @@
-import type { Alliance, GameId, GameLoadout, GameSettings, PerfDisplay, PracticeSeat, PracticeSeats, RobotSpec } from './types';
+import type { Alliance, AssistConfig, GameId, GameLoadout, GameSettings, PerfDisplay, PracticeSeat, PracticeSeats, RobotSpec } from './types';
 import {
   DEFAULT_ASSISTS,
   DEFAULT_SPEC,
   coerceSpec,
   coerceAssists,
-  coerceAutoPath,
   coerceStartPose,
   defaultAssistsFor,
   PLAYER_ASSISTS,
   type RobotSetup,
 } from './sim/spawn';
-import { MAX_SAVED_ROBOTS, MAX_SAVED_AUTOS, MAX_SAVED_STARTS_SUPPORTER } from './config';
-import { GAME_IDS, isGameId } from './games/types';
+import { FTC25_MIN_POWER, MAX_SAVED_ROBOTS, MAX_SAVED_STARTS_SUPPORTER } from './config';
+import { DEFAULT_GAME, GAME_IDS, isGameId } from './games/types';
 // the BIOBUZZ base robot, for `GAME_DEFAULT_SPEC`. `games/biobuzz/coerce.ts` is a LEAF of the
 // spawn chokepoint (its own header states the rule), so this reaches no further than the
 // `sim/spawn` import above already does.
@@ -22,7 +21,14 @@ import type { StartSel, StartPose } from './types';
 /** how many named start anchors a game has (for clamping startIndex per game) —
  * the module owns the count, so a new game does not touch this file. */
 const startPoseCount = (game: GameId): number => simModuleFor(game).startPoseCount;
-import { cloneBindings, DEFAULT_BINDINGS, mergeBindings } from './input/bindings';
+import {
+  cloneBindings,
+  DEFAULT_BINDINGS,
+  FTC25_DEFAULT_BINDINGS,
+  FTC25_SINGLE_DEFAULT_BINDINGS,
+  mergeBindings,
+  type ControlBindings,
+} from './input/bindings';
 import { clamp } from './math';
 
 // the key itself comes from the registry every privacy surface reads (src/storageKeys.ts)
@@ -62,20 +68,221 @@ export const DEFAULT_MOBILE_LAYOUT: GameSettings['mobileLayout'] = {
  */
 export const PERF_DISPLAY_LEVELS: readonly PerfDisplay[] = ['off', 'simple', 'detailed', 'graphs'];
 
+/**
+ * THE MAP IN USE — the DSim map or the FTC25 one, by `controlScheme`. Everything that drives or
+ * names a control starts here (then `effectiveBindings` for the game), never `settings.bindings`.
+ */
+export function activeBindings(s: GameSettings): ControlBindings {
+  if (s.controlScheme !== 'ftc25') return s.bindings;
+  return s.ftc25Pads === 1 ? s.ftc25SingleBindings : s.ftc25Bindings;
+}
+
+/** `s` with the map in use replaced by `b` — the Controls screen's writer */
+export function withActiveBindings(s: GameSettings, b: ControlBindings): GameSettings {
+  if (s.controlScheme !== 'ftc25') return { ...s, bindings: b };
+  return s.ftc25Pads === 1 ? { ...s, ftc25SingleBindings: b } : { ...s, ftc25Bindings: b };
+}
+
+/**
+ * THE MAP A PLAYER ON ONE CONTROLLER DRIVES WITH — Player 2 of a Local versus, whatever the
+ * first player uses: the scheme's one-controller map (the DSim map is one already).
+ */
+export function singlePadBindings(s: GameSettings): ControlBindings {
+  return s.controlScheme === 'ftc25' ? s.ftc25SingleBindings : s.bindings;
+}
+
+/**
+ * A LOCAL VERSUS LINE-UP (the Modes tile): `s` with this game's seats set to Player 2 as
+ * opponent 1 and nobody else — a 1v1 between two people on one device. A copy for one match,
+ * never saved: the seats the player configured in Match ▸ Practice are untouched.
+ */
+export function versusSeats(s: GameSettings): GameSettings {
+  const tier = practiceSeatsFor(s, s.game)[0].tier;
+  const seats: PracticeSeats = [
+    { kind: 'none', tier },
+    { kind: 'player2', tier },
+    { kind: 'none', tier },
+  ];
+  return { ...s, practiceSeats: { ...s.practiceSeats, [s.game]: seats } };
+}
+
+/** their 100 / 90 / 80 / 40 %, the presets a fresh install starts on (`GameSettings.ftc25Powers`) */
+export const FTC25_DEFAULT_POWERS: [number, number, number, number] = [100, 90, 80, 40];
+
+/**
+ * THE ASSISTS A SEAT DRIVEN WITH THESE SETTINGS SPAWNS WITH: the robot's own, plus — under FTC25
+ * controls — the preset table (`AssistConfig.manualShot`) the d-pad presets index. It made
+ * DECODE's shooter fire at the driver's power; DECODE is gone from this fork (2026-10-12) and the
+ * table is KEPT for BIOBUZZ's launcher (owner, same day), which does not read it yet. It is also
+ * the mark `replayIsFork` reads, so a run driven with FTC25 controls stays on the device. Only
+ * for a world this device steps or a LAN room; never for a room on DSIM's own servers (`Lobby`).
+ */
+export function seatAssists(s: GameSettings): AssistConfig {
+  if (s.controlScheme !== 'ftc25') return s.assists;
+  return { ...s.assists, manualShot: s.ftc25Powers.map((p) => p / 100) };
+}
+
+/**
+ * ⚠️ THIS FORK'S SETTINGS NEVER LEAVE THE DEVICE (owner, 2026-10-12: nothing of these changes may
+ * reach anything that syncs to DSIM's own servers). The settings blob is synced to the player's
+ * DSIM account VERBATIM (`saveAccountSettings`), so every field this fork added is taken out of
+ * the copy that goes there: the scheme, both FTC25 maps, the controller count, the presets,
+ * gamepad 2 on the DSim map, and a Player 2 practice seat (written as None). The account copy is
+ * then exactly what an unmodified DSIM client would write.
+ *
+ * DECODE'S SETTINGS GO BACK IN (`GameSettings.retired`). This fork has no DECODE, but the account
+ * and an unmodified DSIM client still do — without this, the first save from here would delete
+ * the player's DECODE robot, its saved autos and its binding overrides from the account copy.
+ */
+export function forAccount(s: GameSettings): unknown {
+  const {
+    controlScheme: _a,
+    ftc25Bindings: _b,
+    ftc25Pads: _c,
+    ftc25SingleBindings: _d,
+    ftc25Powers: _e,
+    retired,
+    ...rest
+  } = s;
+  const bindings = cloneBindings(s.bindings);
+  delete bindings.pad2;
+  const out: Record<string, unknown> = { ...rest, bindings };
+  if (s.practiceSeats) {
+    const seats: Partial<Record<GameId, PracticeSeats>> = {};
+    for (const g of GAME_IDS) {
+      const list = s.practiceSeats[g];
+      if (list) seats[g] = list.map((x) => (x.kind === 'player2' ? { ...x, kind: 'none' } : x)) as PracticeSeats;
+    }
+    out.practiceSeats = seats;
+  }
+  if (retired) {
+    const r = RETIRED_GAME;
+    if (retired.loadout !== undefined) out.loadouts = { ...(s.loadouts ?? {}), [r]: retired.loadout };
+    if (retired.practiceSeats !== undefined) {
+      out.practiceSeats = { ...((out.practiceSeats as object | undefined) ?? {}), [r]: retired.practiceSeats };
+    }
+    if (retired.bindings !== undefined) {
+      out.bindings = { ...bindings, perGame: { ...(bindings.perGame ?? {}), [r]: retired.bindings } };
+    }
+    for (const k of RETIRED_FLAT) if (retired[k] !== undefined) out[k] = retired[k];
+  }
+  return out;
+}
+
+// ---- DECODE'S SETTINGS, CARRIED OPAQUE ----------------------------------------------------
+
+/** the game this fork removed (owner, 2026-10-12) — the key its data has in a settings blob */
+const RETIRED_GAME = 'decode';
+/** the flat, game-less fields that only ever held DECODE data (its `.pp` auto-path library) */
+const RETIRED_FLAT = ['savedAutos', 'autoPath', 'autoPathEnabled'] as const;
+/** the flat fields that are the ACTIVE game's loadout (`GameLoadout`, `pickLoadout`) */
+const LOADOUT_KEYS = ['spec', 'savedRobots', 'startIndex', 'startPose', 'startCat', 'savedStartPoses', 'startMemory'] as const;
+/** the largest single retired value kept, as JSON — this is localStorage and a synced account
+ *  blob, so junk must not ride in a field nothing here reads */
+const RETIRED_MAX_CHARS = 256 * 1024;
+
+const objOf = (x: unknown): Record<string, unknown> | undefined =>
+  typeof x === 'object' && x !== null && !Array.isArray(x) ? (x as Record<string, unknown>) : undefined;
+
+/** `v` if it is plain JSON within the budget, else undefined */
+function retiredValue(v: unknown): unknown {
+  if (v === undefined) return undefined;
+  try {
+    const json = JSON.stringify(v);
+    return json !== undefined && json.length <= RETIRED_MAX_CHARS ? JSON.parse(json) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Pull DECODE's data out of a raw blob: its archived loadout (or the flat fields, when the blob was
+ * saved ON DECODE), its practice seats, its binding overrides and the auto-path library. A bag we
+ * saved ourselves (`s.retired`) is the base and anything fresher in the blob wins over it, since an
+ * account blob may have been written by an unmodified client since.
+ */
+function collectRetired(s: Record<string, unknown>): GameSettings['retired'] {
+  const prev = objOf(s.retired) ?? {};
+  const out: NonNullable<GameSettings['retired']> = {};
+  const put = <K extends keyof NonNullable<GameSettings['retired']>>(k: K, fresh: unknown) => {
+    const v = retiredValue(fresh !== undefined ? fresh : prev[k]);
+    if (v !== undefined) out[k] = v as never;
+  };
+  const flatLoadout =
+    s.game === RETIRED_GAME
+      ? Object.fromEntries(LOADOUT_KEYS.filter((k) => s[k] !== undefined).map((k) => [k, s[k]]))
+      : undefined;
+  put('loadout', flatLoadout ?? objOf(s.loadouts)?.[RETIRED_GAME]);
+  put('practiceSeats', objOf(s.practiceSeats)?.[RETIRED_GAME]);
+  put('bindings', objOf(objOf(s.bindings)?.perGame)?.[RETIRED_GAME]);
+  for (const k of RETIRED_FLAT) put(k, s[k]);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * A blob SAVED ON DECODE: its flat robot/start fields are DECODE's, so they are dropped and the
+ * default game's ARCHIVED loadout — the player's own BIOBUZZ robot, if they ever built one —
+ * becomes the active copy, as `switchGame` would restore it. Coercing the DECODE robot into a
+ * BIOBUZZ one instead would hand the player a robot they never built while theirs sat in the
+ * archive. (DECODE's own copy is kept, opaque, by `collectRetired`.)
+ */
+function offRetiredGame(s: Record<string, unknown>): Record<string, unknown> {
+  if (s.game !== RETIRED_GAME) return s;
+  const archive = { ...(objOf(s.loadouts) ?? {}) };
+  const restore = objOf(archive[DEFAULT_GAME]);
+  delete archive[DEFAULT_GAME];
+  const out: Record<string, unknown> = { ...s, game: DEFAULT_GAME, loadouts: archive };
+  // `assists` is the active robot's MIRROR, so it goes with the robot it mirrored
+  for (const k of [...LOADOUT_KEYS, 'assists']) delete out[k];
+  if (restore) for (const k of LOADOUT_KEYS) if (restore[k] !== undefined) out[k] = restore[k];
+  return out;
+}
+
+/**
+ * …and the way back: settings loaded FROM the account keep this device's own copy of every field
+ * `forAccount` withheld, so signing in never resets the FTC25 controls, gamepad 2 or a Player 2
+ * seat to defaults.
+ */
+export function keepLocalForkFields(loaded: GameSettings, local: GameSettings): GameSettings {
+  const out: GameSettings = {
+    ...loaded,
+    controlScheme: local.controlScheme,
+    ftc25Bindings: local.ftc25Bindings,
+    ftc25Pads: local.ftc25Pads,
+    ftc25SingleBindings: local.ftc25SingleBindings,
+    ftc25Powers: local.ftc25Powers,
+  };
+  if (local.bindings.pad2) out.bindings = { ...loaded.bindings, pad2: local.bindings.pad2 };
+  if (local.practiceSeats) {
+    const seats: Partial<Record<GameId, PracticeSeats>> = { ...(loaded.practiceSeats ?? {}) };
+    for (const g of GAME_IDS) {
+      const mine = local.practiceSeats[g];
+      const theirs = seats[g];
+      if (!mine || !mine.some((x) => x.kind === 'player2')) continue;
+      seats[g] = (theirs ?? mine).map((x, i) => (mine[i].kind === 'player2' ? mine[i] : x)) as PracticeSeats;
+    }
+    out.practiceSeats = seats;
+  }
+  return out;
+}
+
 export function defaultSettings(): GameSettings {
+  // the default game's OWN first robot (`GAME_DEFAULT_SPEC`), coerced the way `defaultLoadout`
+  // builds one — `DEFAULT_SPEC` is the shared identity and Chain Reaction's seed, not BIOBUZZ's
+  const seed = defaultSpecFor(DEFAULT_GAME);
+  const spec = coerceSpec(seed, seed, DEFAULT_GAME);
   return {
-    game: 'decode',
+    game: DEFAULT_GAME,
     mode: 'match',
     alliance: 'blue',
     // the ACTIVE assists always MIRROR the robot's own (`spec.assists`) — all ON by default
-    assists: { ...(DEFAULT_SPEC.assists ?? defaultAssistsFor()) },
-    spec: { ...DEFAULT_SPEC },
+    assists: { ...(spec.assists ?? defaultAssistsFor()) },
+    spec,
     savedRobots: [],
-    savedAutos: [],
     startIndex: 0,
     startCat: 'close',
     savedStartPoses: { close: [], far: [] },
-    // GATE (index 0, close) + AUDIENCE (index 1, far) are the default per-category picks
+    // anchor 0 (close) + anchor 1 (far) are the default per-category picks
     startMemory: { close: { index: 0, pose: null }, far: { index: 1, pose: null } },
     practiceDummies: false,
     // solo practice defaults to the 3D physics (Day 1 seam, `docs/biobuzz/plan-3d.md` §2.1);
@@ -91,8 +298,11 @@ export function defaultSettings(): GameSettings {
       voice: true,
     },
     bindings: cloneBindings(DEFAULT_BINDINGS),
-    autoPath: null, // Default to no auto path loaded
-    autoPathEnabled: false, // Default to auto path disabled
+    controlScheme: 'dsim',
+    ftc25Bindings: cloneBindings(FTC25_DEFAULT_BINDINGS),
+    ftc25Pads: 2,
+    ftc25SingleBindings: cloneBindings(FTC25_SINGLE_DEFAULT_BINDINGS),
+    ftc25Powers: [...FTC25_DEFAULT_POWERS],
     showEventLog: true,
     // SIMPLE, not off (owner, 2026-09-19: "default for performance statistics should include
     // simple ping and fps"). Two numbers on one line in a corner nothing else uses — the cost
@@ -110,7 +320,7 @@ export function defaultSettings(): GameSettings {
 function coercePracticeSeat(raw: unknown): PracticeSeat | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (r.kind !== 'none' && r.kind !== 'dummy' && r.kind !== 'ai') return null;
+  if (r.kind !== 'none' && r.kind !== 'dummy' && r.kind !== 'ai' && r.kind !== 'player2') return null;
   if (typeof r.tier !== 'string' || r.tier.length > 32) return null;
   return { kind: r.kind, tier: r.tier };
 }
@@ -147,7 +357,7 @@ export function practiceSetups(
   s: GameSettings,
   game: GameId,
   seed: number,
-): { setups: RobotSetup[]; botTiers: Map<number, string> } {
+): { setups: RobotSetup[]; botTiers: Map<number, string>; player2: number | null } {
   const botDriver = simModuleFor(game).bot;
   const opp: Alliance = s.alliance === 'blue' ? 'red' : 'blue';
   const places: [id: number, alliance: Alliance, startIndex: number][] = [
@@ -157,9 +367,24 @@ export function practiceSetups(
   ];
   const setups: RobotSetup[] = [];
   const botTiers = new Map<number, string>();
+  let player2: number | null = null;
   practiceSeatsFor(s, game).forEach((pick, i) => {
     const [id, alliance, startIndex] = places[i];
-    if (pick.kind === 'dummy') {
+    if (pick.kind === 'player2') {
+      // LOCAL VERSUS: a second person on gamepad 2 (`GameController.player2`). ONE such seat —
+      // there is one second pad — so a second Player 2 seat reads as None. The robot is the
+      // player's own, a mirror match; its assists are this device's (`seatAssists`), so a pair
+      // on FTC25 controls both shoot at the same presets.
+      if (player2 !== null) return;
+      player2 = id;
+      setups.push({
+        id,
+        alliance,
+        spec: { ...s.spec, name: 'Player 2' },
+        assists: seatAssists(s),
+        startIndex,
+      });
+    } else if (pick.kind === 'dummy') {
       setups.push({
         id,
         alliance,
@@ -190,7 +415,7 @@ export function practiceSetups(
       });
     }
   });
-  return { setups, botTiers };
+  return { setups, botTiers, player2 };
 }
 
 function cloneMobileLayout(l: GameSettings['mobileLayout']): GameSettings['mobileLayout'] {
@@ -378,7 +603,12 @@ export function coerceSettings(raw: unknown): GameSettings {
   const out = defaultSettings();
   try {
     if (typeof raw !== 'object' || raw === null) return out;
-    const s = raw as Record<string, unknown>;
+    const s0 = raw as Record<string, unknown>;
+    // DECODE's own data is lifted out before anything is coerced, and a blob saved ON DECODE is
+    // moved onto the default game (`collectRetired`, `offRetiredGame`)
+    const retired = collectRetired(s0);
+    if (retired) out.retired = retired;
+    const s = offRetiredGame(s0);
     if (isGameId(s.game)) out.game = s.game;
     if (s.mode === 'match' || s.mode === 'free') out.mode = s.mode;
     if (s.alliance === 'red' || s.alliance === 'blue') out.alliance = s.alliance;
@@ -388,8 +618,8 @@ export function coerceSettings(raw: unknown): GameSettings {
     // Spec is coerced FIRST because its drivetrain decides the active-assist fallback.
     if (s.spec !== undefined) out.spec = coerceSpec(s.spec, out.spec, out.game);
     /**
-     * A BLOB THAT NAMES A GAME BUT CARRIES NO ROBOT still gets that game's OWN seed, not DECODE's
-     * — `out.spec` came from `defaultSettings()`, whose `game` is always `'decode'`.
+     * A BLOB THAT NAMES A GAME BUT CARRIES NO ROBOT still gets that game's OWN seed, not the
+     * default game's — `out.spec` came from `defaultSettings()`, whose `game` is `DEFAULT_GAME`.
      *
      * ⚠️ ONLY WHEN THERE IS NO STORED ROBOT. The branch above is untouched on purpose: for a
      * spec that really was saved, `base` is only a source of fallbacks for fields that are absent
@@ -398,7 +628,7 @@ export function coerceSettings(raw: unknown): GameSettings {
      * door: an account blob written before a game's builder was ever opened, or a hand-edited
      * store.
      */
-    else if (out.game !== 'decode') {
+    else if (out.game !== DEFAULT_GAME) {
       const seed = defaultSpecFor(out.game);
       out.spec = coerceSpec(seed, seed, out.game);
     }
@@ -418,12 +648,6 @@ export function coerceSettings(raw: unknown): GameSettings {
     // saved libraries: validate each entry through the same coercers, cap the count
     if (Array.isArray(s.savedRobots)) {
       out.savedRobots = s.savedRobots.slice(0, MAX_SAVED_ROBOTS).map((r) => coerceSpec(r, undefined, out.game));
-    }
-    if (Array.isArray(s.savedAutos)) {
-      out.savedAutos = s.savedAutos
-        .map((a) => coerceAutoPath(a))
-        .filter((a): a is NonNullable<typeof a> => a !== null)
-        .slice(0, MAX_SAVED_AUTOS);
     }
     if (typeof s.startIndex === 'number') {
       out.startIndex = clamp(Math.round(s.startIndex), 0, startPoseCount(out.game) - 1);
@@ -584,22 +808,22 @@ export function coerceSettings(raw: unknown): GameSettings {
       };
     }
     out.bindings = mergeBindings(s.bindings);
-
-    // Load autoPath and autoPathEnabled (validated + field-clamped by coerceAutoPath)
-    const autoPath = coerceAutoPath(s.autoPath);
-    if (autoPath) {
-      out.autoPath = autoPath;
-      // If autoPathEnabled is not explicitly set or is invalid, enable it if a path is loaded
-      if (typeof s.autoPathEnabled === 'boolean') {
-        out.autoPathEnabled = s.autoPathEnabled;
-      } else {
-        out.autoPathEnabled = true;
-      }
-    } else {
-      out.autoPath = null;
-      out.autoPathEnabled = false;
+    // the FTC25 map merges over ITS OWN defaults, so an action it lacks takes the FTC25 bind
+    out.ftc25Bindings = mergeBindings(s.ftc25Bindings, FTC25_DEFAULT_BINDINGS);
+    out.ftc25SingleBindings = mergeBindings(s.ftc25SingleBindings, FTC25_SINGLE_DEFAULT_BINDINGS);
+    if (s.ftc25Pads === 1 || s.ftc25Pads === 2) out.ftc25Pads = s.ftc25Pads;
+    // the presets: exactly four numbers, each a whole percent inside the launcher's range, or
+    // the defaults whole — a half-valid table would be four presets nobody chose
+    if (
+      Array.isArray(s.ftc25Powers) &&
+      s.ftc25Powers.length === 4 &&
+      s.ftc25Powers.every((v) => typeof v === 'number' && Number.isFinite(v))
+    ) {
+      out.ftc25Powers = (s.ftc25Powers as number[]).map((v) =>
+        clamp(Math.round(v), Math.round(FTC25_MIN_POWER * 100), 100),
+      ) as GameSettings['ftc25Powers'];
     }
-
+    if (s.controlScheme === 'dsim' || s.controlScheme === 'ftc25') out.controlScheme = s.controlScheme;
   } catch {
     /* corrupt data — defaults */
   }

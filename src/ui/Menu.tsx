@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { GameSettings } from '../types';
-import type { ChainScoreMode, DrivetrainType, IntakeStyle, RobotSpec } from '../types';
-import { MAX_SAVED_ROBOTS, ROBOT_PRESETS, CHASSIS_COLORS, CHASSIS_COLOR_KEYS, chassisFill } from '../config';
+import type { ChainScoreMode, DrivetrainType, RobotSpec } from '../types';
+import { MAX_SAVED_ROBOTS, CHASSIS_COLORS, CHASSIS_COLOR_KEYS, chassisFill } from '../config';
 import {
   ACCENT_KEYS,
   DECAL_KEYS,
@@ -64,13 +64,10 @@ import {
   butterflyTankRpm,
   butterflyTankRpmLimits,
   driveParams,
-  lengthLimits,
   massLimits,
   rpmLimits,
-  widthLimits,
 } from '../sim/drivetrain';
 import { coerceSpec, coerceAssists, PLAYER_ASSISTS } from '../sim/spawn';
-import { RobotPreview } from './RobotPreview';
 import { ChainRobotPreview } from '../games/chain/RobotPreview';
 import { moduleFor } from '../games';
 import { DRIVETRAIN_LABELS, buildWords, teamLine } from './robotLabels';
@@ -79,12 +76,6 @@ import { Marquee } from './Marquee';
 import { OptRow, ToggleRow } from './OptRow';
 import { rangeFill } from './rangeFill';
 import { starPoints } from '../render/drawRobot';
-
-const INTAKE_LABELS: Record<IntakeStyle, string> = {
-  sloped: 'Sloped',
-  vector: 'Vector wheel',
-  triangle: 'Triangle',
-};
 
 // Chain Reaction robot config blurbs (CR-only builder controls). The LABELS
 // (CHAIN_MODE_LABELS / CHAIN_INTAKE_LABELS) are shared with the leaderboard config
@@ -495,30 +486,22 @@ export function Menu({ settings, onChange }: Props) {
   };
 
   const spec = settings.spec;
-  // the shooter-specific build controls (intake preset, flywheel inertia, color
-  // sorter) are DECODE concepts — hidden for the Chain Reaction shell, whose real
-  // intakes/config arrive with its rules. The shared chassis controls
-  // (drivetrain/size/mass/rpm) stay for every game.
-  const isDecode = settings.game === 'decode';
-  // MODULE UI SLOTS. A game that fills one of these gets its own panel/schematic
-  // instead of an `isDecode` arm; both current games fill neither, so every branch
-  // below is exactly the one that was there before the slots existed.
+  // MODULE UI SLOTS. A game that fills one of these gets its own panel/schematic instead of the
+  // inline arm below, which is Chain Reaction's (BIOBUZZ fills them; DECODE, whose arms these
+  // used to be, was removed from this fork on 2026-10-12).
   const mod = moduleFor(settings.game);
   const Preview = mod.Preview;
   const Builder = mod.Builder;
   const DrivingRows = mod.DrivingRows;
   // the saved-robot card's THUMBNAIL, when the game draws one: BIOBUZZ renders the build on the
-  // 3D view. DECODE and CR draw none, and their cards are the name and the build line.
+  // 3D view. CR draws none, and its cards are the name and the build line.
   const SavedThumb = mod.savedThumb;
-  /** the game's 2D schematic of a build — the hero's picture and a saved card's, one spelling. TWO
-   * components, not one with a `chain` flag: DECODE's schematic is main's, untouched, and Chain
-   * Reaction's is its own, so work on one game's mechanisms can never change how the other's robot
-   * looks. A game with a `Preview` slot draws its own (BIOBUZZ's, without `allow3d`, is 2D). */
+  /** the game's 2D schematic of a build — the hero's picture and a saved card's, one spelling. A
+   * game with a `Preview` slot draws its own (BIOBUZZ's, without `allow3d`, is 2D); Chain
+   * Reaction's is the inline arm. */
   const preview2d = (s: RobotSpec, size: number) =>
     Preview ? (
       <Preview spec={s} size={size} alliance={settings.alliance} caption={false} />
-    ) : isDecode ? (
-      <RobotPreview spec={s} size={size} caption={false} />
     ) : (
       <ChainRobotPreview spec={s} size={size} caption={false} />
     );
@@ -530,13 +513,7 @@ export function Menu({ settings, onChange }: Props) {
   // every build: the sweeper deploys, so it never competed with the chassis for the starting
   // cube, and the mount is paid for in hopper volume instead (`chainMountStoreMult`).
   const crSize = chainSizeLimits(spec);
-  const { min: minLength, max: maxLength } = isDecode
-    ? lengthLimits(spec.intake)
-    : { min: crSize.minLength, max: crSize.maxLength };
-  const dtWidth = widthLimits(spec.intake, spec.drivetrain);
-  const { min: minWidth, max: maxWidth } = isDecode
-    ? dtWidth
-    : { min: crSize.minWidth, max: crSize.maxWidth };
+  const { minLength, maxLength, minWidth, maxWidth } = crSize;
   const { min: minRpm, max: maxRpm } = rpmLimits(spec.drivetrain);
   // BUTTERFLY carries two independently geared wheel sets, so it gets a SECOND rpm slider.
   // The traction set runs the torque-biased tank envelope, which tops out lower.
@@ -548,17 +525,15 @@ export function Menu({ settings, onChange }: Props) {
     spec.flywheelInertia,
     // CR mechanisms that weigh something (today: the twin turret's second flywheel). Same
     // value coerceSpec uses, so the slider floor IS the enforced floor.
-    isDecode ? 0 : chainMassFloorBump(spec),
+    chainMassFloorBump(spec),
   );
   const dp = driveParams(spec);
-  // The builder shows DECODE robot presets or CR archetype presets per the active game —
-  // unless the game FILLS THE SLOT, which is the only way a third game gets its own. The
-  // two-valued form below is not a safe default for a game that fills neither branch: it is
-  // an `else`, so BIOBUZZ was being offered Chain Reaction's robots under Chain Reaction's
-  // labels. `mod.presets ? <slot> : <existing branch, unchanged>` — see `games/module.ts`.
+  // The builder shows CR archetype presets — unless the game FILLS THE SLOT, which is the only
+  // way another game gets its own (BIOBUZZ does). `mod.presets ? <slot> : <CR's>` — see
+  // `games/module.ts`.
   const gamePresets = mod.presets;
-  const presets = gamePresets ? gamePresets.list : isDecode ? ROBOT_PRESETS : CHAIN_PRESETS;
-  const presetMatches = gamePresets ? gamePresets.matches : isDecode ? specMatches : chainSpecMatches;
+  const presets = gamePresets ? gamePresets.list : CHAIN_PRESETS;
+  const presetMatches = gamePresets ? gamePresets.matches : chainSpecMatches;
   // how many leading cards are real robots rather than archetype demos; each gets a "Real robot"
   // badge. 0 ⇒ none (every current non-slot game is one or the other).
   const realPresets = gamePresets?.realCount ?? 0;
@@ -599,11 +574,6 @@ export function Menu({ settings, onChange }: Props) {
   };
   const deleteSavedRobot = (i: number): void =>
     set({ savedRobots: savedRobots.filter((_, j) => j !== i) });
-
-  function selectIntake(intake: IntakeStyle) {
-    // setSpec re-clamps chassis length into the new preset's range (18in cube)
-    setSpec({ intake });
-  }
 
   return (
     <>
@@ -885,319 +855,268 @@ export function Menu({ settings, onChange }: Props) {
               <>
                 {/* ---- SCORING ---- */}
                 <h3 className="ds-subh">Scoring</h3>
-                {isDecode ? (
-                  <>
+                <>
+                  <div className="ds-opts card4">
+                    {CHAIN_SCORE_MODES.map((m) => (
+                      <button
+                        key={m}
+                        aria-pressed={(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) === m}
+                        className={`ds-opt ${(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) === m ? 'on' : ''}`}
+                        onClick={() => setSpec({ scoreMode: m })}
+                      >
+                        <span className="ot">{CHAIN_MODE_LABELS[m]}</span>
+                        <span className="od">{CHAIN_MODE_BLURBS[m]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {/* The mount means two different things, so it is TWO different pickers.
+                      TURRETLESS: which chassis EDGE the launcher fires over — four sides, and a
+                      corner is not buildable because the launch line spans a side.
+                      TURRETED: where the turret is BOLTED. It aims itself, so this is a position,
+                      not a facing — and it is where the Particle is actually born. Nine positions
+                      laid out as a 3x3 map of the chassis (front row on top), so the picker reads
+                      as a top-down diagram rather than a list of words. */}
+                  {isTurreted(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) ? (
+                    <div className="ds-opts three">
+                      {CHAIN_TURRET_POSITIONS.map((m) => (
+                        <button
+                          key={m}
+                          aria-pressed={shooterMountOf(spec) === m}
+                          className={`ds-opt mini ${shooterMountOf(spec) === m ? 'on' : ''}`}
+                          onClick={() => setSpec({ shooterMount: m })}
+                        >
+                          <span className="ot">{CHAIN_SHOOTER_MOUNT_LABELS[m]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ds-opts four">
+                      {CHAIN_SHOOTER_MOUNTS.map((m) => (
+                        <button
+                          key={m}
+                          aria-pressed={shooterMountOf(spec) === m}
+                          className={`ds-opt mini ${shooterMountOf(spec) === m ? 'on' : ''}`}
+                          onClick={() => setSpec({ shooterMount: m })}
+                        >
+                          <span className="ot">{CHAIN_SHOOTER_MOUNT_LABELS[m]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+
+                {/* ---- INTAKE ---- */}
+                <h3 className="ds-subh">Intake</h3>
+                <>
+                  {/* CR has ONE intake design, so this is a statement, not a picker.
+                      `.static` keeps the card look and drops the pointer affordances —
+                      NOT `disabled`, which would grey it out and say "unavailable" about
+                      the only intake the robot has. */}
+                  <div className="ds-opts fill">
+                    <div className="ds-opt on static">
+                      <span className="ot">{CHAIN_INTAKE_LABELS.sweeper}</span>
+                    </div>
+                  </div>
+                  <div className="ds-opts four">
+                    {CHAIN_INTAKE_MOUNTS.map((m) => (
+                      <button
+                        key={m}
+                        aria-pressed={intakeMountOf(spec) === m}
+                        className={`ds-opt mini ${intakeMountOf(spec) === m ? 'on' : ''}`}
+                        onClick={() => setSpec({ intakeMount: m })}
+                      >
+                        <span className="ot">{CHAIN_INTAKE_MOUNT_LABELS[m]}</span>
+                        {CHAIN_INTAKE_MOUNT_BLURBS[m] ? (
+                          <span className="od">{CHAIN_INTAKE_MOUNT_BLURBS[m]}</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
+
+                {/* ---- CATALYST ---- */}
+                <>
+                  <h3 className="ds-subh">Catalyst</h3>
+                  <div className="ds-opts card4">
+                    {CHAIN_CATALYST_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        aria-pressed={(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === t}
+                        className={`ds-opt ${(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === t ? 'on' : ''}`}
+                        onClick={() => setSpec({ catalystType: t })}
+                      >
+                        <span className="ot">{CHAIN_CATALYST_LABELS[t]}</span>
+                        <span className="od">{CHAIN_CATALYST_BLURBS[t]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {/* SWING is a property of the MECHANISM, not a place to put it. It used to be
+                      the centre cell of this grid, which made "a swing" and "on the right"
+                      mutually exclusive picks — so a fore-aft swing arm bolted to the right
+                      rail, an ordinary build, could not be expressed at all. The DIRECTION
+                      matters as much as the fact of it: which positions a pivot can use follows
+                      from which way it turns, so the grid below re-gates on this. */}
+                  {/* ARM ONLY. A turret claw already aims through a full circle and a rail
+                      already traverses, so a pivot adds nothing to either — it is the fixed
+                      arm, the one mechanism that has to be pointed at its work, for which
+                      swinging is a real build decision. `coerceSpec` drops a swing on anything
+                      else, so this is a gate on an offer, not on a capability the sim keeps. */}
+                  {(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'arm' && (
+                    <div className="ds-opts three">
+                      {([null, 'fb', 'lr'] as const).map((axis) => (
+                        <button
+                          key={axis ?? 'fixed'}
+                          aria-pressed={catalystSwingOf(spec) === axis}
+                          className={`ds-opt mini ${catalystSwingOf(spec) === axis ? 'on' : ''}`}
+                          onClick={() => {
+                            // moving to a pivot from a mount it cannot use takes the nearest one
+                            // that works on THIS axis, rather than refusing the click
+                            const m = catalystMountOf(spec);
+                            setSpec({
+                              catalystSwing: axis ?? undefined,
+                              catalystMount: axis ? swingHomeFor(m, axis) : m === 'center' ? 'front' : m,
+                            });
+                          }}
+                          // Fixed needs no tooltip — the label is the whole story. The two
+                          // swings each keep the one fact the arrow glyph cannot show.
+                          title={
+                            axis === null
+                              ? undefined
+                              : axis === 'fb'
+                                ? 'Reaches from either end'
+                                : 'Reaches from either flank'
+                          }
+                        >
+                          <span className="ot">{axis === null ? 'Fixed' : axis === 'fb' ? 'Swing ↕' : 'Swing ↔'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Same 3x3 chassis map as the turret picker: where the mechanism is BOLTED. */}
+                  {(() => {
+                    // A cell is unavailable for three physical reasons, and the picker says
+                    // WHICH — coerceSpec would quietly relocate the mount otherwise, and a
+                    // button that moves your choice somewhere else without explaining is
+                    // worse than one that refuses.
+                    const railed = (spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'rail';
+                    const swung = catalystSwingOf(spec);
+                    const blockOf = (m: (typeof CHAIN_CATALYST_MOUNTS)[number]): string | undefined => {
+                      if (railed && !isEdgePos(m))
+                        return 'A rail needs a whole chassis side to run along. Corners and the centre have no span for a track';
+                      if (
+                        mountsClash(
+                          { pos: m, spansEdge: railed, swing: swung },
+                          { pos: shooterMountOf(spec), spansEdge: !isTurreted(spec.scoreMode) },
+                        )
+                      )
+                        return 'The shooter is mounted here';
+                      // a pivot needs BOTH of its working ends reachable, which depends on the
+                      // axis: a fore-aft arm wants a front and a back, a lateral one wants two
+                      // flanks. And with no pivot at all, the middle reaches nothing.
+                      if (swung && !isSwingMount(m, swung))
+                        return swung === 'lr'
+                          ? 'A left-right swing pivots between the flanks. Bolt it to the centre line or an end'
+                          : 'A front-back swing pivots between the ends. Bolt it to the centre line or a flank';
+                      if (!swung && m === 'center')
+                        return 'Nothing reaches from the middle of a chassis. Turn on the swing arm to work from here';
+                      // an ENABLED cell gets none: its label already names the mount, and the
+                      // swing picker above names the swing
+                      return undefined;
+                    };
+                    // THE REASONS ALSO PRINT UNDER THE MAP: a disabled cell's `title` never
+                    // reaches a keyboard (it cannot take focus) or a phone (no hover).
+                    const refused = new Map<string, string[]>();
+                    for (const m of CHAIN_CATALYST_MOUNTS) {
+                      const why = blockOf(m);
+                      if (why) refused.set(why, [...(refused.get(why) ?? []), CHAIN_CATALYST_MOUNT_LABELS[m]]);
+                    }
+                    return (
+                      <>
+                        <div className="ds-opts three">
+                          {CHAIN_CATALYST_MOUNTS.map((m) => {
+                            const why = blockOf(m);
+                            return (
+                              <button
+                                key={m}
+                                aria-pressed={catalystMountOf(spec) === m}
+                                className={`ds-opt mini ${catalystMountOf(spec) === m ? 'on' : ''}${why ? ' off' : ''}`}
+                                disabled={why !== undefined}
+                                onClick={() => setSpec({ catalystMount: m })}
+                                title={why}
+                              >
+                                <span className="ot">{CHAIN_CATALYST_MOUNT_LABELS[m]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {[...refused].map(([why, where]) => (
+                          <p className="ds-hint" key={why}>
+                            {where.join(', ')}: {why}
+                          </p>
+                        ))}
+                      </>
+                    );
+                  })()}
+                  {(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'launcher' && (
                     <div className="ds-fields">
                       <label className="ds-field">
                         <span className="cap">
-                          Flywheel inertia <span className="val">{spec.flywheelInertia.toFixed(2)}</span>
+                          Catapult range <span className="val">{chainCatapultRange(spec)}"</span>
                         </span>
                         <input
                           className="ds-range"
                           type="range"
-                          min={0}
-                          max={1}
-                          step={0.05}
-                          value={spec.flywheelInertia}
-                          style={rangeFill(spec.flywheelInertia, 0, 1)}
-                          // a bigger flywheel weighs more: setSpec raises the mass floor
-                          // and pulls mass up with it so the loadout stays legal
-                          onChange={(e) => setSpec({ flywheelInertia: Number(e.target.value) })}
+                          min={CHAIN_CATAPULT_RANGE_MIN}
+                          max={CHAIN_CATAPULT_RANGE_MAX}
+                          step={5}
+                          value={chainCatapultRange(spec)}
+                          aria-valuetext={`${chainCatapultRange(spec)} inches`}
+                          style={rangeFill(chainCatapultRange(spec), CHAIN_CATAPULT_RANGE_MIN, CHAIN_CATAPULT_RANGE_MAX)}
+                          onChange={(e) => setSpec({ catapultRange: Number(e.target.value) })}
+                        />
+                      </label>
+                      {/* WHICH WAY IT THROWS. The catapult is bolted, not turreted — it fires
+                          along the chassis plus this offset — so the direction is a build
+                          decision, and picking it off a slider means doing trigonometry to
+                          answer "out of the back". Eight compass points on the same 3x3 map as
+                          every other mount picker; the slider under it stays for the angles
+                          between them. */}
+                      <div className="ds-opts three wide">
+                        {CATAPULT_DIRS.map((d) => (
+                          <button
+                            key={d.label}
+                            aria-pressed={(spec.catapultYaw ?? 0) === d.yaw}
+                            className={`ds-opt mini ${(spec.catapultYaw ?? 0) === d.yaw ? 'on' : ''}${d.yaw === null ? ' off' : ''}`}
+                            disabled={d.yaw === null}
+                            onClick={() => d.yaw !== null && setSpec({ catapultYaw: d.yaw })}
+                            // the DEGREES are the only thing the label doesn't already say,
+                            // and the sign convention is not guessable (see CATAPULT_DIRS).
+                            // The dead centre cell is `disabled`, which says enough.
+                            title={d.yaw === null ? undefined : `${d.yaw}°`}
+                          >
+                            <span className="ot">{d.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <label className="ds-field">
+                        <span className="cap">
+                          Catapult yaw <span className="val">{spec.catapultYaw ?? 0}°</span>
+                        </span>
+                        <input
+                          className="ds-range"
+                          type="range"
+                          min={-180}
+                          max={180}
+                          step={CHAIN_CATAPULT_YAW_STEP}
+                          value={spec.catapultYaw ?? 0}
+                          aria-valuetext={`${spec.catapultYaw ?? 0} degrees`}
+                          style={rangeFill(spec.catapultYaw ?? 0, -180, 180)}
+                          onChange={(e) => setSpec({ catapultYaw: Number(e.target.value) })}
                         />
                       </label>
                     </div>
-                    {/* its OWN row, not a column of `.ds-fields`: as the one non-`.ds-field`
-                        child of that row it was stretched to the slider's height with its
-                        label pinned to the top edge, landing on the slider's caption line. */}
-                    <ToggleRow
-                      label="Colour sorter"
-                      value={spec.canSort}
-                      onPick={(canSort) => setSpec({ canSort })}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div className="ds-opts card4">
-                      {CHAIN_SCORE_MODES.map((m) => (
-                        <button
-                          key={m}
-                          aria-pressed={(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) === m}
-                          className={`ds-opt ${(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) === m ? 'on' : ''}`}
-                          onClick={() => setSpec({ scoreMode: m })}
-                        >
-                          <span className="ot">{CHAIN_MODE_LABELS[m]}</span>
-                          <span className="od">{CHAIN_MODE_BLURBS[m]}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {/* The mount means two different things, so it is TWO different pickers.
-                        TURRETLESS: which chassis EDGE the launcher fires over — four sides, and a
-                        corner is not buildable because the launch line spans a side.
-                        TURRETED: where the turret is BOLTED. It aims itself, so this is a position,
-                        not a facing — and it is where the Particle is actually born. Nine positions
-                        laid out as a 3x3 map of the chassis (front row on top), so the picker reads
-                        as a top-down diagram rather than a list of words. */}
-                    {isTurreted(spec.scoreMode ?? CHAIN_DEFAULT_SCORE_MODE) ? (
-                      <div className="ds-opts three">
-                        {CHAIN_TURRET_POSITIONS.map((m) => (
-                          <button
-                            key={m}
-                            aria-pressed={shooterMountOf(spec) === m}
-                            className={`ds-opt mini ${shooterMountOf(spec) === m ? 'on' : ''}`}
-                            onClick={() => setSpec({ shooterMount: m })}
-                          >
-                            <span className="ot">{CHAIN_SHOOTER_MOUNT_LABELS[m]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="ds-opts four">
-                        {CHAIN_SHOOTER_MOUNTS.map((m) => (
-                          <button
-                            key={m}
-                            aria-pressed={shooterMountOf(spec) === m}
-                            className={`ds-opt mini ${shooterMountOf(spec) === m ? 'on' : ''}`}
-                            onClick={() => setSpec({ shooterMount: m })}
-                          >
-                            <span className="ot">{CHAIN_SHOOTER_MOUNT_LABELS[m]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* ---- INTAKE ---- */}
-                <h3 className="ds-subh">Intake</h3>
-                {isDecode ? (
-                  // label-only, so CHIP height like the drivetrain row above it — a 62px slab
-                  // directly under 36px chips read as a different kind of control
-                  <div className="ds-opts five">
-                    {(Object.keys(INTAKE_LABELS) as IntakeStyle[]).map((i) => (
-                      <button
-                        key={i}
-                        aria-pressed={spec.intake === i}
-                        className={`ds-opt mini ${spec.intake === i ? 'on' : ''}`}
-                        onClick={() => selectIntake(i)}
-                      >
-                        <span className="ot">{INTAKE_LABELS[i]}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    {/* CR has ONE intake design, so this is a statement, not a picker.
-                        `.static` keeps the card look and drops the pointer affordances —
-                        NOT `disabled`, which would grey it out and say "unavailable" about
-                        the only intake the robot has. */}
-                    <div className="ds-opts fill">
-                      <div className="ds-opt on static">
-                        <span className="ot">{CHAIN_INTAKE_LABELS.sweeper}</span>
-                      </div>
-                    </div>
-                    <div className="ds-opts four">
-                      {CHAIN_INTAKE_MOUNTS.map((m) => (
-                        <button
-                          key={m}
-                          aria-pressed={intakeMountOf(spec) === m}
-                          className={`ds-opt mini ${intakeMountOf(spec) === m ? 'on' : ''}`}
-                          onClick={() => setSpec({ intakeMount: m })}
-                        >
-                          <span className="ot">{CHAIN_INTAKE_MOUNT_LABELS[m]}</span>
-                          {CHAIN_INTAKE_MOUNT_BLURBS[m] ? (
-                            <span className="od">{CHAIN_INTAKE_MOUNT_BLURBS[m]}</span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* ---- CATALYST (CR only) ---- */}
-                {!isDecode && (
-                  <>
-                    <h3 className="ds-subh">Catalyst</h3>
-                    <div className="ds-opts card4">
-                      {CHAIN_CATALYST_TYPES.map((t) => (
-                        <button
-                          key={t}
-                          aria-pressed={(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === t}
-                          className={`ds-opt ${(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === t ? 'on' : ''}`}
-                          onClick={() => setSpec({ catalystType: t })}
-                        >
-                          <span className="ot">{CHAIN_CATALYST_LABELS[t]}</span>
-                          <span className="od">{CHAIN_CATALYST_BLURBS[t]}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {/* SWING is a property of the MECHANISM, not a place to put it. It used to be
-                        the centre cell of this grid, which made "a swing" and "on the right"
-                        mutually exclusive picks — so a fore-aft swing arm bolted to the right
-                        rail, an ordinary build, could not be expressed at all. The DIRECTION
-                        matters as much as the fact of it: which positions a pivot can use follows
-                        from which way it turns, so the grid below re-gates on this. */}
-                    {/* ARM ONLY. A turret claw already aims through a full circle and a rail
-                        already traverses, so a pivot adds nothing to either — it is the fixed
-                        arm, the one mechanism that has to be pointed at its work, for which
-                        swinging is a real build decision. `coerceSpec` drops a swing on anything
-                        else, so this is a gate on an offer, not on a capability the sim keeps. */}
-                    {(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'arm' && (
-                      <div className="ds-opts three">
-                        {([null, 'fb', 'lr'] as const).map((axis) => (
-                          <button
-                            key={axis ?? 'fixed'}
-                            aria-pressed={catalystSwingOf(spec) === axis}
-                            className={`ds-opt mini ${catalystSwingOf(spec) === axis ? 'on' : ''}`}
-                            onClick={() => {
-                              // moving to a pivot from a mount it cannot use takes the nearest one
-                              // that works on THIS axis, rather than refusing the click
-                              const m = catalystMountOf(spec);
-                              setSpec({
-                                catalystSwing: axis ?? undefined,
-                                catalystMount: axis ? swingHomeFor(m, axis) : m === 'center' ? 'front' : m,
-                              });
-                            }}
-                            // Fixed needs no tooltip — the label is the whole story. The two
-                            // swings each keep the one fact the arrow glyph cannot show.
-                            title={
-                              axis === null
-                                ? undefined
-                                : axis === 'fb'
-                                  ? 'Reaches from either end'
-                                  : 'Reaches from either flank'
-                            }
-                          >
-                            <span className="ot">{axis === null ? 'Fixed' : axis === 'fb' ? 'Swing ↕' : 'Swing ↔'}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {/* Same 3x3 chassis map as the turret picker: where the mechanism is BOLTED. */}
-                    {(() => {
-                      // A cell is unavailable for three physical reasons, and the picker says
-                      // WHICH — coerceSpec would quietly relocate the mount otherwise, and a
-                      // button that moves your choice somewhere else without explaining is
-                      // worse than one that refuses.
-                      const railed = (spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'rail';
-                      const swung = catalystSwingOf(spec);
-                      const blockOf = (m: (typeof CHAIN_CATALYST_MOUNTS)[number]): string | undefined => {
-                        if (railed && !isEdgePos(m))
-                          return 'A rail needs a whole chassis side to run along. Corners and the centre have no span for a track';
-                        if (
-                          mountsClash(
-                            { pos: m, spansEdge: railed, swing: swung },
-                            { pos: shooterMountOf(spec), spansEdge: !isTurreted(spec.scoreMode) },
-                          )
-                        )
-                          return 'The shooter is mounted here';
-                        // a pivot needs BOTH of its working ends reachable, which depends on the
-                        // axis: a fore-aft arm wants a front and a back, a lateral one wants two
-                        // flanks. And with no pivot at all, the middle reaches nothing.
-                        if (swung && !isSwingMount(m, swung))
-                          return swung === 'lr'
-                            ? 'A left-right swing pivots between the flanks. Bolt it to the centre line or an end'
-                            : 'A front-back swing pivots between the ends. Bolt it to the centre line or a flank';
-                        if (!swung && m === 'center')
-                          return 'Nothing reaches from the middle of a chassis. Turn on the swing arm to work from here';
-                        // an ENABLED cell gets none: its label already names the mount, and the
-                        // swing picker above names the swing
-                        return undefined;
-                      };
-                      // THE REASONS ALSO PRINT UNDER THE MAP: a disabled cell's `title` never
-                      // reaches a keyboard (it cannot take focus) or a phone (no hover).
-                      const refused = new Map<string, string[]>();
-                      for (const m of CHAIN_CATALYST_MOUNTS) {
-                        const why = blockOf(m);
-                        if (why) refused.set(why, [...(refused.get(why) ?? []), CHAIN_CATALYST_MOUNT_LABELS[m]]);
-                      }
-                      return (
-                        <>
-                          <div className="ds-opts three">
-                            {CHAIN_CATALYST_MOUNTS.map((m) => {
-                              const why = blockOf(m);
-                              return (
-                                <button
-                                  key={m}
-                                  aria-pressed={catalystMountOf(spec) === m}
-                                  className={`ds-opt mini ${catalystMountOf(spec) === m ? 'on' : ''}${why ? ' off' : ''}`}
-                                  disabled={why !== undefined}
-                                  onClick={() => setSpec({ catalystMount: m })}
-                                  title={why}
-                                >
-                                  <span className="ot">{CHAIN_CATALYST_MOUNT_LABELS[m]}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {[...refused].map(([why, where]) => (
-                            <p className="ds-hint" key={why}>
-                              {where.join(', ')}: {why}
-                            </p>
-                          ))}
-                        </>
-                      );
-                    })()}
-                    {(spec.catalystType ?? CHAIN_DEFAULT_CATALYST) === 'launcher' && (
-                      <div className="ds-fields">
-                        <label className="ds-field">
-                          <span className="cap">
-                            Catapult range <span className="val">{chainCatapultRange(spec)}"</span>
-                          </span>
-                          <input
-                            className="ds-range"
-                            type="range"
-                            min={CHAIN_CATAPULT_RANGE_MIN}
-                            max={CHAIN_CATAPULT_RANGE_MAX}
-                            step={5}
-                            value={chainCatapultRange(spec)}
-                            aria-valuetext={`${chainCatapultRange(spec)} inches`}
-                            style={rangeFill(chainCatapultRange(spec), CHAIN_CATAPULT_RANGE_MIN, CHAIN_CATAPULT_RANGE_MAX)}
-                            onChange={(e) => setSpec({ catapultRange: Number(e.target.value) })}
-                          />
-                        </label>
-                        {/* WHICH WAY IT THROWS. The catapult is bolted, not turreted — it fires
-                            along the chassis plus this offset — so the direction is a build
-                            decision, and picking it off a slider means doing trigonometry to
-                            answer "out of the back". Eight compass points on the same 3x3 map as
-                            every other mount picker; the slider under it stays for the angles
-                            between them. */}
-                        <div className="ds-opts three wide">
-                          {CATAPULT_DIRS.map((d) => (
-                            <button
-                              key={d.label}
-                              aria-pressed={(spec.catapultYaw ?? 0) === d.yaw}
-                              className={`ds-opt mini ${(spec.catapultYaw ?? 0) === d.yaw ? 'on' : ''}${d.yaw === null ? ' off' : ''}`}
-                              disabled={d.yaw === null}
-                              onClick={() => d.yaw !== null && setSpec({ catapultYaw: d.yaw })}
-                              // the DEGREES are the only thing the label doesn't already say,
-                              // and the sign convention is not guessable (see CATAPULT_DIRS).
-                              // The dead centre cell is `disabled`, which says enough.
-                              title={d.yaw === null ? undefined : `${d.yaw}°`}
-                            >
-                              <span className="ot">{d.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                        <label className="ds-field">
-                          <span className="cap">
-                            Catapult yaw <span className="val">{spec.catapultYaw ?? 0}°</span>
-                          </span>
-                          <input
-                            className="ds-range"
-                            type="range"
-                            min={-180}
-                            max={180}
-                            step={CHAIN_CATAPULT_YAW_STEP}
-                            value={spec.catapultYaw ?? 0}
-                            aria-valuetext={`${spec.catapultYaw ?? 0} degrees`}
-                            style={rangeFill(spec.catapultYaw ?? 0, -180, 180)}
-                            onChange={(e) => setSpec({ catapultYaw: Number(e.target.value) })}
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </>
-                )}
+                  )}
+                </>
 
                 {/* ---- FRAME: clamped by every block above, so it comes last ---- */}
                 <h3 className="ds-subh">Frame</h3>
@@ -1250,35 +1169,33 @@ export function Menu({ settings, onChange }: Props) {
                       onChange={(e) => setSpec({ massLb: Number(e.target.value) })}
                     />
                   </label>
-                  {!isDecode && (
-                    <label className="ds-field">
-                      <span className="cap">
-                        Ground clearance{' '}
-                        <span className="val">{(spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT).toFixed(1)}"</span>
-                      </span>
-                      <input
-                        className="ds-range"
-                        type="range"
-                        min={CHAIN_CLEARANCE_MIN}
-                        max={CHAIN_CLEARANCE_MAX}
-                        step={0.1}
-                        value={spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT}
-                        aria-valuetext={`${(spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT).toFixed(1)} inches`}
-                        style={rangeFill(
-                          spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT,
-                          CHAIN_CLEARANCE_MIN,
-                          CHAIN_CLEARANCE_MAX,
-                        )}
-                        onChange={(e) => setSpec({ groundClearance: Number(e.target.value) })}
-                      />
-                    </label>
-                  )}
+                  <label className="ds-field">
+                    <span className="cap">
+                      Ground clearance{' '}
+                      <span className="val">{(spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT).toFixed(1)}"</span>
+                    </span>
+                    <input
+                      className="ds-range"
+                      type="range"
+                      min={CHAIN_CLEARANCE_MIN}
+                      max={CHAIN_CLEARANCE_MAX}
+                      step={0.1}
+                      value={spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT}
+                      aria-valuetext={`${(spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT).toFixed(1)} inches`}
+                      style={rangeFill(
+                        spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT,
+                        CHAIN_CLEARANCE_MIN,
+                        CHAIN_CLEARANCE_MAX,
+                      )}
+                      onChange={(e) => setSpec({ groundClearance: Number(e.target.value) })}
+                    />
+                  </label>
                   {/* BALL STORAGE sits with the FRAME, under the dimensions, because that is what
                       sets it: the cap is footprint x archetype x intake mount (chainStorageMax),
                       so it re-clamps as you drag Length/Width right above it. Full-width on its
                       own row deliberately — a fifth 140px column would orphan-wrap, and the
                       "12 / 24 particles" value needs the room. */}
-                  {!isDecode && (() => {
+                  {(() => {
                     const storeMax = chainStorageMax(spec);
                     const store = Math.min(spec.ballStorage ?? CHAIN_STORAGE_DEFAULT, storeMax);
                     return (

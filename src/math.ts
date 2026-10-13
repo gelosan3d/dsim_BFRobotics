@@ -17,36 +17,6 @@ export function norm(a: Vec2): Vec2 {
   const l = len(a);
   return l > 1e-9 ? { x: a.x / l, y: a.y / l } : { x: 0, y: 0 };
 }
-
-// ---- Bezier Curve Functions -----------------------------------------------
-export function linearPoint(p0: Vec2, p1: Vec2, t: number): Vec2 {
-  return {
-    x: p0.x + (p1.x - p0.x) * t,
-    y: p0.y + (p1.y - p0.y) * t,
-  };
-}
-
-export function quadraticBezierPoint(p0: Vec2, p1: Vec2, p2: Vec2, t: number): Vec2 {
-  const mt = 1 - t;
-  const mt2 = mt * mt;
-  const t2 = t * t;
-  return {
-    x: mt2 * p0.x + 2 * mt * t * p1.x + t2 * p2.x,
-    y: mt2 * p0.y + 2 * mt * t * p1.y + t2 * p2.y,
-  };
-}
-
-export function cubicBezierPoint(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): Vec2 {
-  const mt = 1 - t;
-  const mt3 = mt * mt * mt;
-  const mt2t = mt * mt * t;
-  const t2mt = t * t * mt;
-  const t3 = t * t * t;
-  return {
-    x: mt3 * p0.x + 3 * mt2t * p1.x + 3 * t2mt * p2.x + t3 * p3.x,
-    y: mt3 * p0.y + 3 * mt2t * p1.y + 3 * t2mt * p2.y + t3 * p3.y,
-  };
-}
 // ---------------------------------------------------------------------------
 
 // ---- deterministic trig ----------------------------------------------------
@@ -151,12 +121,6 @@ export function wrapAngle(a: number): number {
   while (a > Math.PI) a -= 2 * Math.PI;
   while (a <= -Math.PI) a += 2 * Math.PI;
   return a;
-}
-
-/** move angle `from` toward `to` by at most `maxDelta` */
-export function approachAngle(from: number, to: number, maxDelta: number): number {
-  const d = wrapAngle(to - from);
-  return from + clamp(d, -maxDelta, maxDelta);
 }
 
 export const approach = (from: number, to: number, maxDelta: number): number =>

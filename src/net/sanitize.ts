@@ -36,7 +36,7 @@ function coerceName(raw: unknown, fallback: string): string {
  * It clamped to DECODE's `START_POSES.length` (5) for every game, which CR (4
  * anchors) survives only because 4 < 5 — a game with fewer anchors than DECODE
  * would take an out-of-range index straight off the wire. Exported so smoke can
- * pin the per-game range; `simModuleFor` falls back to DECODE for an unknown id,
+ * pin the per-game range; `simModuleFor` falls back to `DEFAULT_GAME` for an unknown id,
  * exactly like every other resolver.
  */
 export function coerceStartIndex(raw: unknown, game?: GameId): number {
@@ -140,8 +140,12 @@ export function sanitizeReplay(raw: unknown, game?: GameId): Replay | null {
 
   // WHICH GAME this container claims, resolved BEFORE the setups are coerced: the
   // setup coercion is game-aware (chassis ranges, and the start-anchor count), so a CR
-  // replay sanitized against DECODE's envelope comes back as a different robot.
-  const replayGame: GameId = isGameId(r.game) ? r.game : (game ?? 'decode');
+  // replay sanitized against another game's envelope comes back as a different robot.
+  // An ABSENT game is the caller's (the board it was uploaded to); one this build does not
+  // have (DECODE, removed 2026-10-12) — or none at all, with no caller's either — is a
+  // container nothing here could play, and is refused rather than read as another game.
+  const replayGame: GameId | undefined = isGameId(r.game) ? r.game : r.game === undefined ? game : undefined;
+  if (!replayGame) return null;
 
   if (!Array.isArray(r.setups) || r.setups.length < 1 || r.setups.length > 4) return null;
   const setups: RobotSetup[] = [];

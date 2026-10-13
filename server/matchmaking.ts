@@ -5,7 +5,7 @@ import { PLACEMENT_GAMES } from '../src/config';
 import { dbEnabled } from './db/pool';
 import type { GameId, Physics } from '../src/types';
 import { simModuleFor } from '../src/games/sim';
-import { serverPhysics } from '../src/games/types';
+import { DEFAULT_GAME, serverPhysics } from '../src/games/types';
 import { DEPLOY_REGIONS, bestHost, type PingInfo } from './regions';
 import type { PendingMatch, PendingRosterEntry } from './matchTypes';
 import { QUEUE_NEED, type LobbyPlayer, type QueueMode, type ServerMsg } from '../src/net/protocol';
@@ -226,7 +226,7 @@ export interface QueueEntry {
   /** protocol capabilities this client build advertised (mixed-version safe) */
   caps?: string[];
   /** which game this client queued for (part of the bucket key — see bucketKey).
-   * Absent ⇒ 'decode'. */
+   * Absent ⇒ `DEFAULT_GAME`. */
   game?: GameId;
   /** release channel ('alpha' | 'stable' | …). The matchmaker ONLY pairs entries
    * of the same channel — alpha and stable run different src/sim, so a shared
@@ -750,7 +750,7 @@ export class Matchmaker {
    * Ranked is one population per game, so every staged match of that game must run the same
    * solve; letting a client's preference near this would split a leaderboard down the middle
    * with nothing on screen saying so. A game that declares no `'3d'` option stays `'2d'`,
-   * which is DECODE and Chain Reaction and is why their staged rooms are unchanged.
+   * which is Chain Reaction and is why its staged rooms are unchanged.
    *
    * Exported so `npm run test:mm` asserts the rule rather than the call site.
    */
@@ -886,7 +886,7 @@ export class Matchmaker {
     for (const mode of Object.keys(this.queues) as QueueMode[]) {
       for (const e of this.queues[mode]) {
         if (e.partyOnly) continue; // a closed challenge is not an open pool
-        const g = e.game ?? 'decode';
+        const g = e.game ?? DEFAULT_GAME;
         out[g] ??= { '1v1': 0, '2v2': 0 };
         out[g][mode]++;
       }
@@ -1126,8 +1126,7 @@ export function allianceOrder(group: QueueEntry[]): QueueEntry[] {
 /** matchmaking compatibility bucket: two entries may only be paired when this key
  * matches — same release channel AND same client build. Absent build ⇒ '' (old
  * clients fall back to channel-only separation). */
-// GAME is part of the bucket: a Chain-Reaction queuer and a DECODE queuer run
+// GAME is part of the bucket: a Chain-Reaction queuer and a BIOBUZZ queuer run
 // DIFFERENT `step()`s, so they must NEVER share one authoritative room (instant
-// desync). Old clients advertise no game ⇒ 'decode', so they only ever bucket with
-// other DECODE players.
-const bucketKey = (e: QueueEntry): string => `${e.game ?? 'decode'}|${e.channel ?? 'stable'}|${e.build ?? ''}`;
+// desync). A client that advertises no game is read as `DEFAULT_GAME`.
+const bucketKey = (e: QueueEntry): string => `${e.game ?? DEFAULT_GAME}|${e.channel ?? 'stable'}|${e.build ?? ''}`;

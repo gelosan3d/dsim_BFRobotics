@@ -241,12 +241,62 @@ that season has none) — then the bind panels —
   on a touch device that also has a keyboard or pad; touch itself has no button for it
   (`TOUCH_OTHER_ACTIONS`). `npm test` holds the switch end to end against the sim's own
   field-centric drive.
+- **TWO CONTROL SCHEMES: "DSim controls" and "FTC25 controls"** (owner, 2026-10-12, THIS FORK;
+  `GameSettings.controlScheme`, Controls ▸ Control scheme). FTC25 is team 2627's DECODE-season
+  TeleOp (`TeleOP25` in moorlacks/FTC2627, used with permission), on TWO controllers (their driver
+  + operator, `ftc25Bindings`) or ONE (`ftc25SingleBindings`, `GameSettings.ftc25Pads`). Read the
+  map in use through `activeBindings`, never a field directly. ⚠️ **DSIM CONTROLS MUST STAY EXACTLY
+  WHAT THEY WERE**: the nine FTC25 actions (`FTC25_ONLY`; the green / purple colour buttons went
+  with DECODE, 2026-10-12) ship UNBOUND on the DSim map and are
+  not on the DSim screen. That is why the smoke rule "every action has a default key and pad
+  button" exempts them on the DSim map, and a second rule demands a pad bind for each on both
+  FTC25 maps.
+  - **GAMEPAD 2** (`ControlBindings.pad2`, the operator's pad, buttons only) is the SECOND connected
+    pad, ORed into the same robot (`InputManager`). It is edited by the SAME editor through
+    `pad2View` / `fromPad2View`, so conflicts are within gamepad 2 only, and it has no season
+    scopes or pad settings. The menu button is watched on gamepad 1 alone.
+  - **Driving is input level** (`DriverShaping`, `src/input/driverShaping.ts`) — no wire, replay or
+    sim change: `slowHold` (×0.2, their `SLOW_MODE_FACTOR`) and the TARGET SNAPS `snapAim` /
+    `snapAlt` (owner: "snap towards the hive"), which turn the robot's SHOOTER to face
+    `GameSimModule.aimHeading` — Chain the goal opening, BIOBUZZ the own HIVE's
+    taking cell (`snapAlt`: the other cell). Half power, tapering, done inside 1.5°
+    (`FTC25_SNAP`); their fixed ±45° bang-bang landed anywhere in 35–53°. **The field-centric frame
+    is DSIM's own** (owner): their Options heading reset is gone.
+  - **The presets are the player's** (Controls ▸ Shooter presets, `GameSettings.ftc25Powers`, on the
+    d-pad in both layouts). The TABLE rides on the robot (`AssistConfig.manualShot`, fractions)
+    because a replay must reproduce a run whose presets were edited later; `RobotCommand.shotPower`
+    is only the index. `fireSel` asks for one kind of element, honoured by a BIOBUZZ double turret
+    only. Both are left OFF the command at 0 and `manualShot` is absent when off, so DSim-controls
+    commands, setups and replays are byte-identical. Protocol bits 1024–8192.
+  - ⚠️ **THE PRESETS ARE RESERVED** (owner, 2026-10-12: "keep presets for BIOBUZZ later"). DECODE's
+    launcher was the only reader of `shotPower` / `manualShot`, and it went with DECODE (with its
+    `solveShotAtSpeed` power model). The d-pad binds, the editor and `ftc25Powers` stay, but
+    `ACTION_GAMES` lists NO game for them (`RESERVED_ACTIONS`), so `effectiveBindings` empties them,
+    they conflict with nothing, and the HUD's power readout stays hidden until a game uses them. On
+    the one-controller map that matters: the presets shared D-UP / D-LEFT with DSIM's drive toggles.
+    Wiring BIOBUZZ's launcher up = list `'biobuzz'` for them in `ACTION_GAMES` and read
+    `manualShot[shotPower]` in its shot.
+- **LOCAL VERSUS** (this fork): a practice seat may be **Player 2** (`PracticeSeatKind`), a second
+  person on GAMEPAD 2 driving a twin of the player's robot, through their own `InputManager`
+  (`{ padSlot: 1, keyboard: false }`) and their own `DriverShaping`; both play the scheme's
+  ONE-controller map (`singlePadBindings`) and player 1 loses the operator pad. One Player 2 seat at
+  most. The Modes tile **Local versus** seats Player 2 as opponent 1 for THAT match only
+  (`versusSeats`, never saved). Solo only.
+- ⚠️ **NOTHING OF THIS FORK REACHES DSIM'S OWN SERVERS** (owner, 2026-10-12;
+  `src/net/forkScope.ts`). The account copy of the settings is `forAccount(settings)` — no scheme, no
+  FTC25 maps or presets, no gamepad 2, Player 2 written as None — and an account load keeps the
+  device's own (`keepLocalForkFields`). A run with a FTC25 seat (`replayIsFork`) or a Local versus
+  is kept on the device and never uploaded or counted (`localOnly`, and the backlog re-checks the
+  BODY so a missing flag cannot leak one). In a room, the fork's features act only when the lobby
+  marked the SESSION as LAN (`markLanSession`) or this tab hosts it; a room on DSIM's servers gets
+  plain commands and assists with no preset table. LAN rooms on this fork's own server keep it all
+  (`coerceAssists` keeps the table).
 - **AIM ASSIST IS ALWAYS ON, in BOTH games, and is NOT configurable.** `coerceAssists`
   (sim/spawn.ts) forces `aimAssist` true — deliberately in the SHARED coercer, not the UI,
   because a stored `false` can arrive from localStorage, a synced account blob, a saved robot
   slot, or the wire, and forcing it only in the menu would strand anyone who had switched it
   off with no control to switch back. The FLAG and both sims' manual-aim branches stay
-  (DECODE's chassis-locked turret in `updateRobotActions`, Chain's `chainAimAssist` guard),
+  (Chain's `chainAimAssist` guard; DECODE's chassis-locked turret went with DECODE),
   tested by setting `r.aimAssist` on the spawned robot — restoring the option is deleting one
   line in `coerceAssists` and putting the toggle back in `Menu.tsx`. A DECODE "auto align"
   assist (hold fire → steer the chassis onto the shot) was built and then REMOVED: with the
@@ -465,7 +515,7 @@ four `PERF_DISPLAY_BLURB` lines, an option's download size, and the R102 stow no
   back. The exception is Chain Reaction's drum and dumper with aim assist on, where a held
   SHOOT steers the chassis onto the goal (`chainAimAssist`) and so keeps its button (the
   `manualFireCounts` hook). This reverses the 2026-09-21 "ghosted, never hidden" ruling (tester
-  feedback, 2026-09-23). A default DECODE phone really is the two sticks and PARK, because
+  feedback, 2026-09-23). A default DECODE phone was the two sticks and PARK, because
   nothing else on it would do anything. `ready(live)` asks whether a press would act NOW
   (hopper empty, no FLOWER in reach, robots disabled), off `touchLiveOf(hud)` at the 10 Hz HUD
   poll. An unready button is drawn IDLE in place (`.mobile-btn.idle`, `aria-disabled`), still
@@ -536,8 +586,9 @@ same arguments are not had again:
 - **A name always gets `SupporterBadge`, as a SIBLING** — see the badge rules above — and
   **`BadgeMarks` beside it** (the worn badges; titles folded into badges in 0049): see
   `docs/area/accounts.md` for the surfaces.
-- **Terminology.** DSIM is the app; DECODE and Chain Reaction are seasons. DECODE has
-  ARTIFACTS, CR has PARTICLES, and a leak either way is a bug. CR's ring is a **CATALYST**
+- **Terminology.** DSIM is the app; BIOBUZZ and Chain Reaction are seasons (DECODE was one
+  until this fork removed it). BIOBUZZ has POLLEN and NECTAR, CR has PARTICLES, and a leak
+  either way is a bug. CR's ring is a **CATALYST**
   — the **RING STAND** is a different object in the same game, so the HUD chips that said
   RING now say CATALYST. Teleop is **DRIVER-CONTROLLED** on all THREE surfaces that name it
   (the live HUD, `world.events`, and the burned-in video overlay); it used to be
@@ -571,9 +622,8 @@ next step **REBUILDS** the world and stages that one, exactly as `startMatch`/`r
   periods**, so the step that asks for a NECTAR in a FLOWER cannot hand out a G410 MAJOR for doing
   as it says; and free drive is **never recorded** (`startMatch` returns on a phase that is not
   `pre`), which is the honest answer to "could a replay reproduce a staged world" — it could not,
-  so none is kept. ⚠️ **DECODE's penalty engine DOES run in `freeplay`** (`src/sim/penalties.ts`
-  says so), so a DECODE step staged near the gate can bill the player; the TUTORIAL lane asserts
-  every scripted run ends with zero fouls.
+  so none is kept. The TUTORIAL lane asserts every scripted run ends with zero fouls (DECODE's
+  penalty engine, which DID bill in `freeplay`, went with DECODE).
 - **It is not a `GameSettings` field.** A run is not a preference: settings persist to
   localStorage and sync to Postgres per account, so a "in the tutorial right now" bit would follow
   the account to another machine and survive a reload onto a screen with no idea what was staged.

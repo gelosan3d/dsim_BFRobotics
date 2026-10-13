@@ -19,6 +19,7 @@ export function ModeSelect({
   onRejoin,
   onFreeDrive,
   onSoloMatch,
+  onLocalVersus,
   onRecordRun,
   onDuoRecord,
   onRanked,
@@ -39,6 +40,8 @@ export function ModeSelect({
   onRejoin: () => void;
   onFreeDrive: () => void;
   onSoloMatch: () => void;
+  /** you against a second person on gamepad 2, on this device (`versusSeats`) */
+  onLocalVersus: () => void;
   onRecordRun: () => void;
   onDuoRecord: () => void;
   onRanked: () => void;
@@ -157,6 +160,13 @@ export function ModeSelect({
           <button className="ds-tile" onClick={onFreeDrive}>
             <span>
               <span className="t">Free drive</span>
+            </span>
+          </button>
+
+          {/* LOCAL VERSUS: two people, one controller each, on this device */}
+          <button className="ds-tile" onClick={onLocalVersus}>
+            <span>
+              <span className="t">Local versus</span>
             </span>
           </button>
         </div>

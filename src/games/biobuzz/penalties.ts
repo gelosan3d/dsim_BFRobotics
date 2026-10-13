@@ -750,11 +750,11 @@ function bbUpdatePins(world: World, dt: number, commands: Map<number, RobotComma
           bbRobotsContact(pinner, pinned),
           commands.get(pinned.id),
           commands.get(pinner.id),
-          // THIS field's solids. Left to its default the test reads DECODE's goal wedges and
-          // classifier channels, which on this field are open floor in two corners and say
-          // nothing about the FLOWER feet and HIVE frame bars a robot is actually held
-          // against — and a victim wrongly read as cornered is read as ESCAPING, so the pin
-          // it is in bills nothing. See `bbPinSolid`.
+          // THIS field's solids. The probe's old default was DECODE's goal wedges and
+          // classifier channels (required since DECODE left this fork), which on this field are
+          // open floor in two corners and say nothing about the FLOWER feet and HIVE frame bars
+          // a robot is actually held against — and a victim wrongly read as cornered is read as
+          // ESCAPING, so the pin it is in bills nothing. See `bbPinSolid`.
           bbPinSolid,
         ),
       );

@@ -114,7 +114,6 @@ export function AudioSection({
   audio.gameVolume = vol.game;
   audio.shootVolume = vol.shoot;
   audio.intakeVolume = vol.intake;
-  audio.gateVolume = vol.gate;
   audio.beepVolume = vol.beep;
   audio.alertVolume = vol.alert;
   audio.voiceVolume = vol.voice;
@@ -154,8 +153,8 @@ export function AudioSection({
             onChange={(voice) => setVolume({ voice })}
             onAudition={() => audio.say('Volume', true)}
           />
-          {/* ONE ROW PER EMITTER, BEHIND A FOLD. These five were a single slider labelled
-              "Beeping" — which moved the launcher, the intake and the gate as well, and was
+          {/* ONE ROW PER EMITTER, BEHIND A FOLD. These were a single slider labelled
+              "Beeping" — which moved the launcher, the intake and DECODE's gate as well, and was
               named after the rarest of them — so each one exists because the label is now
               checkable against its own audition. But eight identical sliders in a column is
               still a wall, and three of them (master, game, voice) are the ones anybody
@@ -177,13 +176,6 @@ export function AudioSection({
                 muted={silent}
                 onChange={(intake) => setVolume({ intake })}
                 onAudition={() => audio.sfxIntake()}
-              />
-              <VolumeRow
-                label="Classifier gate"
-                value={vol.gate}
-                muted={silent}
-                onChange={(gate) => setVolume({ gate })}
-                onAudition={() => audio.sfxGate()}
               />
               <VolumeRow
                 label="Countdown beeps"
@@ -220,7 +212,7 @@ export function AudioSection({
             options={THEMES.map((t) => ({ v: t.id, t: t.title }))}
           />
           {/* the stack of messages in the field's top-left corner during a match
-              (scoring, gate, penalties). It is a read-out and never a control, so
+              (scoring, penalties). It is a read-out and never a control, so
               turning it off costs nothing but the reading. */}
           <ToggleRow
             label="In-match messages"

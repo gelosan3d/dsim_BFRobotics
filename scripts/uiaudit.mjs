@@ -40,6 +40,13 @@ const css = readdirSync(UI).filter((f) => f.endsWith('.css')).map((f) => join(UI
 const tsx = readdirSync(UI).filter((f) => f.endsWith('.tsx')).map((f) => join(UI, f));
 // helpers like rangeFill.ts also hand custom properties to a style object
 const ts = readdirSync(UI).filter((f) => f.endsWith('.ts')).map((f) => join(UI, f));
+/** a GAME's own components (its HUD slots) set custom properties inline too — Chain Reaction's
+ *  storage gauge is the one setter of `--vg` since DECODE's power gauge went (2026-10-12). Read
+ *  for DEFINITIONS only: the rules below still audit `src/ui` alone. */
+const gameTsx = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? gameTsx(join(dir, e.name)) : e.name.endsWith('.tsx') ? [join(dir, e.name)] : [],
+  );
 const read = (f) => readFileSync(f, 'utf8').split('\n');
 
 /** every finding, grouped by rule id */
@@ -149,15 +156,16 @@ const BASELINE = {
   // and every colour fade moved onto them. What is left animates DATA, not state — gauge fills,
   // progress widths, a ring's dashoffset, a gate icon's swing — plus one joystick fade.
   // 7 → 4 the same day: the fill bars dropped their width transitions (§7) and the disclosure
-  // carets rotate at --ds-dur-fade.
-  'literal-duration': 4,
+  // carets rotate at --ds-dur-fade. 4 → 3 on 2026-10-12: DECODE's gate icon (its swing) went
+  // with DECODE.
+  'literal-duration': 3,
   'stale-component-index': 0,
 };
 
 // ── 1. undefined custom properties ───────────────────────────────────────────
 // definitions can come from either stylesheet, or from JS setting a property inline
 const defined = new Set();
-for (const f of [...css, ...tsx, ...ts]) {
+for (const f of [...css, ...tsx, ...ts, ...gameTsx('src/games')]) {
   for (const l of read(f)) {
     for (const m of l.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) defined.add(m[1]);
     // JSX sets custom properties two ways: `'--x':` and the computed

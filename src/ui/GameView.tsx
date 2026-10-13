@@ -9,10 +9,9 @@ import {
   type PerfSnapshot,
 } from '../game';
 import { PerfHud } from './PerfHud';
-import { PERF_DISPLAY_LEVELS } from '../settings';
+import { PERF_DISPLAY_LEVELS, activeBindings } from '../settings';
 import type { PerfDisplay } from '../types';
 import { effectiveBindings, keyLabel, livePadBinds, padBindLabel } from '../input/bindings';
-import { POWER_DRAW_MAX } from '../config';
 import { MobileControls } from './MobileControls';
 import { timerPanel } from './timerPanel';
 import { FoulChip } from './FoulChip';
@@ -26,6 +25,7 @@ import { clearActiveGame } from '../net/activeGame';
 import { TutorialCard } from './TutorialCard';
 import type { Replay, ReplayResult } from '../sim/replay';
 import { moduleFor } from '../games';
+import { DEFAULT_GAME } from '../games/types';
 import { seasonFor } from '../seasons';
 import { useCoarsePointer } from './useCoarsePointer';
 import type { Alliance, DrivetrainType } from '../types';
@@ -50,30 +50,6 @@ import { setPadMenuHandler } from './PadNavLayer';
  * display setting, which is what the owner asked for and costs the HUD no click target at all.
  */
 
-/** top-right drive power-draw gauge: how much current the flywheel spin-up + intake
- * are pulling off the drive motors right now (0 → POWER_DRAW_MAX). Bar on top (fills
- * upward toward the cap, green→amber→red), the actual % the drive is slowed at that
- * instant underneath — vertical to sit beside DECODE's storage+gate column. */
-function PowerGauge({ draw }: { draw: number }) {
-  const frac = Math.max(0, Math.min(1, draw)); // literal 0-100%, matches pct below
-  const pct = Math.round(draw * 100); // actual drive slowdown right now
-  const cls = draw > POWER_DRAW_MAX * 0.75 ? 'hot' : draw > POWER_DRAW_MAX * 0.4 ? 'warm' : '';
-  return (
-    <span
-      className="power-gauge"
-      role="img"
-      aria-label={`Drive power draw: ${pct}% slower right now.`}
-    >
-      <span className="v-gauge">
-        {/* the LEVEL, not a height: the fill is full-size and clipped to it, so the bar
-            animates without laying anything out — see .v-gauge-fill */}
-        <span className={`v-gauge-fill ${cls}`} style={{ ['--vg' as string]: String(frac) }} />
-      </span>
-      <span className="pg-num">{pct}%</span>
-    </span>
-  );
-}
-
 const DT_LABEL: Record<DrivetrainType, string> = {
   mecanum: 'Mecanum',
   tank: 'Tank',
@@ -81,21 +57,6 @@ const DT_LABEL: Record<DrivetrainType, string> = {
   xdrive: 'X-drive',
   butterfly: 'Butterfly',
 };
-
-/**
- * THE MOTIF, which the whole DECODE match is scored against — never by hue alone (design
- * review 17-06). A reader gets the sequence as words; a colour-blind driver gets a SHAPE,
- * purple round and green square (`.motif-dot.green` in styles.css).
- */
-function MotifDots({ motif, className }: { motif: readonly string[]; className?: string }) {
-  return (
-    <span className={className} role="img" aria-label={`Motif: ${motif.join(', ')}`}>
-      {motif.map((c, i) => (
-        <span key={i} className={`motif-dot ${c}`} />
-      ))}
-    </span>
-  );
-}
 
 /**
  * ONE IN-MATCH OVERLAY as a dialog (design review C07): the card is the dialog, labelled by
@@ -217,7 +178,7 @@ interface Props {
    *  score cannot reach the leaderboard until there is an account to hang it on. */
   onSignIn?: () => void;
   /** a SOLO PRACTICE run just finished — the app keeps it (locally, and on the account) */
-  onPracticeRun?: (replay: Replay, result: ReplayResult) => void;
+  onPracticeRun?: (replay: Replay, result: ReplayResult, localOnly: boolean) => void;
   /** whether the player is signed in — drives the record results "sign in to
    * save & rank" prompt vs the live PB / WR / rank line */
   signedIn?: boolean;
@@ -481,7 +442,7 @@ export function GameView({
          that window was handed to nobody and lost. */
       controller.setRestartRequest(restartRunRef.current ?? null);
       controller.onPracticeRun = practiceRunRef.current
-        ? (r, res) => practiceRunRef.current?.(r, res)
+        ? (r, res, localOnly) => practiceRunRef.current?.(r, res, localOnly)
         : null;
       setIntro(controller.getIntro()); // ranked matches only; null otherwise
       hudTimer = window.setInterval(() => setHud(controller.getHud()), 100);
@@ -583,7 +544,7 @@ export function GameView({
    */
   useEffect(() => {
     const c = controllerRef.current;
-    if (c) c.onPracticeRun = onPracticeRun ? (r, res) => onPracticeRun(r, res) : null;
+    if (c) c.onPracticeRun = onPracticeRun ? (r, res, localOnly) => onPracticeRun(r, res, localOnly) : null;
   }, [onPracticeRun]);
 
   /**
@@ -610,8 +571,8 @@ export function GameView({
    * world is authoritative in a room) and fall back to the setting before the first HUD poll.
    */
   const effBindings = useMemo(
-    () => effectiveBindings(settings.bindings, hud?.game ?? settings.game),
-    [settings.bindings, settings.game, hud?.game],
+    () => effectiveBindings(activeBindings(settings), hud?.game ?? settings.game),
+    [settings.bindings, settings.ftc25Bindings, settings.controlScheme, settings.game, hud?.game],
   );
   const [scene3d, setScene3d] = useState(false);
   useEffect(() => {
@@ -704,7 +665,7 @@ export function GameView({
           ref={canvasRef}
           className="game-canvas"
           role="img"
-          aria-label={`${seasonFor(hud?.game ?? 'decode').name} field, top-down view. Match state is announced in the event log.`}
+          aria-label={`${seasonFor(hud?.game ?? DEFAULT_GAME).name} field, top-down view. Match state is announced in the event log.`}
         />
       </div>
       {/* THE LOADING SCREEN. Physics has two owners: solo decides before the controller
@@ -856,12 +817,6 @@ export function GameView({
           <h2 id="gv-pre-title">
             <span className={`chip alliance-${hud.alliance}`}>{hud.alliance.toUpperCase()} ALLIANCE</span>
           </h2>
-          {hud.game === 'decode' && (
-            <p>
-              {/* the dots' own label says "Motif", so the visible word is not read twice */}
-              <span aria-hidden="true">MOTIF</span> <MotifDots motif={hud.motif} />
-            </p>
-          )}
           {!coarsePointer && (
             <p className="big">
               Press {keyLabel(effBindings.keys.start[0] ?? 'enter')} or{' '}
@@ -1002,24 +957,15 @@ function Hud({
   const timer = timerPanel(hud);
   const redScore = hud.alliance === 'red' ? hud.score.total : hud.oppTotal;
   const blueScore = hud.alliance === 'blue' ? hud.score.total : hud.oppTotal;
-  // Chain Reaction is scored (its own breakdown); DECODE shows motif + its breakdown.
+  // Chain Reaction is scored with its own breakdown row below. (DECODE's motif dots, its
+  // CLASSIFIED / OVERFLOW / PATTERN / RAMP row and its hopper + gate + power card went with
+  // DECODE on 2026-10-12.)
   const cr = hud.game === 'chain';
-  /**
-   * ...and DECODE is DECODE, named POSITIVELY.
-   *
-   * The motif dots, the CLASSIFIED / OVERFLOW / PATTERN / RAMP row and the hopper
-   * pips + power gauge + gate chip are DECODE's elements, and they were gated on
-   * `!cr` — "every game that is not Chain Reaction", which was the same set as
-   * DECODE right up until there was a third game, and then silently put DECODE's
-   * chrome on it. Byte-identical for both games that existed: `!cr` and `dec` agree
-   * on `decode` (true) and on `chain` (false).
-   */
-  const dec = hud.game === 'decode';
 
   return (
     <div className="hud">
       {/* A game that owns its whole bottom bar replaces it wholesale — the shared bar is
-          red | timer | blue with a motif, which is not a given for every game. It replaces
+          red | timer | blue, which is not a given for every game. It replaces
           only the BAR: the chip row below is shared chrome (net, gamepad, cards, spectators)
           that every game wants, and a game's own chips go into it through `hudChips`. */}
       {GameScoreBar ? (
@@ -1037,7 +983,6 @@ function Hud({
               {timer.label}
             </span>
             <span className="timer-time">{timer.time}</span>
-            {dec && <MotifDots className="timer-motif" motif={hud.motif} />}
           </div>
           <div className={`score-panel blue ${hud.alliance === 'blue' ? 'mine' : ''}`} role="group" aria-label="Blue alliance score">
             {hud.alliance === 'blue' && <span className="you-tag">YOU</span>}
@@ -1048,26 +993,10 @@ function Hud({
         <div className="scorebar" data-hud-band>
           <div className="timer-panel">
             <span className="timer-phase">FREE DRIVE</span>
-            {dec && <MotifDots className="timer-motif" motif={hud.motif} />}
           </div>
         </div>
       )}
 
-      {hud.mode === 'match' && dec && (
-        <div className="breakdown-row" data-hud-band>
-          {/* artifact COUNTS, not points (points live in the score panels).
-              PATTERN shows only BANKED points — it is assessed solely at the
-              end of AUTO and the end of the match, never live. */}
-          <span>CLASSIFIED {hud.classifiedCount}</span>
-          <span>OVERFLOW {hud.overflowCount}</span>
-          <span>
-            PATTERN{' '}
-            {hud.score.autoPattern + (hud.phase === 'post' ? hud.score.telePattern : 0)} PTS
-          </span>
-          <span>RAMP {hud.rampCount}/9</span>
-          <FoulChip hud={hud} />
-        </div>
-      )}
 
       {hud.mode === 'match' && cr && hud.chain && (
         <div className="breakdown-row" data-hud-band>
@@ -1116,39 +1045,6 @@ function Hud({
           <div className="status-row" data-hud-band={coarsePointer ? undefined : true}>
             <div className="robot-status">
               {GameChips && <GameChips hud={hud} />}
-              {dec && (
-                <div className="dec-hud">
-                  <div className="dec-hud-left">
-                    {/* spoken like Chain's and BIOBUZZ's columns (design review 22-12): the pips
-                        are colour alone, and `.hud` takes no pointer, so a `title` never shows */}
-                    <div
-                      className="hopper vertical"
-                      role="img"
-                      aria-label={`Hopper ${hud.hopper.length} of 3${hud.hopper.length ? `: ${hud.hopper.join(', ')}` : ''}.`}
-                    >
-                      {[0, 1, 2].map((i) => (
-                        <span key={i} className={`hopper-pip ${hud.hopper[i] ?? 'empty'}`} />
-                      ))}
-                    </div>
-                    {/* the gate lever always renders — closed is a real, visible state, unlike
-                        the old chip that vanished entirely when the gate wasn't open */}
-                    <span
-                      className={`gate-icon${hud.gateOpen ? ' open' : ''}${hud.gateOpen && hud.gateForced ? ' forced' : ''}`}
-                      role="img"
-                      aria-label={
-                        hud.gateOpen
-                          ? hud.gateForced
-                            ? 'Gate forced open by the opponent.'
-                            : 'Gate open.'
-                          : 'Gate closed.'
-                      }
-                    />
-                  </div>
-                  <div className="dec-hud-right">
-                    <PowerGauge draw={hud.powerDraw} />
-                  </div>
-                </div>
-              )}
               {/* ⚠️ NOTHING ELSE GOES IN THIS CARD. It is the GAME's card — a column of dots,
                   a gauge, a lever — and every text/emoji chip that used to sit beside them was
                   relocated by the owner's own pass over this corner (`HUD-RELOCATION.md`, which
@@ -1177,8 +1073,20 @@ function Hud({
               a new driver could not learn what two amber rings meant. The word is `aria-hidden`
               because the glyph's own `aria-label` already says it in full. This card is NOT in
               `[data-hud-band]`, so a word here never re-frames the 3D field. */}
-          {(hud.driveStyleSwitched || hud.frontFlipped || hud.butterflyMode || hud.card) && (
+          {(hud.driveStyleSwitched || hud.frontFlipped || hud.butterflyMode || hud.card || hud.ftc25) && (
             <div className="sub-hud">
+              {/* FTC25 controls: the shooter power the operator last picked (only on a robot that
+                  launches at it — offline DECODE), and slow mode while it is held */}
+              {hud.ftc25?.powerPct != null && (
+                <span className="sub-hud-item">
+                  <span className="sub-hud-lbl">{`POWER ${hud.ftc25.powerPct}%`}</span>
+                </span>
+              )}
+              {hud.ftc25?.slow && (
+                <span className="sub-hud-item">
+                  <span className="sub-hud-lbl">SLOW</span>
+                </span>
+              )}
               {/* the mid-match drive style switch, shown only while it differs from the menu's
                   Drive style: that is the one the driver chose, and needs no reminder */}
               {hud.driveStyleSwitched && (

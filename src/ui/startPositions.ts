@@ -1,6 +1,6 @@
 import type { Alliance, GameId, GameSettings, RobotSpec, StartCat, StartPose, StartSel } from '../types';
 import type { LobbyPlayer } from '../net/protocol';
-import { START_POSES, MAX_SAVED_STARTS, MAX_SAVED_STARTS_SUPPORTER } from '../config';
+import { MAX_SAVED_STARTS, MAX_SAVED_STARTS_SUPPORTER } from '../config';
 import { chainAnchorCat, chainDefaultIndex } from '../games/chain/config';
 import { simModuleFor } from '../games/sim';
 
@@ -70,45 +70,19 @@ export function derivedRole(players: LobbyPlayer[], me: LobbyPlayer): StartCat |
   return duo.mineFirst ? 'close' : 'far';
 }
 
-/**
- * Pure helpers for the Close/Far start-position model shared by the editor and
- * its host screens. The ACTIVE start (`startIndex`/`startPose`) is what spawns /
- * travels on the wire; `startCat` picks the category, `savedStartPoses` is the
- * per-category library (≤ MAX_SAVED_STARTS each), and `startMemory` remembers the
- * last selection in each category so switching tabs restores it.
- */
-
-export interface CatPreset {
-  index: number;
-  pose: StartPose;
-  label: string;
-}
-
-/** the built-in presets belonging to a category, with their START_POSES index */
-export function categoryPresets(cat: StartCat): CatPreset[] {
-  const out: CatPreset[] = [];
-  START_POSES.forEach((p, index) => {
-    if (p.cat === cat) out.push({ index, pose: { x: p.x, y: p.y, headingDeg: p.headingDeg }, label: p.label });
-  });
-  return out;
-}
-
-/** the fallback preset index for a category (its first preset) — game-aware: CR maps
- * the category onto its TOP/BOTTOM Lab-corner anchors, DECODE onto its Close/Far presets. */
+/** the fallback anchor index for a category — game-aware: CR maps the category onto its
+ * TOP/BOTTOM Lab-corner anchors, and a game with its own roles answers through its module
+ * (BIOBUZZ's TOP / BOTTOM). A game with neither (none today — the last was DECODE's Close/Far
+ * table, removed 2026-10-12) starts on its first anchor. */
 export function categoryDefaultIndex(cat: StartCat, game?: GameId): number {
   if (game === 'chain') return chainDefaultIndex(cat);
-  // a game with its own roles answers through its module (BIOBUZZ's TOP / BOTTOM)
-  const byModule = simModuleFor(game).startDefaultIndex;
-  if (byModule) return byModule(cat);
-  return categoryPresets(cat)[0]?.index ?? 0;
+  return simModuleFor(game).startDefaultIndex?.(cat) ?? 0;
 }
 
 /** the category a preset/anchor index belongs to (game-aware, see above) */
 export function indexCategory(index: number, game?: GameId): StartCat {
   if (game === 'chain') return chainAnchorCat(index);
-  const byModule = simModuleFor(game).startAnchorCategory;
-  if (byModule) return byModule(index);
-  return START_POSES[index]?.cat ?? 'close';
+  return simModuleFor(game).startAnchorCategory?.(index) ?? 'close';
 }
 
 /** the ACTIVE start fields (startIndex/startPose) for a remembered selection */

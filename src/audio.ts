@@ -31,7 +31,6 @@ export class MatchAudio {
    */
   shootVolume = 1;
   intakeVolume = 1;
-  gateVolume = 1;
   beepVolume = 1;
   /** "your ranked match is ready" — its own level because it is the one sound that
    *  plays when you are deliberately NOT looking at the game, so it wants to be
@@ -171,7 +170,7 @@ export class MatchAudio {
   ): void {
     // every synthesized effect funnels through tone/noiseBurst, so scaling here is
     // the only place a category level has to be applied. The caller passes WHICH
-    // category, because one emitter (the gate) is built from several of these.
+    // category, because one emitter may be built from several of these.
     const level = this.gain(category) * vol;
     if (level <= 0) return;
     const ctx = this.ensureCtx();
@@ -306,13 +305,6 @@ export class MatchAudio {
   sfxBeam(): void {
     this.noiseBurst(520, 150, 0.06, 0.2, 1);
     this.tone(140, 62, 0.09, 'sine', 0.17);
-  }
-
-  /** classifier gate "clack-clunk": latch click, then the flap swinging open */
-  sfxGate(): void {
-    this.noiseBurst(2600, 2600, 0.03, 0.25, 3, 0, this.gateVolume);
-    this.tone(520, 520, 0.05, 'square', 0.14, 0, this.gateVolume);
-    this.tone(340, 300, 0.08, 'square', 0.16, 0.07, this.gateVolume);
   }
 
   private voice: SpeechSynthesisVoice | null = null;

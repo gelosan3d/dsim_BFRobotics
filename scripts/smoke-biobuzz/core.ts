@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GAME_IDS, coerceGameId, isGameId, type GameId } from '../../src/games/types';
+import { DEFAULT_GAME, GAME_IDS, coerceGameId, isGameId, type GameId } from '../../src/games/types';
 import { GAMES, moduleFor, registeredGames } from '../../src/games';
 import { SIM_GAMES, simModuleFor } from '../../src/games/sim';
 import { coerceStartIndex, sanitizePlayer } from '../../src/net/sanitize';
@@ -42,7 +42,7 @@ import { bbLauncherOf, bbLiftOf } from '../../src/games/biobuzz/mechs';
 import type { BbMechSpec } from '../../src/games/biobuzz/mechs';
 import { bbConfigSummary, bbLiftKindLabel } from '../../src/games/biobuzz/labels';
 import { BB_PRESET_LIST, BB_REAL_PRESETS, BB_STARTER_BOTS } from '../../src/games/biobuzz/presets';
-import { buildWords, shotRange, teamLine } from '../../src/ui/robotLabels';
+import { buildWords, teamLine } from '../../src/ui/robotLabels';
 import { SIM_DT } from '../../src/config';
 import { createBiobuzzWorld } from '../../src/games/biobuzz/spawn';
 import { biobuzzStep } from '../../src/games/biobuzz/step';
@@ -60,12 +60,18 @@ const readRepo = (p: string): string => readFileSync(join(root, p), 'utf8');
 
 export function coreChecks(check: Check): void {
   // ---- registry integrity, for EVERY id ------------------------------------
-  // Both registries are typed PARTIAL and both resolvers fall back to DECODE, so
-  // an unregistered id is a SILENT downgrade: a player picks the game, gets a
-  // DECODE world, and nothing says so. Assert every id in the union is actually
+  // Both registries are typed PARTIAL and both resolvers fall back to DEFAULT_GAME, so
+  // an unregistered id is a SILENT downgrade: a player picks the game, gets the
+  // fallback's world, and nothing says so. Assert every id in the union is actually
   // registered, in BOTH registries, and that each module agrees about its own id.
   section('registry integrity');
-  check('GAME_IDS starts with decode (the fallback)', GAME_IDS[0] === 'decode');
+  check('GAME_IDS starts with DEFAULT_GAME (the fallback)', GAME_IDS[0] === DEFAULT_GAME);
+  check('the fallback is BIOBUZZ (DECODE was removed from this fork, 2026-10-12)', DEFAULT_GAME === 'biobuzz');
+  check('DECODE is not a game any more, in either registry or the season list',
+    !isGameId('decode') &&
+      !('decode' in GAMES) &&
+      !('decode' in SIM_GAMES) &&
+      !SEASONS.some((s) => (s.key as string) === 'decode'));
   check('GAME_IDS has no duplicates', new Set(GAME_IDS).size === GAME_IDS.length);
   for (const id of GAME_IDS) {
     const sim = simModuleFor(id);
@@ -131,12 +137,13 @@ export function coreChecks(check: Check): void {
       }
       check(`biobuzz: ${alliance}'s TOP anchors are the ones drawn at the top, named for their real wall`, bad === '', bad);
     }
-    check('decode: roles and anchor categories are unchanged (no module hooks)', !simModuleFor('decode').startRoleLabel && indexCategory(0, 'decode') === 'close');
   }
-  // the back-compat rule: an absent or unknown game is DECODE, never a throw
-  check('moduleFor(undefined) is decode', moduleFor(undefined).id === 'decode');
-  check('simModuleFor(null) is decode', simModuleFor(null).id === 'decode');
-  check('simModuleFor("nope") is decode', simModuleFor('nope' as GameId).id === 'decode');
+  // the back-compat rule: an absent or unknown game is DEFAULT_GAME, never a throw — and that
+  // includes the retired 'decode', which a stored blob or an old link can still carry
+  check('moduleFor(undefined) is the default game', moduleFor(undefined).id === DEFAULT_GAME);
+  check('simModuleFor(null) is the default game', simModuleFor(null).id === DEFAULT_GAME);
+  check('simModuleFor("nope") is the default game', simModuleFor('nope' as GameId).id === DEFAULT_GAME);
+  check('simModuleFor("decode") is the default game', simModuleFor('decode' as GameId).id === DEFAULT_GAME);
 
   // ---- coerceGameId / isGameId --------------------------------------------
   section('game id coercion');
@@ -144,33 +151,32 @@ export function coreChecks(check: Check): void {
     check(`coerceGameId round-trips ${id}`, coerceGameId(id) === id);
     check(`isGameId accepts ${id}`, isGameId(id));
   }
-  check('coerceGameId(undefined) is decode', coerceGameId(undefined) === 'decode');
-  check('coerceGameId("nope") is decode', coerceGameId('nope') === 'decode');
+  check('coerceGameId(undefined) is the default game', coerceGameId(undefined) === DEFAULT_GAME);
+  check('coerceGameId("nope") is the default game', coerceGameId('nope') === DEFAULT_GAME);
+  check('coerceGameId("decode") is the default game (a retired id)', coerceGameId('decode') === DEFAULT_GAME);
   check('coerceGameId honours its fallback', coerceGameId('nope', 'chain') === 'chain');
-  check('coerceGameId("DECODE") is decode (no case folding)', coerceGameId('DECODE') === 'decode');
+  check('coerceGameId("CHAIN") is not chain (no case folding)', coerceGameId('CHAIN') === DEFAULT_GAME);
   check('isGameId rejects a non-string', !isGameId(3));
   check('isGameId rejects "nope"', !isGameId('nope'));
 
   // ---- per-game start-index clamp (item 3) --------------------------------
-  // The clamp used DECODE's five anchors for every game. CR has four, so index 4
-  // survived a switch to CR; a game with FEWER anchors than DECODE would accept
-  // an index it cannot resolve at all.
+  // The clamp once used one game's anchor count for every game (DECODE's five, while it was
+  // here), so an index a game cannot resolve survived a switch to it. Each game's own count.
   section('per-game start-index clamp');
   const cr = simModuleFor('chain').startPoseCount;
-  const dec = simModuleFor('decode').startPoseCount;
-  check('DECODE has more anchors than CR (the reason this bug hid)', dec > cr, `${dec} vs ${cr}`);
-  check('CR keeps index 3', coerceStartIndex(3, 'chain') === 3);
-  check('DECODE keeps index 4', coerceStartIndex(4, 'decode') === 4);
-  check(`CR clamps index 4 to ${cr - 1}`, coerceStartIndex(4, 'chain') === cr - 1);
+  const bbn = simModuleFor('biobuzz').startPoseCount;
+  check('CR keeps its last anchor', coerceStartIndex(cr - 1, 'chain') === cr - 1);
+  check(`CR clamps index 9 to ${cr - 1}`, coerceStartIndex(9, 'chain') === cr - 1);
+  check('BIOBUZZ keeps its last anchor', coerceStartIndex(bbn - 1, 'biobuzz') === bbn - 1);
+  check(`BIOBUZZ clamps index 9 to ${bbn - 1}`, coerceStartIndex(9, 'biobuzz') === bbn - 1);
   check(
-    'an unknown game clamps as decode',
-    coerceStartIndex(4, 'nope' as GameId) === 4 &&
-      coerceStartIndex(99, 'nope' as GameId) === dec - 1,
+    'an unknown game clamps as the default game',
+    coerceStartIndex(99, 'nope' as GameId) === simModuleFor(DEFAULT_GAME).startPoseCount - 1,
   );
-  check('an absent game clamps as decode', coerceStartIndex(4, undefined) === 4);
+  check('an absent game clamps as the default game', coerceStartIndex(99, undefined) === simModuleFor(DEFAULT_GAME).startPoseCount - 1);
   check('a negative index clamps to 0', coerceStartIndex(-2, 'chain') === 0);
   check('a non-number index is 0', coerceStartIndex('3', 'chain') === 0);
-  check('NaN is 0', coerceStartIndex(Number.NaN, 'decode') === 0);
+  check('NaN is 0', coerceStartIndex(Number.NaN, 'biobuzz') === 0);
   // coerceSetup reads the same count
   const setup = (startIndex: number, game?: GameId): number =>
     coerceSetup(
@@ -183,10 +189,10 @@ export function coreChecks(check: Check): void {
       },
       game,
     ).startIndex;
-  check('coerceSetup: CR keeps index 3', setup(3, 'chain') === 3);
-  check('coerceSetup: DECODE keeps index 4', setup(4, 'decode') === 4);
-  check(`coerceSetup: CR clamps index 4 to ${cr - 1}`, setup(4, 'chain') === cr - 1);
-  check('coerceSetup: an unknown game clamps as decode', setup(4, 'nope' as GameId) === 4);
+  check('coerceSetup: CR keeps its last anchor', setup(cr - 1, 'chain') === cr - 1);
+  check(`coerceSetup: CR clamps index 9 to ${cr - 1}`, setup(9, 'chain') === cr - 1);
+  check(`coerceSetup: BIOBUZZ clamps index 9 to ${bbn - 1}`, setup(9, 'biobuzz') === bbn - 1);
+  check('coerceSetup: an unknown game clamps as the default game', setup(99, 'nope' as GameId) === simModuleFor(DEFAULT_GAME).startPoseCount - 1);
 
   // ---- channel visibility (item 4) ----------------------------------------
   // The PURE rule, tested in the leaf module. `src/seasonVisibility.ts` reads the
@@ -195,9 +201,9 @@ export function coreChecks(check: Check): void {
   section('season channel visibility');
   const stable = visibleGameIdsOn('stable');
   const alpha = visibleGameIdsOn('alpha');
-  check('decode is visible on stable', stable.includes('decode'));
+  check('biobuzz is visible on stable', stable.includes('biobuzz'));
   check('chain is visible on stable', stable.includes('chain'));
-  check('decode is visible on alpha too', alpha.includes('decode'));
+  check('biobuzz is visible on alpha too', alpha.includes('biobuzz'));
   check('chain is visible on alpha too', alpha.includes('chain'));
   for (const s of SEASONS) {
     const on = (c: string): boolean => !s.channels || (s.channels as readonly string[]).includes(c);
@@ -312,7 +318,6 @@ export function coreChecks(check: Check): void {
   {
     const rows = moduleFor('biobuzz').resultsRows;
     check('biobuzz FILLS the resultsRows slot', typeof rows === 'function');
-    check('decode does NOT fill it (its inline branch stays the live path)', !moduleFor('decode').resultsRows);
     check('chain does NOT fill it (its inline branch stays the live path)', !moduleFor('chain').resultsRows);
     // ONLY the titles need a hud here: every value goes through `n()`, which reads 0 from an
     // absent slice rather than throwing, so the order is pinnable without stepping a world.
@@ -390,7 +395,6 @@ export function coreChecks(check: Check): void {
   section('builder stat tiles (the per-game hero summary)');
   const bbTiles = moduleFor('biobuzz').statTiles;
   check('biobuzz FILLS the statTiles slot', typeof bbTiles === 'function');
-  check('decode does NOT fill it (its inline branch stays the live path)', !moduleFor('decode').statTiles);
   check('chain does NOT fill it (its inline branch stays the live path)', !moduleFor('chain').statTiles);
 
   /** one tile as the hero renders it: value, caption, and the optional second caption. */
@@ -443,7 +447,6 @@ export function coreChecks(check: Check): void {
   {
     const summary = moduleFor('biobuzz').labels?.configSummary;
     check('biobuzz FILLS the labels.configSummary slot', typeof summary === 'function');
-    check('decode does NOT fill labels (its inline arm stays the live path)', !moduleFor('decode').labels);
     check('chain does NOT fill labels (its inline arm stays the live path)', !moduleFor('chain').labels);
 
     // THE WIRING, pinned at the source. A correct summary that no screen reads is the whole bug
@@ -464,11 +467,12 @@ export function coreChecks(check: Check): void {
       card.includes('<span className="om">{buildWords(spec, game).join(\' · \')}</span>'),
     );
     check(
-      'buildWords reads the statTiles SLOT before the DECODE and CR arms',
+      'buildWords reads the statTiles SLOT before the CR arm',
       /const tiles = moduleFor\(game\)\.statTiles\?\.\(spec\);\s*\n\s*if \(tiles\)/.test(labelsSrc.replace(/\r\n/g, '\n')),
     );
-    // and BOTH shipped arms are there: DECODE names the intake, CR the archetype and catalyst.
-    check('the DECODE arm names the intake', labelsSrc.includes('`${INTAKE_SHORT[spec.intake]} intake`'));
+    // the shipped arm is there (CR names the archetype and catalyst), and DECODE's is gone:
+    // a third arm naming an intake STYLE would describe every slotless game in DECODE's words
+    check('no DECODE arm is left (it named the intake style)', !labelsSrc.includes('INTAKE_SHORT[spec.intake]'));
     check(
       'the CR arm names the archetype and the catalyst',
       labelsSrc.includes('CHAIN_MODE_LABELS[mode]') && labelsSrc.includes('CHAIN_CATALYST_LABELS[spec.catalystType'),
@@ -565,13 +569,7 @@ export function coreChecks(check: Check): void {
       'a Box Tube CHANGES the card line',
       words(rawOf(LOADOUTS[0].mech)).join() !== words(rawOf(LOADOUTS[1].mech)).join(),
     );
-    // DECODE and CR take their own arms, in their own words
-    const decodeWords = buildWords({ ...DEFAULT_SPEC, intake: 'vector', canSort: true, flywheelInertia: 0.9 }, 'decode');
-    check(
-      'DECODE card line: drivetrain, intake, sorter, shot range',
-      decodeWords.join(' · ') === `${decodeWords[0]} · Vector intake · sorter · ${shotRange(0.9)}`,
-      decodeWords.join(' · '),
-    );
+    // CR takes its own arm, in its own words
     const chainWords = buildWords({ ...DEFAULT_SPEC }, 'chain').join(' · ').toLowerCase();
     check('a CR card line never says POLLEN or intake style', !chainWords.includes('pollen') && !chainWords.includes('sloped'), chainWords);
     // THE TEAM LINE: number then name, and nothing at all when there is neither
@@ -864,7 +862,7 @@ export function coreChecks(check: Check): void {
       }),
     );
     const asBiobuzz = sanitizePlayer(wire, 'biobuzz').spec;
-    const asDecode = sanitizePlayer(wire, 'decode').spec;
+    const asChain = sanitizePlayer(wire, 'chain').spec;
     const mechOf = (s: RobotSpec): string => JSON.stringify(s.bbMech ?? null);
     check(
       'the test build really has a Box Tube (else the checks below prove nothing)',
@@ -877,9 +875,9 @@ export function coreChecks(check: Check): void {
       mechOf(asBiobuzz),
     );
     check(
-      'sanitized as DECODE, they do NOT (so the check above can fail)',
-      mechOf(asDecode) !== mechOf(built),
-      mechOf(asDecode),
+      'sanitized as Chain Reaction, they do NOT (so the check above can fail)',
+      mechOf(asChain) !== mechOf(built),
+      mechOf(asChain),
     );
     const indexSrc = readRepo('server/index.ts');
     check(

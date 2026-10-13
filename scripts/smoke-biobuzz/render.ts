@@ -364,12 +364,11 @@ import type { RobotSpec, World } from '../../src/types';
 import { mkWorld, type Check } from './harness';
 // COSMETICS (Day 4, `docs/cosmetics-plan.md`) — the 2D halo/decal helpers are DOM-free, so they
 // are checked directly against a stub context, same as the tape probe above.
-import { drawDecal, drawRobot as drawDecodeRobot, ROBOT_TRIM } from '../../src/render/drawRobot';
+import { drawDecal, ROBOT_TRIM } from '../../src/render/drawRobot';
 import { drawChainRobot } from '../../src/games/chain/drawRobot';
 import { createChainWorld } from '../../src/games/chain/spawn';
 import { createBiobuzzWorld } from '../../src/games/biobuzz/spawn';
 import { drawBiobuzzRobot } from '../../src/games/biobuzz/drawRobot';
-import { createWorld as createDecodeWorld } from '../../src/sim/spawn';
 // -- THE PERFORATED CAD SCORING ELEMENTS (2026-09-21), in their own import block --------
 import { BB_POLLEN_R } from '../../src/games/biobuzz/config';
 import { buildBiobuzzElements, setElementDetail, updateBiobuzzElements } from '../../src/games/biobuzz/scene/renderElements';
@@ -1101,7 +1100,6 @@ export function renderChecks(check: Check): void {
   // ---- the seam itself: GameModule.scene is a function ------------------------------------
   const mod = moduleFor('biobuzz');
   check('biobuzz fills the GameModule.scene slot, and it is a function', typeof mod.scene === 'function');
-  check('decode does NOT fill it (no 3D renderer)', moduleFor('decode').scene === undefined);
   check('chain does NOT fill it (no 3D renderer)', moduleFor('chain').scene === undefined);
 
   // ══ DAY 2 ═══════════════════════════════════════════════════════════════════════════════
@@ -2163,16 +2161,14 @@ function cosmeticsChecks(check: Check): void {
     const seat = (a: 'red' | 'blue') => ({ id: 0, alliance: a, spec: {} as RobotSpec, assists: {} as never, startIndex: 0 });
     for (const a of ['red', 'blue'] as const) {
       const worlds = {
-        decode: createDecodeWorld('free', 5, [seat(a)]),
         chain: createChainWorld('free', 5, [seat(a)]),
         biobuzz: createBiobuzzWorld('free', 5, [seat(a)]),
       };
       const draws = {
-        decode: (c: CanvasRenderingContext2D, on: boolean) => drawDecodeRobot(c, worlds.decode.robots[0], on, []),
         chain: (c: CanvasRenderingContext2D, on: boolean) => drawChainRobot(c, worlds.chain.robots[0], on, [], { x: 0, y: 1 }, worlds.chain),
         biobuzz: (c: CanvasRenderingContext2D, on: boolean) => drawBiobuzzRobot(c, worlds.biobuzz.robots[0], on, [], { x: 0, y: 1 }, worlds.biobuzz),
       };
-      for (const game of ['decode', 'chain', 'biobuzz'] as const) {
+      for (const game of ['chain', 'biobuzz'] as const) {
         const strokes = [...strokesOf((c) => draws[game](c, false)), ...strokesOf((c) => draws[game](c, true))];
         const bad = strokes.filter((st) => ALLIANCE.includes(st));
         check(
@@ -4237,8 +4233,8 @@ function graphicsChecks(check: Check, allFiles: string[]): void {
       // ── THE SLOTS, AND THE HOSTS THAT FILL THEM ──────────────────────────────────────────
       check('biobuzz fills previewScene, and it is a function', typeof bbMod.previewScene === 'function');
       check(
-        'decode and chain do NOT (no 3D generator for either)',
-        moduleFor('decode').previewScene === undefined && moduleFor('chain').previewScene === undefined,
+        'chain does NOT (no 3D generator)',
+        moduleFor('chain').previewScene === undefined,
       );
       check('biobuzz fills the savedThumb slot', typeof bbMod.savedThumb === 'function');
       check(
@@ -4271,12 +4267,6 @@ function graphicsChecks(check: Check, allFiles: string[]): void {
       check(
         'the preview scene warms its shaders with compileAsync and draws nothing until then',
         previewSrc.includes('.compileAsync(scene, camera)') && previewSrc.includes('if (!warm ||'),
-      );
-      // DECODE's sprite preview builds its template world ONCE: `createWorld` runs the G304 start
-      // search (~30 ms a call), and a hero plus three saved cards made it a 276 ms long task
-      check(
-        'the DECODE robot preview builds one template world per document, not one per picture',
-        readFileSync(join(root, 'src', 'ui', 'RobotPreview.tsx'), 'utf8').includes('template ??= createWorld('),
       );
       // the name and the team are one line each and scroll rather than wrap, on the card and in
       // the pinned hero — the results roster's own marquee, not a second one
@@ -5663,14 +5653,16 @@ function graphicsChecks(check: Check, allFiles: string[]): void {
 
       // ── ALL FIVE DRIVETRAINS, AND THE ONE THAT WAS ACTUALLY WRONG ────────────────────────
       // `xdrive` and `butterfly` both used to fall through to the mecanum wheel. X-DRIVE was a
-      // BUG: `drawWheels` (the 2D map, shared by all three games) cants its omnis across their
+      // BUG: `drawWheels` (the 2D map; each game keeps its own copy) cants its omnis across their
       // corners so the four read as a diamond, and its header explains why that is the machine
       // this sim models — a radial X could never yaw. Drawing them pointing forward in 3D made
       // the same robot a different machine depending on which view key was pressed, so the 3D
       // cant is now THE SAME EXPRESSION. BUTTERFLY was only under-drawn, and now carries both
       // sets with `butterflyTank` deciding which is down.
       {
-        const wheelsSrc = readFileSync(join(root, 'src', 'render', 'drawRobot.ts'), 'utf8');
+        // BIOBUZZ's own copy (`games/biobuzz/parts.ts`) — the shared one in render/drawRobot.ts was
+        // DECODE's, and went with it
+        const wheelsSrc = readFileSync(join(root, 'src', 'games', 'biobuzz', 'parts.ts'), 'utf8');
         check(
           'the 2D map still cants its X-drive omnis across their corners',
           /px \* py >= 0 \? -Math\.PI \/ 4 : Math\.PI \/ 4/.test(wheelsSrc),
@@ -10054,9 +10046,7 @@ function environmentAndReadoutChecks(check: Check): void {
       'the module slot draws the read-out',
       record((ctx) => BIOBUZZ_MODULE.drawSceneOverlay!(ctx, fw, flatView(0))).discs.filter(isElement).length === drawn.length,
     );
-    for (const id of ['decode', 'chain'] as const) {
-      check(`${id} fills no 3D overlay slot, so a scene of its own would draw none of this`, !moduleFor(id).drawSceneOverlay);
-    }
+    check('chain fills no 3D overlay slot, so a scene of its own would draw none of this', !moduleFor('chain').drawSceneOverlay);
 
     // ── AND REFUSES A PROJECTION IT CANNOT DRAW THROUGH ───────────────────────────────────
     // The affine transform is legitimate for an ORTHOGRAPHIC top-down camera and for nothing

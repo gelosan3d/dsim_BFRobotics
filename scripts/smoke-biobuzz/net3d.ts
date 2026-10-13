@@ -229,13 +229,13 @@ export function net3dChecks(check: Check): void {
       bare.physics === '3d',
       bare.physics,
     );
-    const dec = new Room('n3-dec', () => {}, { kind: 'record', record: 'solo', game: 'decode' });
+    const dec = new Room('n3-dec', () => {}, { kind: 'record', record: 'solo', game: 'chain' });
     check(
       'room: ...but only for a game that HAS a 3D solve — a DECODE record room is untouched',
       dec.physics === '2d',
       dec.physics,
     );
-    const forced = new Room('n3-forced', () => {}, { kind: 'versus', game: 'decode', physics: '3d' });
+    const forced = new Room('n3-forced', () => {}, { kind: 'versus', game: 'chain', physics: '3d' });
     check(
       'room: a DECODE room asked for 3D stays 2D rather than handing step() a physics it cannot run',
       forced.physics === '2d',
@@ -360,7 +360,7 @@ export function net3dChecks(check: Check): void {
   // A 2D GAME NEVER WAITS, whatever its clients advertise — there is no chunk to load.
   {
     const seen: ServerMsg[] = [];
-    const room = new Room('n3-r3d-2d', () => {}, { kind: 'versus', game: 'decode' });
+    const room = new Room('n3-r3d-2d', () => {}, { kind: 'versus', game: 'chain' });
     for (const s of ROSTER) room.add(mkClient(s, s.id === 'n3-b1' ? (m) => seen.push(wireCopy(m)) : () => {}));
     room.onMessage('n3-b1', { t: 'start' });
     check('ready3d: a DECODE room starts on START, with nobody having reported anything', seen.some((m) => m.t === 'matchStart'));
@@ -459,7 +459,7 @@ export function net3dChecks(check: Check): void {
     room.advanceForTest(1);
   }
   {
-    const room = new Room('n3-hold-2d', () => {}, { kind: 'versus', game: 'decode' });
+    const room = new Room('n3-hold-2d', () => {}, { kind: 'versus', game: 'chain' });
     for (const s of ROSTER) room.add(mkClient(s, () => {}));
     room.onMessage(ROSTER[0].id, { t: 'start' });
     check('viewready: a DECODE match is never held', room.tickForTest() === 0 && !room.loadHoldForTest().held);
@@ -614,7 +614,7 @@ export function net3dChecks(check: Check): void {
   // and always will be: a DECODE room, whose game declares no 3D solve at all.
   {
     const msgs: ServerMsg[] = [];
-    const room = new Room('n3-2d', () => {}, { kind: 'versus', game: 'decode' });
+    const room = new Room('n3-2d', () => {}, { kind: 'versus', game: 'chain' });
     check('room: a DECODE room is a 2D room', room.physics === '2d', room.physics);
     for (const s of ROSTER) {
       room.add(mkClient(s, s.id === 'n3-b1' ? (m) => msgs.push(wireCopy(m)) : () => {}));
@@ -1278,7 +1278,7 @@ export function net3dChecks(check: Check): void {
       {
         const rec = new Room('n3-bot-rec', () => {}, { kind: 'record', record: 'solo', game: 'biobuzz' });
         check('bots: a RECORD room refuses one (its replay is leaderboard proof)', rec.addBot() !== null, String(rec.addBot()));
-        const dec = new Room('n3-bot-dec', () => {}, { kind: 'versus', game: 'decode' });
+        const dec = new Room('n3-bot-dec', () => {}, { kind: 'versus', game: 'chain' });
         check('bots: a game with no driver refuses one', dec.addBot() !== null, String(dec.addBot()));
         const staged = new Room('n3-bot-mm', () => {}, { kind: 'versus', game: 'biobuzz' });
         staged.applyPending({

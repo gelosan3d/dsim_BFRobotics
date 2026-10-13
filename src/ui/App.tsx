@@ -2,7 +2,16 @@ import { lazy, useCallback, useEffect, useId, useMemo, useRef, useState } from '
 import type { ComponentType, ReactNode } from 'react';
 import { useDialog } from './useDialog';
 import type { GameSettings } from '../game';
-import { hasStoredSettings, loadSettings, saveSettings, switchGame, syncAudioMirrors } from '../settings';
+import {
+  activeBindings,
+  versusSeats,
+  forAccount,
+  keepLocalForkFields,
+  loadSettings,
+  saveSettings,
+  switchGame,
+  syncAudioMirrors,
+} from '../settings';
 import {
   saveAccountSettings,
   fetchAdminStatus,
@@ -13,8 +22,9 @@ import {
   type RoomInvite,
 } from '../net/api';
 import { uploadPracticeRun, uploadLanRun, reportPlayed, type LanParticipant } from '../net/api';
+import { replayIsFork } from '../net/forkScope';
 import { tabHosting } from '../lan/hosting';
-import { GAME_IDS } from '../games/types';
+import { DEFAULT_GAME, GAME_IDS, isGameId } from '../games/types';
 import { devRoutesEnabled, gameVisible } from '../seasonVisibility';
 import { moduleFor } from '../games';
 import { preloadRoomPhysics } from '../net/roomPhysics';
@@ -163,10 +173,10 @@ const NO_ARGS: RouteArgs = { replayId: null, username: null, sub: null, dev: nul
 
 /**
  * Tiny path router (no dependency). Each screen is a real URL, and every URL is
- * PREFIXED by the selected game — /decode/modes, /chain/configure/robot,
+ * PREFIXED by the selected game — /biobuzz/modes, /chain/configure/robot,
  * /chain/records/career, … — via the History API, so links are shareable, the
  * game is always visible in the address bar, and back/forward switch both the
- * screen AND the game. DECODE and Chain Reaction never share a URL. The web build
+ * screen AND the game. Two games never share a URL. The web build
  * uses an absolute base + a vercel.json SPA rewrite so a deep load/refresh
  * resolves. Under Electron (file://) there is no History to push, so we route by
  * state only (isWebHistory === false).
@@ -178,23 +188,29 @@ const NO_ARGS: RouteArgs = { replayId: null, username: null, sub: null, dev: nul
 const isWebHistory = typeof window !== 'undefined' && window.location.protocol !== 'file:';
 
 /**
- * The `/decode`, `/chain`, … URL prefix, BUILT FROM `GAME_IDS` rather than written
+ * The `/biobuzz`, `/chain`, … URL prefix, BUILT FROM `GAME_IDS` rather than written
  * out — it was a hand-typed `(decode|chain)` in two places, so a new game got no
  * route at all and its deep links silently rendered the saved game's screen.
  * Every id is a plain lowercase word, so nothing here needs escaping.
+ *
+ * `RETIRED_PREFIXES` are the games this fork no longer has (DECODE, 2026-10-12). Their old
+ * links still PARSE as prefixed, so `/decode/records` keeps its screen on the saved game — the
+ * same answer a hidden season's prefix gets in `parsePath` — rather than reading `decode` as an
+ * unknown screen and landing on home.
  */
-const GAME_PREFIX_RE = new RegExp(`^/(${GAME_IDS.join('|')})(?=/|$)`);
+const RETIRED_PREFIXES = ['decode'] as const;
+const GAME_PREFIX_RE = new RegExp(`^/(${[...GAME_IDS, ...RETIRED_PREFIXES].join('|')})(?=/|$)`);
 
 /**
  * Did this document OPEN on a game-prefixed URL? Captured at module load, before
- * the mount effect canonicalizes `/` to `/decode` in the address bar.
+ * the mount effect canonicalizes `/` to `/biobuzz` in the address bar.
  *
- * It decides the home route's canonical. `/` and `/decode` render the same
+ * It decides the home route's canonical. `/` and `/biobuzz` render the same
  * screen, so one has to point at the other, and which one depends on the URL
  * that was actually requested: arrive at `/` and the canonical is `/`, arrive at
- * `/decode` and it is `/decode`. Reading `location.pathname` from the effect
+ * `/biobuzz` and it is `/biobuzz`. Reading `location.pathname` from the effect
  * can't tell the two apart (the rewrite has already run), so every visit would
- * canonicalize to `/decode` and quietly deindex the homepage.
+ * canonicalize to `/biobuzz` and quietly deindex the homepage.
  *
  * A crawler renders exactly one URL and never navigates, so a value fixed at
  * load is right for the only consumer that reads canonicals; in-app navigation
@@ -323,9 +339,9 @@ function parseScreen(rest: string): { screen: Screen } & RouteArgs {
 }
 
 /**
- * Parse a full URL into the game + screen. A leading game segment (/decode,
+ * Parse a full URL into the game + screen. A leading game segment (/biobuzz,
  * /chain, …) selects the game; an unprefixed (legacy) path falls back to
- * `fallbackGame`.
+ * `fallbackGame`, and so does a retired game's prefix (`RETIRED_PREFIXES`).
  *
  * A prefix for a game HIDDEN on this release channel falls back to
  * `fallbackGame` as well, but keeps its SCREEN: the link is a real link and its
@@ -336,7 +352,7 @@ function parseScreen(rest: string): { screen: Screen } & RouteArgs {
  */
 function parsePath(pathname: string, fallbackGame: GameId): { game: GameId; screen: Screen } & RouteArgs {
   const gm = pathname.match(GAME_PREFIX_RE);
-  const prefixed = gm ? (gm[1] as GameId) : null;
+  const prefixed = gm && isGameId(gm[1]) ? gm[1] : null;
   const game: GameId = prefixed && gameVisible(prefixed) ? prefixed : fallbackGame;
   const rest = gm ? pathname.slice(gm[0].length) || '/' : pathname;
   // a game's own dev route wins over the shared screen table, but only where the
@@ -465,28 +481,14 @@ export function App() {
   // that game up front (switchGame swaps in its saved loadout) — do it in the
   // initializer so the very first render is already on the right game.
   const [settings, setSettings] = useState<GameSettings>(() => {
-    const stored = loadSettings();
     /**
-     * THE DISCORD ACTIVITY OPENS ON BIOBUZZ, and only the activity does.
-     *
-     * The app-wide default in `defaultSettings()` stays DECODE — the website and the
-     * desktop app are unchanged. Inside the embed there is no game-prefixed URL to read a
-     * season from, so `settings.game` is the whole story, and the current season is the
-     * one a player dropping into a voice channel expects to land on.
-     *
-     * ⚠️ It seeds a DEFAULT, it does not pin a season. A player who picks another season
-     * in the activity has settings stored for that origin from then on, so this stops
-     * applying to them — which is why it asks `hasStoredSettings()` rather than testing
-     * whether the loaded game happens to equal the default. Those are different questions:
-     * somebody who deliberately chose DECODE would be overridden on every launch by the
-     * second one.
-     *
-     * `DiscordLobbyList` is still handed `settings.game` and still says "the season picked
-     * on the home page", both of which stay true — this only changes what that value
-     * STARTS as, so there is no second source of truth for the season.
+     * THE DISCORD ACTIVITY OPENS ON BIOBUZZ — which is now simply the app-wide default
+     * (`DEFAULT_GAME`). The activity used to switch to BIOBUZZ itself while the site defaulted
+     * to DECODE; with DECODE removed from this fork (2026-10-12) the two coincide, so it has
+     * no special case. Inside the embed there is no game-prefixed URL to read a season from,
+     * so `settings.game` is the whole story.
      */
-    const s =
-      inDiscordActivity() && !hasStoredSettings() ? switchGame(stored, 'biobuzz') : stored;
+    const s = loadSettings();
     // a SAVED game hidden on this channel is dropped as well, not just a hidden
     // URL prefix: `coerceSettings` validates `game` as a `GameId` and knows
     // nothing about channels, so a stored `biobuzz` from an alpha build (the same
@@ -494,7 +496,7 @@ export function App() {
     // straight onto a season it must not name. Measured before the guard: the
     // home eyebrow read "BIOBUZZ presented by RTX" and the URL canonicalized to
     // /biobuzz, on a build whose picker does not list it.
-    const visible = gameVisible(s.game) ? s : switchGame(s, 'decode');
+    const visible = gameVisible(s.game) ? s : switchGame(s, DEFAULT_GAME);
     if (isWebHistory) {
       const g = parsePath(window.location.pathname, visible.game).game;
       if (g !== visible.game) return switchGame(visible, g);
@@ -573,7 +575,8 @@ export function App() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   // the 3D view keys listen outside React (`graphics/viewKey.ts`), so they are handed the binds
-  useEffect(() => setViewBindings(settings.bindings.keys), [settings.bindings]);
+  const liveBindings = activeBindings(settings);
+  useEffect(() => setViewBindings(liveBindings.keys), [liveBindings]);
 
   // on first load, persist the possibly-URL-switched game and canonicalize the URL
   // so an old unprefixed / cross-game link becomes a proper /<game>/... path.
@@ -593,7 +596,7 @@ export function App() {
     // ⚠️ KEEP THE FRAGMENT. `pathFor` emits neither a query nor a hash, so replacing the URL
     // with it alone DELETED the hash — and the admin console's whole URL state lives there
     // (`#tab=users&user=<id>`, chosen precisely because App owns the path and the query). The
-    // unprefixed `/admin` canonicalizes to `/decode/admin`, which is not equal, so EVERY
+    // unprefixed `/admin` canonicalizes to `/biobuzz/admin`, which is not equal, so EVERY
     // pasted console link was rewritten to a bare path before `Admin` mounted and opened on
     // Live. The query still goes: `?token=` is consumed at module load and must not survive.
     // ⚠️ EXCEPT THE GOOGLE SIGN-IN VERIFIER. Neon Auth returns from Google to this page with
@@ -613,7 +616,7 @@ export function App() {
   }, []);
 
   // reflect back/forward into state (no push — the URL already changed). A game
-  // prefix change (…/decode/… ↔ …/chain/…) swaps the game too.
+  // prefix change (…/biobuzz/… ↔ …/chain/…) swaps the game too.
   useEffect(() => {
     if (!isWebHistory) return;
     const onPop = (): void => {
@@ -656,8 +659,8 @@ export function App() {
      layer is mounted beside `<App/>` (main.tsx) and cannot see this state; `setPadNavPrefs` is a
      no-op when neither field moved, so this costs a comparison per render. */
   useEffect(() => {
-    setPadNavPrefs(settings.bindings.pad);
-  }, [settings.bindings.pad]);
+    setPadNavPrefs(liveBindings.pad);
+  }, [liveBindings.pad]);
 
   // surface the one-time Chain Reaction disclaimer on the first PLAY with CR loaded, not on the
   // switch itself (design review 22-06): firing on `settings.game` threw a blocking modal over
@@ -997,7 +1000,9 @@ export function App() {
     saveSettings(s);
     if (accountUserId) {
       clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => void saveAccountSettings(s), 700);
+      // THE ACCOUNT GETS WHAT AN UNMODIFIED DSIM CLIENT WOULD WRITE: this fork's own settings
+      // stay on the device (`forAccount`, `src/net/forkScope.ts`)
+      saveTimer.current = setTimeout(() => void saveAccountSettings(forAccount(s)), 700);
     }
   };
 
@@ -1043,11 +1048,13 @@ export function App() {
     // game when the account's saved settings load in, so a /chain deep-link isn't
     // reverted to whatever game the account last saved.
     const g = settingsRef.current.game;
-    const next = s.game !== g ? switchGame(s, g) : s;
+    // the account never holds this fork's settings, so keep this device's own (`forAccount`)
+    const kept = keepLocalForkFields(s, settingsRef.current);
+    const next = kept.game !== g ? switchGame(kept, g) : kept;
     setSettings(next);
     saveSettings(next);
   }, []);
-  const onSyncSeed = useCallback(() => void saveAccountSettings(settingsRef.current), []);
+  const onSyncSeed = useCallback(() => void saveAccountSettings(forAccount(settingsRef.current)), []);
 
   // the multiplayer game this browser is currently in (persisted to localStorage), so
   // the player can REJOIN it after navigating away and is stopped from starting a 2nd.
@@ -1347,12 +1354,15 @@ export function App() {
    * practice figure that flattered you relative to a record run would be worse than useless
    * for the one thing practice is for.
    */
-  const keepPracticeRun = (replay: Replay, result: ReplayResult): void => {
+  const keepPracticeRun = (replay: Replay, result: ReplayResult, localOnly = false): void => {
     const alliance = replay.setups[0]?.alliance ?? 'blue';
     const score = recordScore(result, alliance);
-    savePracticeRun(replay, { ...result, score: { ...result.score, [alliance]: score } });
+    savePracticeRun(replay, { ...result, score: { ...result.score, [alliance]: score } }, localOnly);
+    // A RUN PLAYED WITH THIS FORK'S FEATURES STAYS ON THE DEVICE (`src/net/forkScope.ts`): no
+    // games-played report, and the flush below skips it. It is still kept and watchable here.
+    if (localOnly || replayIsFork(replay)) return;
     // the homepage's games-played counter, signed in or not (the upload below is account-only)
-    reportPlayed(replay.game ?? 'decode', 'practice');
+    reportPlayed(replay.game ?? DEFAULT_GAME, 'practice');
     // Do not upload THIS run directly — flush the whole backlog instead, which includes it.
     // One path to the server means a run that failed on its own attempt is retried by the
     // next flush rather than being lost, and it is the same code either way.
@@ -1445,7 +1455,9 @@ export function App() {
     }));
     saveLanRunLocal(info.matchId, info.replay, info.result.score, participants);
     // the homepage's games-played counter: a LAN server has no database, so its host counts it
-    reportPlayed(info.replay.game ?? 'decode', 'lan', sess.setups.length >= 4 ? '2v2' : '1v1');
+    // a LAN match played with this fork's features is kept here and reported nowhere
+    if (replayIsFork(info.replay)) return;
+    reportPlayed(info.replay.game ?? DEFAULT_GAME, 'lan', sess.setups.length >= 4 ? '2v2' : '1v1');
     // Same as practice: never upload THIS match directly — drain the backlog, which contains
     // it. One path to the cloud means a failure is retried by the next flush.
     void flushLanRuns();
@@ -1674,6 +1686,7 @@ export function App() {
   const exitGame = (): void => {
     leaveSession();
     setTutorialRun(false);
+    setLocalVersus(false);
     navigate('home');
   };
 
@@ -1701,6 +1714,12 @@ export function App() {
   const [pendingStart, setPendingStart] = useState<(() => void) | null>(null);
   /** the next `/game` mount runs the TUTORIAL (see `startTutorial`), cleared on the way out. */
   const [tutorialRun, setTutorialRun] = useState(false);
+  /**
+   * THE NEXT `/game` MOUNT IS A LOCAL VERSUS (the Modes tile): you against a second person on
+   * gamepad 2, on the seats `versusSeats` lays out — for THIS match only, never written to the
+   * settings, so Solo practice keeps the line-up you gave it. Cleared on the way out.
+   */
+  const [localVersus, setLocalVersus] = useState(false);
   // a scheduled server restart is live (admin notice): don't let anyone START a new
   // game / queue — they'd just get dropped by the restart. People already in a game
   // are untouched (this only guards the start actions). Info notices don't block.
@@ -1911,7 +1930,7 @@ export function App() {
   if (screen === 'game') {
     return fullScreen(
       <GameView
-        settings={settings}
+        settings={localVersus && !session ? versusSeats(settings) : settings}
         session={session}
         signedIn={signedIn}
         onExit={exitGame}
@@ -2224,6 +2243,13 @@ export function App() {
           onSoloMatch={() =>
             guardStart(() => {
               update({ ...settings, mode: 'match' });
+              navigate('game');
+            })
+          }
+          onLocalVersus={() =>
+            guardStart(() => {
+              update({ ...settings, mode: 'match' });
+              setLocalVersus(true);
               navigate('game');
             })
           }

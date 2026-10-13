@@ -3,21 +3,21 @@ import { chainRoleLabel } from '../games/chain/config';
 import { simModuleFor } from '../games/sim';
 import type { RoleSwap } from './useRoleSwap';
 
-// role labels are game-specific: DECODE splits CLOSE/FAR (distance to goal), Chain
-// Reaction splits TOP/BOTTOM (which Lab corner), and a game with its own roles names them
-// through its module (BIOBUZZ: TOP/BOTTOM). `useRoleSwap` still carries the two abstract
-// StartCat slots; only the wording differs per game.
+// role labels are game-specific: Chain Reaction splits TOP/BOTTOM (which Lab corner), and a
+// game with its own roles names them through its module (BIOBUZZ: TOP/BOTTOM). `useRoleSwap`
+// still carries the two abstract StartCat slots (DECODE's CLOSE/FAR, by name); only the wording
+// differs per game.
 const roleLabel = (r: StartCat | undefined, game?: GameId, alliance?: Alliance) => {
   if (game === 'chain') return chainRoleLabel(r);
   const byModule = simModuleFor(game).startRoleLabel;
   if (byModule) return byModule(r, alliance);
-  return r === 'close' ? 'CLOSE' : r === 'far' ? 'FAR' : '—';
+  return '—';
 };
 
 /**
- * The 2v2 start-ROLE bar: shows this robot's role (Close/Far for DECODE, Top/Bottom
- * for Chain Reaction) and drives the consent-based swap handshake (propose → the
- * partner accepts). Rendered in the lobby + ranked strategy start-position section.
+ * The 2v2 start-ROLE bar: shows this robot's role (Top/Bottom in both games) and drives the
+ * consent-based swap handshake (propose → the partner accepts). Rendered in the lobby + ranked
+ * strategy start-position section.
  * Pure presentational over the `useRoleSwap` result.
  */
 export function RoleSwapBar({

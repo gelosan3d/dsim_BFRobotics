@@ -135,7 +135,7 @@ function step2d(world: World, dt: number, commands: Map<number, RobotCommand>): 
   // 4. see the note above — this is not a misplaced reset.
   world.rrContacts.length = 0;
   // 5. Rapier owns robot translation/velocity + wall containment on the BIOBUZZ field.
-  const preVels = solveRobots(world, dt, biobuzzColliders, undefined, drive);
+  const preVels = solveRobots(world, dt, biobuzzColliders, drive);
   // 6. square a tilted chassis flush against the walls (and other robots).
   squareUpRobotsWalls(world, preVels, BB_HALF_X, BB_HALF_Y);
 

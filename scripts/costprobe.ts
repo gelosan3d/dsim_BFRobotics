@@ -11,7 +11,7 @@
  * estimate is MEASURED here, off the real `step()` and the real slim + ball-delta codec
  * `Room.broadcastSnapshot` sends through, and re-measured whenever someone asks.
  *
- * WHAT IT MEASURES, per scenario (DECODE, Chain Reaction and BIOBUZZ, solo + 2v2):
+ * WHAT IT MEASURES, per scenario (Chain Reaction and BIOBUZZ, solo + 2v2):
  *   · cores/room       — cpu-seconds per second of match. This is the figure fly.toml's
  *                        sizing block is written against; take it before resizing a VM.
  *   · bytes/snapshot   — the exact `{t:'snapshot'}` frame the server broadcasts.
@@ -209,8 +209,6 @@ const bbBits = (tick: number): Partial<RobotCommand> => ({
 });
 
 const SCENARIOS: Scenario[] = [
-  { key: 'decode-solo', game: 'decode', robots: 1, label: 'DECODE solo record run' },
-  { key: 'decode-2v2', game: 'decode', robots: 4, label: 'DECODE 2v2 versus' },
   { key: 'chain-solo', game: 'chain', robots: 1, label: 'Chain Reaction solo' },
   { key: 'chain-2v2', game: 'chain', robots: 4, label: 'Chain Reaction 2v2' },
   // BIOBUZZ is `scored: false` and alpha-only, so it reaches no leaderboard and is NOT in the
@@ -601,13 +599,13 @@ if (pricedScenarios.length) {
   );
 }
 
-// Extrapolated on DECODE, the default scored game. Chain Reaction's columns are printed
-// above for comparison — its 300 particles make it the pessimistic case for bandwidth.
+// Extrapolated on Chain Reaction, the 2D scored game (DECODE, which this used to price, was
+// removed from this fork) — and with its 300 particles the pessimistic case for bandwidth.
 // BIOBUZZ is deliberately NOT extrapolated: it is `scored: false` and alpha-channel only, so
 // there is no population of it to extrapolate FROM. Its per-room columns are the useful half
 // and they are printed above; when it becomes a playable season, give it a share here.
-const solo = results.get('decode-solo')!;
-const v2 = results.get('decode-2v2')!;
+const solo = results.get('chain-solo')!;
+const v2 = results.get('chain-2v2')!;
 const nSolo = CCU * SOLO_SHARE;
 const nV2 = CCU * (1 - SOLO_SHARE);
 const rooms = nSolo + nV2 / 4;

@@ -1,4 +1,5 @@
 import type { Artifact, GameId, Physics, RobotCommand, RobotSpec } from '../types';
+import { DEFAULT_GAME } from '../games/types';
 import type { RobotSetup } from '../sim/spawn';
 import type { MatchResultInfo, NetSession, NetStatus, RematchVote, Snapshot } from './session';
 import type { Transport } from './transport';
@@ -58,7 +59,7 @@ const RTT_HISTORY = 120;
  * prediction means the local robot keeps responding meanwhile.
  */
 export class ServerSession implements NetSession {
-  /** which game the match plays (from matchStart; DECODE by default). Mutable so a
+  /** which game the match plays (from matchStart; `DEFAULT_GAME` by default). Mutable so a
    * host restart can carry a new game, but never written by consumers. */
   game: GameId;
   /** which physics the ROOM runs on (`matchStart.physics`; absent ⇒ '2d'). Mutable for the
@@ -188,7 +189,7 @@ export class ServerSession implements NetSession {
   ) {
     this.seatToken = seatToken;
     this.spectator = spectator;
-    this.game = start.game ?? 'decode';
+    this.game = start.game ?? DEFAULT_GAME; // a known game: `LobbyClient` refuses any other
     this.physics = start.physics ?? '2d';
     this.seed = start.seed;
     this.setups = start.setups;

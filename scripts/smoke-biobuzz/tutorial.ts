@@ -20,12 +20,6 @@ import { BB_FLOWERS, BB_GARDEN, BB_HIVE_CELL_DY, BB_HIVE_X, BB_LZ, BB_PRESETS } 
 import { bbCarriesNectar, bbLauncherOf, bbLiftOf } from '../../src/games/biobuzz/mechs';
 import { bbFlowerInReach } from '../../src/games/biobuzz/robot';
 import { bbHopperCap } from '../../src/games/biobuzz/robot';
-import { DECODE_TUTORIAL } from '../../src/games/decode/tutorial';
-import { createWorld as createDecodeWorld, DEFAULT_SPEC } from '../../src/sim/spawn';
-import { step as decodeStep } from '../../src/sim/world';
-import { robotInLaunchZone } from '../../src/sim/robot';
-import { baseZone, goalCenter } from '../../src/sim/field';
-import { wheelContacts } from '../../src/sim/physics';
 import type { Check } from './harness';
 
 /**
@@ -217,17 +211,11 @@ export function tutorialChecks(check: Check): void {
     const bb = moduleFor('biobuzz').tutorial;
     check('BIOBUZZ registers a tutorial on its module', !!bb);
     check("…and it declares itself BIOBUZZ's", bb?.game === 'biobuzz', String(bb?.game));
-    // Chain Reaction has none and is not expected to; DECODE's is asserted by name so that
-    // ADDING one cannot silently go unchecked, and REMOVING one is visible here.
+    // Chain Reaction has none and is not expected to, so ADDING one cannot silently go
+    // unchecked. (DECODE's four-step tutorial went with DECODE on 2026-10-12.)
     check(
       'Chain Reaction offers no tutorial (nothing is registered for it)',
       moduleFor('chain').tutorial === undefined,
-    );
-    const dec = moduleFor('decode').tutorial;
-    check(
-      `DECODE: ${dec ? `a tutorial with ${dec.steps.length} steps` : 'none registered'}`,
-      dec === undefined || (dec.game === 'decode' && dec.steps.length > 0),
-      dec ? dec.steps.map((s) => s.id).join(',') : '',
     );
   }
 
@@ -322,7 +310,7 @@ export function tutorialChecks(check: Check): void {
     // line too — it once resolved inside the inner `say` and was pasted mid-sentence
     const noUp = cloneBindings(DEFAULT_BINDINGS);
     noUp.keys.driveUp = [];
-    for (const s of [...BIOBUZZ_TUTORIAL.steps, ...DECODE_TUTORIAL.steps]) {
+    for (const s of BIOBUZZ_TUTORIAL.steps) {
       const t = hintText(s.hint({ bindings: noUp, gamepad: false, touch: false }));
       if (!/has no key/.test(t)) continue;
       check(`hint: ${s.id} with an unbound nested key is exactly the one line`, /^\w[\w ]* has no key\. Bind one in Controls\.$/.test(t), t);
@@ -378,7 +366,7 @@ export function tutorialChecks(check: Check): void {
     const lower: string[] = [];
     const long: string[] = [];
     const caps: string[] = [];
-    for (const s of [...BIOBUZZ_TUTORIAL.steps, ...DECODE_TUTORIAL.steps]) {
+    for (const s of BIOBUZZ_TUTORIAL.steps) {
       for (const c of ctxs) {
         const t = hintText(s.hint(c));
         if (/^[a-z]/.test(t)) lower.push(`${s.id}: ${t}`);
@@ -394,9 +382,9 @@ export function tutorialChecks(check: Check): void {
     // 19-24: game nouns are lowercase in prose (the step title beside the hint already is); the
     // caps belong to the HUD chips only.
     check('hint: no all-caps game noun in hint prose, on every device (19-24)', caps.length === 0, caps.join(' | '));
-    // 12-17: aim assist is ONE idea, so it is one sentence in both games
-    const aim = [...BIOBUZZ_TUTORIAL.steps, ...DECODE_TUTORIAL.steps].filter((s) => /turret/i.test(hintText(s.hint(kb))));
-    check('hint: both games word aim assist the same way (12-17)', aim.length === 2 && aim.every((s) => hintText(s.hint(kb)).endsWith('The turret aims for you.')), aim.map((s) => s.id).join(','));
+    // 12-17: aim assist is ONE idea, so it is one sentence, worded the house way
+    const aim = BIOBUZZ_TUTORIAL.steps.filter((s) => /turret/i.test(hintText(s.hint(kb))));
+    check('hint: aim assist is worded the house way (12-17)', aim.length === 1 && aim.every((s) => hintText(s.hint(kb)).endsWith('The turret aims for you.')), aim.map((s) => s.id).join(','));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -425,16 +413,16 @@ export function tutorialChecks(check: Check): void {
       removeItem: (k: string) => void store.delete(k),
     };
     try {
-      markTutorialSeen('decode');
-      check('flag: finishing DECODE’s tutorial marks DECODE seen', tutorialSeen('decode'));
+      markTutorialSeen('chain');
+      check('flag: marking one game marks that game seen', tutorialSeen('chain'));
       check('flag: …and does NOT hide BIOBUZZ’s offer', !tutorialSeen('biobuzz'));
       markTutorialSeen('biobuzz');
-      markTutorialSeen('decode');
-      check('flag: both games seen, each id written once', tutorialSeen('biobuzz') && [...store.values()][0] === 'decode,biobuzz', [...store.values()].join());
+      markTutorialSeen('chain');
+      check('flag: both games seen, each id written once', tutorialSeen('biobuzz') && [...store.values()][0] === 'chain,biobuzz', [...store.values()].join());
       store.clear();
       store.set(TUTORIAL_SEEN_KEY, '1');
-      check('flag: the legacy "1" reads as seen for every game (no re-nag after the upgrade)', tutorialSeen('decode') && tutorialSeen('biobuzz') && tutorialSeen());
-      markTutorialSeen('decode');
+      check('flag: the legacy "1" reads as seen for every game (no re-nag after the upgrade)', tutorialSeen('chain') && tutorialSeen('biobuzz') && tutorialSeen());
+      markTutorialSeen('chain');
       check('flag: marking a game over the legacy value keeps it', [...store.values()][0] === '1');
     } finally {
       delete g.localStorage;
@@ -573,87 +561,6 @@ export function tutorialChecks(check: Check): void {
             `${rEnd.pos.x.toFixed(1)},${rEnd.pos.y.toFixed(1)}`,
           );
         }
-      }
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  section('DECODE content: every step staged, non-vacuous and completable');
-  // ═══════════════════════════════════════════════════════════════════════════
-  //
-  // ⚠️ DECODE CHECKS IN THE BIOBUZZ SUITE, and it is a deliberate exception with a precedent:
-  // `sponsor.ts` rides this suite for the same reason. `scripts/smoke.ts` is SHARDED across
-  // processes by `smokeshard.mjs`, which parses it and deals its top-level blocks out — so a new
-  // block there wants a cost-table recalibration and a careful read of the no-shared-state rule,
-  // for four checks that belong beside the engine they exercise. The TUTORIAL lane is one
-  // feature's lane, not one game's.
-  //
-  // DECODE's field is a REFLECTION in x (not point-symmetric like BIOBUZZ's), and its LAUNCH ZONE
-  // spans the whole far half rather than belonging to a side, so both alliances are driven here
-  // too — a pose written with the wrong mirror lands on the opponent's half.
-  {
-    const dec = DECODE_TUTORIAL;
-    const ids = dec.steps.map((s) => s.id);
-    check('DECODE: ids are unique and kebab-case', new Set(ids).size === ids.length && ids.every((i) => /^[a-z][a-z0-9-]*$/.test(i)), ids.join(','));
-    const kb: TutorialHintCtx = { bindings: DEFAULT_BINDINGS, gamepad: false, touch: false };
-    check(
-      'DECODE: titles are sentence case, hints are sentences with typographic punctuation',
-      dec.steps.every((s) => /^[A-Z][^.]*$/.test(s.title) && hintText(s.hint(kb)).endsWith('.') && !/'|\.\.\./.test(hintText(s.hint(kb)))),
-      dec.steps.map((s) => s.title).join(' | '),
-    );
-
-    for (const alliance of ['blue', 'red'] as const) {
-      for (const step of new TutorialRunner(dec, DEFAULT_SPEC).steps) {
-        const tag = `${step.id} (decode, ${alliance})`;
-        const w = createDecodeWorld('free', 20260918, [tutorialSetup(alliance, { ...DEFAULT_SPEC })]);
-        const ballsBefore = w.balls.length;
-        step.stage?.(w, 0);
-        check(`stage: ${tag} conserves world.balls`, w.balls.length === ballsBefore, `${ballsBefore} \u2192 ${w.balls.length}`);
-        check(`stage: ${tag} is NON-VACUOUS (done is false at tick 0)`, !step.done(w, 0));
-        let at = -1;
-        const ticks = Math.round(BUDGET_S / SIM_DT);
-        const g = goalCenter(alliance);
-        const bz = baseZone(alliance);
-        // the artifact the INTAKE step is driven at: the nearest one on the tiles to the staged
-        // pose, which is the one a player would reach for too.
-        const r0 = w.robots[0]!;
-        const intakeTarget =
-          w.balls
-            .filter((b) => b.state.kind === 'ground')
-            .sort(
-              (p, q) =>
-                (p.pos.x - r0.pos.x) ** 2 + (p.pos.y - r0.pos.y) ** 2 -
-                ((q.pos.x - r0.pos.x) ** 2 + (q.pos.y - r0.pos.y) ** 2),
-            )[0]?.id ?? null;
-        for (let t = 0; t < ticks; t++) {
-          const r = w.robots[0]!;
-          let c: RobotCommand;
-          if (step.id === 'drive') c = toward(r, 0, 30);
-          else if (step.id === 'intake') {
-            // ONE target, chosen at STAGE time and then chased by id. Re-picking "whatever is
-            // nearest this tick" made the driver hop between the loading-zone row and the preload
-            // this step put down, and each hop restarted the approach — it never arrived.
-            const b = intakeTarget === null ? undefined : w.balls.find((x) => x.id === intakeTarget);
-            c = { ...(b ? toward(r, b.pos.x, b.pos.y) : cmd({})), intake: true };
-          } else if (step.id === 'score') c = cmd({ fire: true });
-          else c = toward(r, (bz.x0 + bz.x1) / 2, (bz.y0 + bz.y1) / 2);
-          decodeStep(w, SIM_DT, new Map([[0, c]]));
-          if (step.done(w, 0)) {
-            at = t;
-            break;
-          }
-        }
-        check(
-          `drive: ${tag} completes within ${BUDGET_S}s of scripted driving`,
-          at >= 0,
-          at >= 0 ? `${(at * SIM_DT).toFixed(1)}s` : `never (launchZone=${robotInLaunchZone(w.robots[0]!)}, classified=${w.goals[alliance].classifiedCount}, wheelsInBase=${wheelContacts(w.robots[0]!).filter((p) => p.x > bz.x0 && p.x < bz.x1 && p.y > bz.y0 && p.y < bz.y1).length}, goal=${g.x.toFixed(0)},${g.y.toFixed(0)})`,
-        );
-        // A TUTORIAL MUST NOT HAND OUT FOULS. DECODE's penalty engine runs in `freeplay`
-        // (`src/sim/penalties.ts` says so in as many words), unlike BIOBUZZ's — so a step staged
-        // in the gate zone or leaning on a structure could bill the player for doing as they were
-        // told, in the one mode where nothing they do is meant to count against them.
-        const f = w.match.fouls[alliance];
-        check(`drive: ${tag} bills no foul against the player`, f.minor === 0 && f.major === 0, `${f.minor} minor, ${f.major} major`);
       }
     }
   }

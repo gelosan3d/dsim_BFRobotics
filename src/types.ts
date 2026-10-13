@@ -1,4 +1,4 @@
-import type { ControlBindings } from './input/bindings';
+import type { ControlBindings, ControlScheme, Ftc25Pads } from './input/bindings';
 import type { GameId, Physics } from './games/types';
 import type { ChainState } from './games/chain/state';
 import type { BiobuzzState } from './games/biobuzz/state';
@@ -81,6 +81,22 @@ export interface RobotCommand {
    * that both halves of an alliance already know. Protocol bit 512 — the next one past `bbRamp`. Optional; absent reads false.
    */
   bbPass?: boolean;
+  /**
+   * FTC25 CONTROLS (team 2627's TeleOp, `GameSettings.controlScheme`): the SHOOTER POWER preset
+   * the driver last picked on the d-pad, as an index into the robot's `manualShot` table — 0 is
+   * preset 1, the one a robot powers up on. A LEVEL, not an edge: it rides on every tick so a replayed or
+   * reconciled step sees the same power the driver had. Read only by a DECODE robot spawned with
+   * `manualShot`; every other robot ignores it. Protocol bits 1024/2048. Optional; absent = 0.
+   */
+  shotPower?: number;
+  /**
+   * FTC25 CONTROLS: WHICH ELEMENT this shot should be — 0 any, 1 the first kind (DECODE green,
+   * BIOBUZZ POLLEN), 2 the second (DECODE purple, BIOBUZZ NECTAR). Held with `fire`. Honoured
+   * only where the robot can physically choose: a DECODE sorter (`spec.canSort`) and a BIOBUZZ
+   * double turret, which feeds each kind to its own turret. Anything else fires what it would
+   * have fired anyway. Protocol bits 4096/8192. Optional; absent = 0.
+   */
+  fireSel?: number;
 }
 
 /** menu-configured driver assists */
@@ -89,6 +105,16 @@ export interface AssistConfig {
   aimAssist: boolean;
   autoIntake: boolean;
   autoFire: boolean;
+  /**
+   * FTC25 CONTROLS: the driver sets the DECODE shooter's power from one of four presets
+   * (`RobotCommand.shotPower` picks one) instead of the solver picking the speed. The TABLE rides
+   * here, as fractions of `LAUNCH_MAX_SPEED`, because a replay must reproduce the shots of a run
+   * whose presets have since been edited — so it is a property of the robot as it was spawned,
+   * like everything else in a setup. Set from `GameSettings.ftc25Powers` on a seat driven with
+   * FTC25 controls, never from the robot menu. ABSENT when off, so every setup, snapshot and
+   * replay written without it is byte-identical to one written before it existed.
+   */
+  manualShot?: number[];
 }
 
 export type IntakeStyle = 'sloped' | 'vector' | 'triangle';
@@ -556,6 +582,10 @@ export interface RobotState {
   aimAssist: boolean;
   autoIntake: boolean; // intake runs whenever the hopper has room
   autoFire: boolean; // fire automatically when in the zone and on target
+  /** FTC25 CONTROLS (`AssistConfig.manualShot`): DECODE launches at the driver's preset power —
+   *  this table, indexed by `RobotCommand.shotPower`. ABSENT unless set, so a snapshot or replay
+   *  of a robot without it carries no extra field. */
+  manualShot?: number[];
   lastFireAt: number;
   lastIntakeAt: number;
   /** earliest world.time the shooter may fire again (transfer cadence +
@@ -581,7 +611,10 @@ export interface RobotState {
    * from burning CPU on work they'll never use. Optional (real robots omit it). */
   passive?: boolean;
 
-  // --- Auto Pathing State ---
+  // --- Auto Pathing State (INERT) ---
+  // DECODE's `.pp` auto paths were removed with DECODE (2026-10-12) and nothing reads these. They
+  // STAY because Chain Reaction and BIOBUZZ still spawn every robot with them at rest, so they are
+  // in every world's JSON — `worldHash`, the snapshot codec and DSIM's own servers all see them.
   autoPathActive: boolean;
   currentPathSegmentIndex: number;
   pathSegmentProgress: number; // 0.0 to 1.0 along the current segment
@@ -594,7 +627,6 @@ export interface RobotState {
   pathSequenceIndex: number; // index in the overall sequence
   pathTargetPoint: Vec2 | null;
   pathTargetHeading: number | null;
-  autoPath?: AutoPathData; // Add autoPath to RobotState
   isAligningHeading: boolean; // New state for heading alignment
   targetAlignmentHeading: number | null; // The heading to align to
   // --- End Auto Pathing State ---
@@ -699,7 +731,6 @@ export interface PinState {
   at?: number;
 }
 
-
 /** deterministic penalty-engine state (all plain JSON — serializable) */
 export interface PenaltyState {
   /** episode debounce: `${rule}:${key}` -> last world.time the rule was active
@@ -767,48 +798,6 @@ export interface PenaltyState {
    * goal's ramp last tick, to detect ones that leave (G418.B) */
   rampBallIds: Record<Alliance, number[]>;
 }
-
-// --- Auto Pathing Types ---
-export type HeadingType = 'linear' | 'constant' | 'tangential';
-
-export interface PathPoint extends Vec2 {
-  heading: HeadingType;
-  startDeg?: number; // For 'linear'
-  endDeg?: number;   // For 'linear'
-  degrees?: number;  // For 'constant'
-  reverse?: boolean; // For 'tangential'
-}
-
-export interface ControlPoint extends Vec2 {}
-
-export interface PathLine {
-  id: string;
-  endPoint: PathPoint;
-  controlPoints?: ControlPoint[]; // For Bezier curves
-  waitBeforeMs?: number;
-  waitAfterMs?: number;
-  waitBeforeName?: string;
-  waitAfterName?: string;
-}
-
-export type SequenceItemKind = 'path' | 'wait' | 'action'; // 'action' is a placeholder
-
-export interface SequenceItem {
-  kind: SequenceItemKind;
-  id?: string; // For 'wait' kind
-  durationMs?: number; // For 'wait' kind
-  lineId?: string; // For 'path' kind
-  // Add other properties for 'action' if needed
-}
-
-export interface AutoPathData {
-  fileName: string; // To store the name of the imported file
-  startPoint: PathPoint;
-  lines: PathLine[];
-  sequence?: SequenceItem[];
-  version?: string;
-  timestamp?: string;
-}
 // --- End Auto Pathing Types ---
 
 /** a robot start pose (field frame, heading in degrees). Custom poses are stored
@@ -848,7 +837,7 @@ export interface GameLoadout {
 
 /** one practice seat beside the player (`GameSettings.practiceSeats`). `tier` is kept while the
  *  seat is not AI, so switching a seat Dummy → AI brings its difficulty back. */
-export type PracticeSeatKind = 'none' | 'dummy' | 'ai';
+export type PracticeSeatKind = 'none' | 'dummy' | 'ai' | 'player2';
 export interface PracticeSeat {
   kind: PracticeSeatKind;
   tier: string;
@@ -866,9 +855,6 @@ export interface GameSettings {
   /** the player's saved robot library (up to MAX_SAVED_ROBOTS). `spec` is the
    * ACTIVE robot; loading a slot copies it into `spec`, saving copies `spec` in. */
   savedRobots: RobotSpec[];
-  /** the player's saved auto library (up to MAX_SAVED_AUTOS). `autoPath` is the
-   * ACTIVE auto; selecting a slot copies it into `autoPath`. */
-  savedAutos: AutoPathData[];
   startIndex: number;
   /** a fully-placed CUSTOM start pose (canonical goalSide=+1 frame). When set it
    * OVERRIDES startIndex; validated against G304 and snapped legal at spawn.
@@ -933,6 +919,25 @@ export interface GameSettings {
    * runs all read it, so the wire and the spawn seam never had to change. */
   assists: AssistConfig;
   bindings: ControlBindings;
+  /**
+   * WHICH CONTROLS ARE IN USE: `dsim` is DSIM's own (`bindings`), `ftc25` is team 2627's
+   * DECODE-season TeleOp layout (`ftc25Bindings`, from moorlacks/FTC2627), which also lets the
+   * driver pick the DECODE shooter's power (`AssistConfig.manualShot`, offline only). Read the
+   * map in use through `activeBindings`, never either field directly. A NEW SIBLING, like
+   * `perGame`: an older client ignores it and plays `bindings`.
+   */
+  controlScheme: ControlScheme;
+  /** the FTC25 controls' own map — a whole second `ControlBindings`, so switching back never
+   *  costs the DSim binds anything (`FTC25_DEFAULT_BINDINGS`) */
+  ftc25Bindings: ControlBindings;
+  /** how many controllers the FTC25 controls are laid out for: two (their driver + operator,
+   *  `ftc25Bindings`) or one (`ftc25SingleBindings`). Under DSim controls it is not read. */
+  ftc25Pads: Ftc25Pads;
+  /** the FTC25 controls on ONE controller — a whole map of its own, like `ftc25Bindings` */
+  ftc25SingleBindings: ControlBindings;
+  /** the four shooter power presets, in percent of `LAUNCH_MAX_SPEED` (`FTC25_DEFAULT_POWERS`):
+   *  what each d-pad preset does. Copied onto the robot as `AssistConfig.manualShot`. */
+  ftc25Powers: [number, number, number, number];
   audio: {
     /** per-category levels, 0–1 — the source of truth. `master` scales the other
      * the rest. ONE PER EMITTER — `game` = the FIRST field-recording WAV cues;
@@ -949,6 +954,8 @@ export interface GameSettings {
       game: number;
       shoot: number;
       intake: number;
+      /** DECODE's classifier gate. No sound reads it since DECODE was removed (2026-10-12);
+       *  kept so the blob synced to a DSIM account is the one an unmodified client writes. */
       gate: number;
       beep: number;
       alert: number;
@@ -980,9 +987,24 @@ export interface GameSettings {
    *   graphs    + a frame-time and a ping sparkline
    */
   perfDisplay: PerfDisplay;
-  // New fields for auto pathing
-  autoPath: AutoPathData | null;
-  autoPathEnabled: boolean;
+  /**
+   * DECODE'S OWN SETTINGS, OPAQUE. DECODE was removed from this fork (owner, 2026-10-12), but a
+   * synced DSIM account — and an unmodified DSIM client on it — still has DECODE, so its data is
+   * carried untouched rather than dropped: lifted out of a loaded blob by `coerceSettings` and put
+   * back by `forAccount`. Nothing in this build reads inside it.
+   */
+  retired?: {
+    /** DECODE's loadout: `loadouts.decode`, or the flat fields of a blob saved on DECODE */
+    loadout?: unknown;
+    /** `practiceSeats.decode` */
+    practiceSeats?: unknown;
+    /** `bindings.perGame.decode` */
+    bindings?: unknown;
+    /** the `.pp` auto-path library and the active path (DECODE ran auto paths, nothing else did) */
+    savedAutos?: unknown;
+    autoPath?: unknown;
+    autoPathEnabled?: unknown;
+  };
   /** park mode's speed cap, 0-100 (% of normal max speed); activation is
    * gated to endgame / free drive regardless of this value */
   parkSpeedPct: number;
@@ -1023,8 +1045,9 @@ export interface MobileLayout {
 }
 
 export interface World {
-  /** which game this world simulates. Optional for back-compat: an absent value
-   * (old snapshots/replays) resolves to `'decode'` via `gameOf`/`moduleFor`. */
+  /** which game this world simulates. Optional for back-compat: an absent value (an old
+   * snapshot or replay) is DECODE's — refused where a recording is read (`replayGameOf`) — and
+   * `gameOf`/`moduleFor` resolve it to `DEFAULT_GAME` everywhere else. */
   game?: GameId;
   /** Chain Reaction runtime state (catalysts / scoring / endgame). Present only
    * when `game === 'chain'`; DECODE worlds omit it. */

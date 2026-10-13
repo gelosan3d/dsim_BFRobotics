@@ -123,14 +123,14 @@ export function Account({
           <h3 className="ds-panel-title">Reset settings</h3>
         </div>
         <div className="ds-panel-body stack start">
-          {/* `danger`: it wipes builds, autos and bindings, which for a local-only player is
+          {/* `danger`: it wipes builds and bindings, which for a local-only player is
               more loss than deleting the account. The confirm names every one of them. */}
           <button
             className="ds-btn danger"
             onClick={() => {
               if (
                 confirm(
-                  'Reset every setting? This clears your robot build, saved robots, imported autos, ' +
+                  'Reset every setting? This clears your robot build, saved robots, ' +
                     'saved start positions, key bindings, audio and mobile layout. It cannot be undone.',
                 )
               ) {

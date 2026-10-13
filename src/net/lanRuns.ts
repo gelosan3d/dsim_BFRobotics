@@ -1,6 +1,8 @@
 import type { GameId } from '../types';
+import { DEFAULT_GAME, isGameId } from '../games/types';
 import { withLocalPatch, type Replay } from '../sim/replay';
 import type { LanParticipant } from './api';
+import { replayIsFork } from './forkScope';
 
 /**
  * SELF-HOSTED (LAN) MATCHES, kept on the HOST's device until the cloud has them.
@@ -26,6 +28,18 @@ import type { LanParticipant } from './api';
 
 import { LAN_RUNS_KEY as KEY } from '../storageKeys';
 const bodyKey = (id: string): string => `${KEY}.${id}`;
+
+/** does the stored body of match `id` carry this fork's features? Fails CLOSED, like the
+ *  practice backlog's twin (`practiceRuns.ts`). */
+function lanBodyIsFork(id: string): boolean {
+  try {
+    const raw = localStorage.getItem(bodyKey(id));
+    if (!raw) return false;
+    return replayIsFork(JSON.parse(raw) as Replay);
+  } catch {
+    return true;
+  }
+}
 
 /**
  * How many self-hosted matches this device keeps.
@@ -94,9 +108,12 @@ const dropBody = (id: string): void => {
   }
 };
 
-/** this device's self-hosted matches, newest first */
+/** this device's self-hosted matches, newest first — minus a game this build does not have
+ *  (DECODE), which stays stored but cannot be played back here (see `listPracticeRuns`) */
 export function listLocalLanRuns(): LanRunMeta[] {
-  return readIndex().sort((a, b) => b.at - a.at);
+  return readIndex()
+    .filter((m) => isGameId(m.game))
+    .sort((a, b) => b.at - a.at);
 }
 
 /** the stored input log for a match, or null if the body is gone (quota eviction, cleared
@@ -143,7 +160,7 @@ export function saveLanRunLocal(
     id,
     matchId,
     at: Date.now(),
-    game: replay.game ?? 'decode',
+    game: replay.game ?? DEFAULT_GAME,
     score,
     participants,
     ticks: replay.ticks,
@@ -183,7 +200,11 @@ export function saveLanRunLocal(
  */
 export function pendingLanUploads(): LanRunMeta[] {
   return readIndex()
-    .filter((m) => !m.remoteId && !m.refused)
+    // a match played with this fork's features is kept here and never sent to DSIM's cloud
+    // (`src/net/forkScope.ts`) — read off the body, so no flag can be missing
+    .filter((m) => !m.remoteId && !m.refused && !lanBodyIsFork(m.id))
+    // this build sends nothing of DECODE anywhere (see `pendingPracticeUploads`)
+    .filter((m) => isGameId(m.game))
     .sort((a, b) => a.at - b.at);
 }
 

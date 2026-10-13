@@ -12,6 +12,7 @@ import { chainColliders } from './colliders';
 import { chainStartLegal } from './state';
 import { createChainWorld } from './spawn';
 import { chainStep } from './step';
+import { chainGoalAimHeading } from './play';
 
 /**
  * Chain Reaction SIMULATION module (DOM-free) — fully playable + SCORED. `scored: true`
@@ -50,12 +51,13 @@ export const CHAIN_SIM: GameSimModule = {
   // the frame it is stored in. Changing that is a CR rules question, not a seam change.
   startLegal: (spec, _a, pose) =>
     !pose || chainStartLegal(spec, { x: pose.x, y: pose.y }, pose.headingDeg),
-  // CR's step never calls `updatePathTraversal`, so an imported `.pp` path would be inert
-  autoPaths: false,
   // camera bounds include the protruding goals (walls/colliders stay at ±72)
   bounds: { halfX: CHAIN_VIEW_HALF_X, halfY: CHAIN_HALF_Y, viewMargin: CHAIN_VIEW_MARGIN },
   colliders: chainColliders,
   createWorld: createChainWorld,
   step: chainStep,
   settled: chainSettled,
+  // FTC25 target snap: the mounted launcher at the goal opening, lead-compensated — the heading
+  // Chain's own turretless aim assist steers to (`chainGoalAimHeading`). One target.
+  aimHeading: (_w, r) => chainGoalAimHeading(r),
 };

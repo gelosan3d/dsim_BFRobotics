@@ -116,7 +116,7 @@ function parseArgs(argv: string[]): Opts {
     http,
     rooms: Number(get('rooms', '10')),
     shape: (get('shape', 'mix') as Shape),
-    game: (get('game', 'decode') as GameId | 'mix'),
+    game: (get('game', 'chain') as GameId | 'mix'),
     path: (get('path', 'code') as Path),
     secs: Number(get('secs', '60')),
     ramp: Number(get('ramp', '10')),
@@ -239,7 +239,7 @@ class Bot {
   // --- prediction (only for `--predict` bots) ---
   private predicting = false;
   private world: World | null = null;
-  private game: GameId = 'decode';
+  private game: GameId = 'chain';
   private specs = new Map<number, RobotSpec>();
   private baseBalls = new Map<number, Artifact>();
   private remoteCmds = new Map<number, RobotCommand>();
@@ -327,7 +327,7 @@ class Bot {
         this.inMatch = true;
         this.gen = m.gen ?? 0;
         this.robotId = m.yourRobotId;
-        this.game = m.game ?? 'decode';
+        this.game = m.game ?? 'chain';
         this.stats.matchStartAt = Date.now();
         this.specs.clear();
         for (const s of m.setups as RobotSetup[]) this.specs.set(s.id, s.spec);
@@ -448,7 +448,7 @@ function planRooms(o: Opts): RoomPlan[] {
   };
   for (let i = 0; i < o.rooms; i++) {
     const shape = shapeFor(i);
-    const game: GameId = o.game === 'mix' ? (i % 4 === 3 ? 'chain' : 'decode') : o.game;
+    const game: GameId = o.game === 'mix' ? (i % 4 === 3 ? 'biobuzz' : 'chain') : o.game;
     const bare = generateRoomCode();
     const code = o.region ? `${o.region}-${bare}` : bare;
     if (shape === 'solo') {

@@ -48,3 +48,4 @@ export function reframeStick(stick: Vec2, field: boolean, heading: number, viewA
   const m = Math.max(Math.abs(out.x), Math.abs(out.y));
   return m > 1 ? { x: out.x / m, y: out.y / m } : out;
 }
+

@@ -55,15 +55,16 @@ export interface GameModule extends GameSimModule {
    * is a trap: `drawOverlays` is written in FIELD INCHES, a game that ignores the extra argument
    * keeps compiling, and DECODE's ramp strips were duly drawn — in world coordinates, onto a
    * screen-pixel transform, off the side of the canvas. An OPTIONAL SECOND SLOT cannot do that,
-   * because a game that has no 3D view simply does not fill it, which is DECODE and Chain
-   * Reaction. Absent ⇒ nothing is drawn, exactly as before this existed.
+   * because a game that has no 3D view simply does not fill it, which is Chain Reaction.
+   * Absent ⇒ nothing is drawn, exactly as before this existed.
    */
   drawSceneOverlay?(ctx: CanvasRenderingContext2D, world: World, view: SceneOverlayView): void;
-  /** per-robot sprite. DECODE omits it (the shared `drawRobot` is used); CR provides its
-   * own so the archetype launcher + intake design read correctly. `screenUp` lets CR bob the
-   * chassis up onto a beam it's crossing. `world` is optional and read-only — CR's rail-turret
-   * claw TRACKS a live target, so its sprite needs to see where the loose rings are. */
-  drawRobot?(
+  /** per-robot sprite — every game draws its own robots (the shared fallback was DECODE's, and
+   * went with it on 2026-10-12; the pieces both games reuse stay in `src/render/drawRobot.ts`).
+   * `screenUp` lets CR bob the chassis up onto a beam it's crossing. `world` is optional and
+   * read-only — CR's rail-turret claw TRACKS a live target, so its sprite needs to see where the
+   * loose rings are. */
+  drawRobot(
     ctx: CanvasRenderingContext2D,
     r: RobotState,
     intakeOn: boolean,
@@ -84,7 +85,7 @@ export interface GameModule extends GameSimModule {
   ui: GameUiSpec;
   /**
    * THE LAZY 3D SCENE (Day 1 seam, `docs/biobuzz/plan-3d.md` §2.3/§2.5) — absent ⇒ this game
-   * has no 3D renderer, which is DECODE and Chain Reaction today. A FUNCTION rather than the
+   * has no 3D renderer, which is Chain Reaction today. A FUNCTION rather than the
    * factory itself, so the Three.js chunk is only ever `import()`-ed the moment a 3D view is
    * actually mounted: a player who never opens a 3D BIOBUZZ view never downloads it, exactly
    * like `sim3d/engine.ts`'s `initPhysics3d()` on the physics side.
@@ -92,7 +93,7 @@ export interface GameModule extends GameSimModule {
   scene?: () => Promise<GameSceneFactory>;
   /**
    * THE ROBOT PREVIEW'S 3D SCENE (`docs/roadmap.md` item 1) — absent ⇒ this game's builder has
-   * only its 2D schematic, which is DECODE and Chain Reaction today.
+   * only its 2D schematic, which is Chain Reaction today.
    *
    * A SECOND loader beside `scene` rather than a field on it, for the reason `scene` is a
    * function at all: a player who never opens the 3D preview never downloads Three.js. It is

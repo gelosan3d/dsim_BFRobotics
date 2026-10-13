@@ -188,21 +188,21 @@ async function seed(repo: any, db: PGlite): Promise<void> {
   await repo.writeStandingEvent(
     'u-alan',
     { kind: 'dodge', points: 12, scoreBefore: 100, scoreAfter: 88, tierAfter: 'watch', cooldownMin: 5, ratingCharge: 0, rung: 1 },
-    { game: 'decode', mode: '1v1', roomCode: 'iad-9f2a' },
+    { game: 'chain', mode: '1v1', roomCode: 'iad-9f2a' },
   );
   await repo.writeStandingEvent(
     'u-alan',
     { kind: 'leave', points: 24, scoreBefore: 88, scoreAfter: 64, tierAfter: 'watch', cooldownMin: 30, ratingCharge: 8, rung: 2 },
-    { game: 'decode', mode: '1v1', roomCode: 'iad-3c11' },
+    { game: 'chain', mode: '1v1', roomCode: 'iad-3c11' },
   );
 
   // records + matches, so the boards and the drill-downs have rows
   const SEASON = 4;
   for (const [i, [id]] of people.entries()) {
     const replay = await repo.saveReplay(
-      { format: 2, balanceVersion: SEASON, sim: 3, game: 'decode', mode: 'match', seed: 100 + i, ticks: 9000, setups: [], tracks: {} },
+      { format: 2, balanceVersion: SEASON, sim: 3, game: 'chain', mode: 'match', seed: 100 + i, ticks: 9000, setups: [], tracks: {} },
       SEASON,
-      'decode',
+      'chain',
     );
     await repo.submitRecord({
       userId: id,
@@ -212,10 +212,10 @@ async function seed(repo: any, db: PGlite): Promise<void> {
       drivetrain: ['mecanum', 'tank', 'swerve', 'xdrive', 'mecanum', 'tank'][i],
       balanceVersion: SEASON,
       replayId: replay,
-      game: 'decode',
+      game: 'chain',
       config: null,
     }).catch(() => {});
-    const mid = await repo.saveMatch('1v1', SEASON, replay, true, 'decode');
+    const mid = await repo.saveMatch('1v1', SEASON, replay, true, 'chain');
     await repo.addMatchParticipant({ matchId: mid, userId: id, alliance: 'red', drivetrain: 'mecanum', score: 120 - i * 7, won: i % 2 === 0, ratingBefore: 1500, ratingAfter: 1512 });
     await repo.addMatchParticipant({ matchId: mid, userId: 'u-alan', alliance: 'blue', drivetrain: 'tank', score: 90, won: i % 2 !== 0, ratingBefore: 1500, ratingAfter: 1488 });
   }
@@ -225,18 +225,18 @@ async function seed(repo: any, db: PGlite): Promise<void> {
   // the refund ticked, uphold the claim, uphold the reports against Alan) sends notices to the
   // account this harness is signed in as, and the pop-up shows them on the way back to the menus.
   {
-    const act = await repo.actFor('decode');
+    const act = await repo.actFor('chain');
     const replay = await repo.saveReplay(
-      { format: 2, balanceVersion: SEASON, sim: 3, game: 'decode', mode: 'match', seed: 57, ticks: 9000, setups: [], tracks: {} },
+      { format: 2, balanceVersion: SEASON, sim: 3, game: 'chain', mode: 'match', seed: 57, ticks: 9000, setups: [], tracks: {} },
       SEASON,
-      'decode',
+      'chain',
     );
-    const mid = await repo.saveMatch('1v1', SEASON, replay, true, 'decode');
+    const mid = await repo.saveMatch('1v1', SEASON, replay, true, 'chain');
     await repo.addMatchParticipant({ matchId: mid, userId: ADMIN_ID, alliance: 'red', drivetrain: 'mecanum', score: 40, won: false, ratingBefore: 1500, ratingAfter: 1482 });
     await repo.addMatchParticipant({ matchId: mid, userId: 'u-alan', alliance: 'blue', drivetrain: 'tank', score: 55, won: true, ratingBefore: 1500, ratingAfter: 1518 });
-    await repo.upsertRating(ADMIN_ID, '1v1', act, 1482, 120, 0.06, 'decode');
-    await repo.upsertRating('u-alan', '1v1', act, 1518, 120, 0.06, 'decode');
-    await repo.submitScoreReport({ reporterId: ADMIN_ID, matchId: mid, roomCode: 'iad-n057', game: 'decode', detail: 'two artifacts went in at the buzzer and did not count' });
+    await repo.upsertRating(ADMIN_ID, '1v1', act, 1482, 120, 0.06, 'chain');
+    await repo.upsertRating('u-alan', '1v1', act, 1518, 120, 0.06, 'chain');
+    await repo.submitScoreReport({ reporterId: ADMIN_ID, matchId: mid, roomCode: 'iad-n057', game: 'chain', detail: 'two artifacts went in at the buzzer and did not count' });
     await repo.submitReport({ reportedId: 'u-alan', reporterId: ADMIN_ID, reason: 'throwing', roomCode: 'iad-n057', detail: 'parked in front of our goal' });
   }
 
@@ -248,14 +248,14 @@ async function seed(repo: any, db: PGlite): Promise<void> {
     [
       'lhr-machine', 'lhr', 4,
       JSON.stringify([
-        { userId: 'u-ada', act: 'match', room: 'lhr-7b21', game: 'decode', sessions: 1 },
+        { userId: 'u-ada', act: 'match', room: 'lhr-7b21', game: 'chain', sessions: 1 },
         { userId: 'u-grace', act: 'menu', queue: '1v1', queuedS: 47, queueGame: 'chain', sessions: 2 },
         // ⚠️ THE CASE THE BUG WAS ABOUT: a signed-in session whose account has no profile row.
         { userId: 'brand-new-signup-0a91', act: 'menu', sessions: 1 },
       ]),
       JSON.stringify([{ id: 'sock-4f2b8c11', act: 'lobby', room: 'lhr-7b21' }]),
       JSON.stringify({ total: 1, inMatch: 0, inLobby: 1, idle: 0 }),
-      JSON.stringify([{ room: 'lhr-7b21', region: 'lhr', game: 'decode', mode: '1v1', ranked: true, phase: 'teleop', score: { red: 42, blue: 38 }, spectators: 2, players: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }] }]),
+      JSON.stringify([{ room: 'lhr-7b21', region: 'lhr', game: 'chain', mode: '1v1', ranked: true, phase: 'teleop', score: { red: 42, blue: 38 }, spectators: 2, players: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }] }]),
     ],
   );
 
@@ -264,7 +264,7 @@ async function seed(repo: any, db: PGlite): Promise<void> {
   // a few audit rows so the tab is not empty on first paint
   await repo.writeAudit({ adminId: ADMIN_ID, action: 'user.rename', targetUser: 'u-annie', detail: { from: 'xXslurXx', to: 'Annie Easley' }, note: 'name policy' });
   await repo.writeAudit({ adminId: ADMIN_ID, action: 'supporter.grant', targetUser: 'u-grace', detail: { months: 3 }, note: 'contributor' });
-  await repo.writeAudit({ adminId: ADMIN_ID, action: 'season.start', detail: { game: 'decode', season: 1, label: 'Act 1 · Season 1' } });
+  await repo.writeAudit({ adminId: ADMIN_ID, action: 'season.start', detail: { game: 'chain', season: 1, label: 'Act 1 · Season 1' } });
   await repo.writeAudit({ adminId: 'secret', action: 'notice.restart', detail: { seconds: 300, notified: 12 }, note: 'Scheduled server update' });
   await repo.writeAudit({ adminId: ADMIN_ID, action: 'record.delete', targetUser: 'u-alan', targetId: 'rec-0f21', note: 'impossible score' });
   await repo.addAdminNote('u-alan', ADMIN_ID, 'Third report this week. Team says it is a shared laptop.');
@@ -277,7 +277,7 @@ async function seed(repo: any, db: PGlite): Promise<void> {
  * beacon only ever writes `now`, so history has to be inserted.
  */
 async function seedAnalytics(db: PGlite): Promise<void> {
-  const PATHS = ['/', '/decode', '/decode/records', '/chain', '/support', '/download', '/account'];
+  const PATHS = ['/', '/biobuzz', '/biobuzz/records', '/chain', '/support', '/download', '/account'];
   const REFS = ['', 'google.com', 'reddit.com', 'youtube.com', 'discord.com'];
   const COUNTRIES = ['US', 'GB', 'DE', 'CA', '', 'IN'];
   const DEVICES = ['desktop', 'mobile', 'tablet'];
@@ -285,7 +285,7 @@ async function seedAnalytics(db: PGlite): Promise<void> {
   const BROWSERS = ['Chrome', 'Safari', 'Firefox', 'Edge'];
   const SCREENS = ['sm', 'md', 'lg', 'xl'];
   const LANGS = ['en', 'de', 'es', ''];
-  const GAMES = ['decode', 'chain', 'biobuzz', ''];
+  const GAMES = ['chain', 'biobuzz', ''];
   const UTM_S = ['', 'twitter', 'newsletter', 'reddit'];
   const EVENTS = ['support_view', 'sponsor_shown', 'sponsor_shown', 'sponsor_dwell', 'sponsor_click', 'desktop_download', 'support_claim_fail', 'player_joined'];
   const PLACEMENTS = ['home', 'footer', 'game', 'download'];

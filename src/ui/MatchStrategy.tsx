@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameSettings, RobotSpec } from '../types';
-import { START_POSES } from '../config';
 import { CHAIN_START_POSES } from '../games/chain/config';
-import { StartPositionEditor } from './StartPositionEditor';
 import { savedStartCap } from './startPositions';
 import { useAds } from '../ads/AdsProvider';
 import { ChainStartEditor } from './ChainStartEditor';
@@ -13,7 +11,6 @@ import { SupporterBadge } from './SupporterBadge';
 import { BadgeMarks } from './BadgeMark';
 import type { LobbyClient } from '../net/lobbyClient';
 import type { LobbyPlayer, PlayerIntro, QueueMode } from '../net/protocol';
-import { RobotPreview } from './RobotPreview';
 import { ChainRobotPreview } from '../games/chain/RobotPreview';
 import { moduleFor } from '../games';
 import { buildSummary, teamLine } from './robotLabels';
@@ -121,7 +118,6 @@ export function MatchStrategy({
   audioRef.current.gameVolume = settings.audio.volume.game;
   audioRef.current.shootVolume = settings.audio.volume.shoot;
   audioRef.current.intakeVolume = settings.audio.volume.intake;
-  audioRef.current.gateVolume = settings.audio.volume.gate;
   audioRef.current.beepVolume = settings.audio.volume.beep;
   audioRef.current.alertVolume = settings.audio.volume.alert;
   audioRef.current.voiceVolume = settings.audio.volume.voice;
@@ -286,10 +282,8 @@ export function MatchStrategy({
                   <div className="ds-strat-prev">
                     {Preview ? (
                       <Preview spec={spec} size={132} />
-                    ) : settings.game === 'chain' ? (
-                      <ChainRobotPreview spec={spec} size={132} />
                     ) : (
-                      <RobotPreview spec={spec} size={132} />
+                      <ChainRobotPreview spec={spec} size={132} />
                     )}
                   </div>
                   <div className="ds-strat-meta">
@@ -311,9 +305,7 @@ export function MatchStrategy({
                           ? 'CUSTOM'
                           : settings.game === 'chain'
                             ? (CHAIN_START_POSES[pl.startIndex]?.name ?? '-')
-                            : (moduleFor(settings.game).startAnchorName?.(pl.startIndex, pl.alliance) ??
-                              START_POSES[pl.startIndex]?.label ??
-                              '-')}
+                            : (moduleFor(settings.game).startAnchorName?.(pl.startIndex, pl.alliance) ?? '-')}
                       </span>
                       {ranked && <span className="ds-chip">{ratingChip(pl)}</span>}
                       <span className={`ds-chip ${pl.ready ? 'on' : 'off'}`}>
@@ -360,7 +352,7 @@ export function MatchStrategy({
                 onSave={(pose) => applyStart(saveStart(sCat, pose))}
                 onDeleteSaved={(c, i) => applyStart(deleteSavedStart(sCat, c, i))}
               />
-            ) : settings.game === 'chain' ? (
+            ) : (
               <ChainStartEditor
                 spec={me.spec}
                 alliance={me.alliance}
@@ -370,21 +362,6 @@ export function MatchStrategy({
                 saved={settings.savedStartPoses}
                 lockedCategory={startRole}
                 onChange={(startPose) => applyStart(selectStart(sCat, { index: -1, pose: startPose }))}
-                onPickPreset={(i) => applyStart(selectStart(sCat, { index: i, pose: null }))}
-                onCategory={(c) => applyStart(switchCategory(settings, c))}
-                onSave={(pose) => applyStart(saveStart(sCat, pose))}
-                onDeleteSaved={(c, i) => applyStart(deleteSavedStart(sCat, c, i))}
-              />
-            ) : (
-              <StartPositionEditor
-                spec={me.spec}
-                alliance={me.alliance}
-                value={me.startPose}
-                startIndex={me.startIndex}
-                category={startRole ?? settings.startCat}
-                saved={settings.savedStartPoses}
-                lockedCategory={startRole}
-                onChange={(startPose) => startPose && applyStart(selectStart(sCat, { index: -1, pose: startPose }))}
                 onPickPreset={(i) => applyStart(selectStart(sCat, { index: i, pose: null }))}
                 onCategory={(c) => applyStart(switchCategory(settings, c))}
                 onSave={(pose) => applyStart(saveStart(sCat, pose))}

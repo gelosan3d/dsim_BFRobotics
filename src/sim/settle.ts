@@ -1,4 +1,4 @@
-import { BALL_REST_SPEED, SIM_DT } from '../config';
+import { SIM_DT } from '../config';
 import type { World } from '../types';
 
 /**
@@ -103,27 +103,4 @@ export function robotsAtRest(world: World): boolean {
     if (Math.abs(r.angVel) >= ROBOT_REST_TURN) return false;
   }
   return true;
-}
-
-/**
- * DECODE: nothing left that can score.
- *   · no artifact in FLIGHT (it can still enter a goal);
- *   · no rail artifact still PENDING (classified vs overflow is decided when it meets the stack)
- *     or still MOVING (it can still drain out, or reach a pattern slot);
- *   · every GROUND and BASIN artifact at rest (depot is a resting-position rule, and a basin
- *     artifact that is still moving can still board the rail);
- *   · every robot at rest (BASE).
- * An artifact held by a robot, in the human player's stock, or parked in an element scores
- * nothing further after the buzzer and is ignored.
- */
-export function decodeSettled(world: World): boolean {
-  for (const b of world.balls) {
-    const s = b.state;
-    if (s.kind === 'flight') return false;
-    if (s.kind === 'rail' && (s.pending || Math.abs(s.v) >= BALL_REST_SPEED)) return false;
-    if ((s.kind === 'ground' || s.kind === 'basin') && movingFaster(b.vel, BALL_REST_SPEED)) {
-      return false;
-    }
-  }
-  return robotsAtRest(world);
 }

@@ -23,16 +23,84 @@ export type KeyAction =
   | 'bbNectar'
   | 'bbRamp'
   | 'bbPass'
+  | Ftc25MechAction
   | 'viewToggle'
   | 'cameraCycle'
   | 'eyeUp'
   | 'eyeDown'
   | 'driveMode'
   | 'driveFrame'
+  | Ftc25DriveAction
   | 'flipFront'
   | 'park'
   | 'start'
   | 'restart';
+
+/**
+ * THE FTC25 CONTROLS' OWN ACTIONS — team 2627's DECODE-season TeleOp (`TeleOP25`, from
+ * moorlacks/FTC2627), brought in so a driver can practise on the layout their real robot uses.
+ * `GameSettings.controlScheme` switches between the two schemes, and each has its own map.
+ *
+ * DRIVING (shared, every game): `slowHold` — held, the drive at `FTC25_SLOW_FACTOR`;
+ * `snapAim` / `snapAlt` — their L1 / R1 heading snaps, re-aimed (owner, 2026-10-12) at the
+ * season's TARGET: the robot turns its shooter to face it (`GameSimModule.aimHeading`, at input
+ * level in `GameController`). The field-centric frame stays DSIM's own (owner, same day), so
+ * their Options heading reset has nothing to reset and is not here.
+ *
+ * MECHANISMS: four shooter power PRESETS on the d-pad (what they set is `RobotCommand.shotPower`,
+ * an index into the robot's `manualShot` table, which the player sets in Controls), and the two
+ * buttons that fire one kind of element (`RobotCommand.fireSel`): POLLEN / NECTAR in BIOBUZZ.
+ * The presets drove DECODE's shooter; DECODE was removed from this fork on 2026-10-12, and they
+ * are KEPT for BIOBUZZ's launcher (owner, same day), which does not read `shotPower` yet — so
+ * until it does they are bindable and do nothing. DECODE's green / purple buttons were removed.
+ *
+ * Every one of them ships UNBOUND in the DSim map (`DEFAULT_BINDINGS`), so DSim controls stay
+ * exactly what they were; the two FTC25 maps bind them — one controller
+ * (`FTC25_SINGLE_DEFAULT_BINDINGS`) or two (`FTC25_DEFAULT_BINDINGS`). `FTC25_ONLY` lists them
+ * for the checks and the screen.
+ */
+export type Ftc25DriveAction = 'slowHold' | 'snapAim' | 'snapAlt';
+export type Ftc25MechAction =
+  | 'shotPreset1'
+  | 'shotPreset2'
+  | 'shotPreset3'
+  | 'shotPreset4'
+  | 'bbFirePollen'
+  | 'bbFireNectar';
+export const FTC25_ONLY: readonly KeyAction[] = [
+  'shotPreset1',
+  'shotPreset2',
+  'shotPreset3',
+  'shotPreset4',
+  'bbFirePollen',
+  'bbFireNectar',
+  'slowHold',
+  'snapAim',
+  'snapAlt',
+];
+/** the actions NO game uses yet — bindable data kept for a later step, never fired
+ *  (`ACTION_GAMES` lists no game for them; see the presets there) */
+export const RESERVED_ACTIONS: readonly KeyAction[] = ['shotPreset1', 'shotPreset2', 'shotPreset3', 'shotPreset4'];
+/** the four preset actions, in `RobotCommand.shotPower` index order */
+export const FTC25_PRESET_ACTIONS = ['shotPreset1', 'shotPreset2', 'shotPreset3', 'shotPreset4'] as const;
+/** the drive scale while `slowHold` is held — `SLOW_MODE_FACTOR` in team 2627's TeleOp */
+export const FTC25_SLOW_FACTOR = 0.2;
+/**
+ * THE TARGET SNAP (`ftc25SnapTurn`, `DriverShaping`). Their TeleOp turned bang-bang at half power to a fixed ±45°
+ * and stopped within 15°, which on the sim landed anywhere from 35° to 53° — fine for a
+ * diagonal, useless for aiming at a HIVE cell. So the snap keeps their HALF-POWER ceiling and
+ * their stick-cancel threshold, and closes on the target proportionally: full half power down to
+ * `slowFrom`, tapering to `minPower`, done inside `tolerance`. `giveUpS` ends one that cannot
+ * get there (a robot pinned against a wall).
+ */
+export const FTC25_SNAP = {
+  power: 0.5,
+  minPower: 0.06,
+  slowFrom: (25 * Math.PI) / 180,
+  tolerance: (1.5 * Math.PI) / 180,
+  cancel: 0.3,
+  giveUpS: 3,
+} as const;
 
 /**
  * THE VIEW KEYS — keyboard only, and not in `PadAction`. They move the CAMERA, not the robot:
@@ -54,8 +122,10 @@ export type PadAction =
   | 'bbNectar'
   | 'bbRamp'
   | 'bbPass'
+  | Ftc25MechAction
   | 'driveMode'
   | 'driveFrame'
+  | Ftc25DriveAction
   | 'flipFront'
   | 'park'
   | 'start'
@@ -220,6 +290,26 @@ export interface ControlBindings {
    * byte through the old shape.
    */
   perGame?: Partial<Record<GameId, GameBindingOverride>>;
+  /**
+   * GAMEPAD 2 — the OPERATOR's pad, FTC's `gamepad2` (FTC25 controls put the shooter on it). Its
+   * buttons drive the SAME robot as the main pad: `InputManager` ORs the two. Buttons and combos
+   * only — the sticks, deadzone, curve, trigger threshold and combo wait are the main pad's, and
+   * gamepad 2's sticks drive nothing. It is the SECOND connected pad; with one pad plugged in
+   * these binds simply never fire.
+   *
+   * A NEW SIBLING FIELD for the reason `perGame` is one: an older client ignores it. ABSENT on the
+   * DSim map until a bind is made, so a blob that never used it round-trips byte for byte. No
+   * per-game overrides: Intake and Shoot on gamepad 2 are the same in every season.
+   * Conflicts are checked against gamepad 2's own binds only — a button on one pad and the same
+   * index on the other are two different buttons.
+   */
+  pad2?: PadSecond;
+}
+
+/** gamepad 2's binds (`ControlBindings.pad2`): the two `PadBindings` lists, nothing else */
+export interface PadSecond {
+  buttons: Record<PadAction, number[]>;
+  combos: Record<PadAction, PadChord[]>;
 }
 
 // ---- WHICH GAMES USE WHICH ACTION -------------------------------------------------
@@ -264,12 +354,32 @@ export const ACTION_GAMES: Readonly<Record<KeyAction, readonly GameId[]>> = {
   bbNectar: ['biobuzz'],
   bbRamp: ['biobuzz'],
   bbPass: ['biobuzz'],
+  // FTC25: the power presets set `shotPower`. They were DECODE's (`manualShotSpeed`) and are
+  // RESERVED for BIOBUZZ's launcher (owner, 2026-10-12), which does not read `shotPower` yet. NO
+  // GAME, until it does: `effectiveBindings` empties them everywhere, so they cannot fire, and
+  // they conflict with nothing — which matters, because the one-controller FTC25 map puts
+  // presets 2 and 3 on D-UP / D-LEFT beside BIOBUZZ's Place NECTAR and human player, on the
+  // premise that no season has both. Listing them for BIOBUZZ means settling that layout first.
+  // Their binds stay in the FTC25 maps and their powers in `ftc25Powers`, so that step is only
+  // this table and the layout. (`RESERVED_ACTIONS`.)
+  shotPreset1: [],
+  shotPreset2: [],
+  shotPreset3: [],
+  shotPreset4: [],
+  // the element buttons, `fireSel` in `bbLaunch` (a double turret's POLLEN or NECTAR turret)
+  bbFirePollen: ['biobuzz'],
+  bbFireNectar: ['biobuzz'],
   viewToggle: ['biobuzz'],
   cameraCycle: ['biobuzz'],
   eyeUp: ['biobuzz'],
   eyeDown: ['biobuzz'],
   driveMode: ALL,
   driveFrame: ALL,
+  // FTC25 driving: no command bit — `GameController` scales, re-frames or turns the stick, so
+  // they act wherever `updateRobot` drives, like `driveFrame`
+  slowHold: ALL,
+  snapAim: ALL,
+  snapAlt: ALL,
   flipFront: ALL,
   park: ALL,
   start: ALL,
@@ -337,6 +447,9 @@ export const SHARED_ACTIONS: readonly KeyAction[] = [
   'rotateCW',
   'driveMode',
   'driveFrame',
+  'slowHold',
+  'snapAim',
+  'snapAlt',
   'flipFront',
   'park',
   'start',
@@ -387,12 +500,21 @@ export const KEY_ACTIONS: KeyAction[] = [
   'bbNectar',
   'bbRamp',
   'bbPass',
+  'shotPreset1',
+  'shotPreset2',
+  'shotPreset3',
+  'shotPreset4',
+  'bbFirePollen',
+  'bbFireNectar',
   'viewToggle',
   'cameraCycle',
   'eyeUp',
   'eyeDown',
   'driveMode',
   'driveFrame',
+  'slowHold',
+  'snapAim',
+  'snapAlt',
   'flipFront',
   'park',
   'start',
@@ -409,8 +531,17 @@ export const PAD_ACTIONS: PadAction[] = [
   'bbNectar',
   'bbRamp',
   'bbPass',
+  'shotPreset1',
+  'shotPreset2',
+  'shotPreset3',
+  'shotPreset4',
+  'bbFirePollen',
+  'bbFireNectar',
   'driveMode',
   'driveFrame',
+  'slowHold',
+  'snapAim',
+  'snapAlt',
   'flipFront',
   'park',
   'start',
@@ -492,6 +623,13 @@ export const DEFAULT_BINDINGS: ControlBindings = {
     // BIOBUZZ: PASS to your partner — launch the held element at a field POINT rather than at
     // your own hive. Shares 'v' with Chain Reaction's catapult throw; see the role table above.
     bbPass: ['v'],
+    // FTC25 controls' own actions: UNBOUND in the DSim map (see `FTC25_ONLY`)
+    shotPreset1: [],
+    shotPreset2: [],
+    shotPreset3: [],
+    shotPreset4: [],
+    bbFirePollen: [],
+    bbFireNectar: [],
     // THE VIEW KEYS (`VIEW_ACTIONS`). T flips 2D and 3D, and I / O raise and lower the eye —
     // the keys they always had. The CAMERA moved off C, which is Place POLLEN, onto L: next to
     // I and O, and free in every game. Not U: the bindings smoke lane uses it as a free key.
@@ -506,6 +644,9 @@ export const DEFAULT_BINDINGS: ControlBindings = {
     // the smoke lane's conflict fixtures; the two that use 'h' edit MAIN, where a shared
     // default is an ordinary steal victim, and none edits a season scope with it.
     driveFrame: ['h'],
+    slowHold: [],
+    snapAim: [],
+    snapAlt: [],
     flipFront: ['f'],
     park: ['p'],
     start: ['enter'],
@@ -549,11 +690,21 @@ export const DEFAULT_BINDINGS: ControlBindings = {
       // and `mergeBindings` will not stack it on a button such a map already uses.
       bbRamp: [11],
       bbPass: [10], // L3 — shared with `fling`
+      // FTC25 controls' own actions: unbound here (`FTC25_ONLY`)
+      shotPreset1: [],
+      shotPreset2: [],
+      shotPreset3: [],
+      shotPreset4: [],
+      bbFirePollen: [],
+      bbFireNectar: [],
       driveMode: [5], // RB — the only unused face/shoulder button
       // UNBOUND on the pad: every standard-mapping button is spoken for, D-DOWN (13) is held
       // free on purpose (see `bbRamp`), and a default combo would move every player onto the
       // chord resolver's stateful path. A player binds it in Controls ▸ Driving.
       driveFrame: [],
+      slowHold: [],
+      snapAim: [],
+      snapAlt: [],
       flipFront: [3], // Y
       park: [2], // X
       start: [9],
@@ -572,6 +723,125 @@ export const DEFAULT_BINDINGS: ControlBindings = {
     turnWith: 'stick',
   },
 };
+
+const NO_BUTTONS = (): Record<PadAction, number[]> => {
+  const out = {} as Record<PadAction, number[]>;
+  for (const a of PAD_ACTIONS) out[a] = [];
+  return out;
+};
+
+/**
+ * THE FTC25 CONTROLS ON TWO CONTROLLERS — team 2627's TeleOp (`TeleOP25`) as their two drivers
+ * hold it. The keyboard is the DSim map's: their code is a pad layout, and its own actions start
+ * unbound on the keyboard (every row is still rebindable).
+ *
+ *   GAMEPAD 1, the driver   left stick drives, right stick X turns (as DSim)
+ *                           RT  slow mode, held (`SLOW_MODE_FACTOR` 0.2)     LT  intake
+ *                           LB  snap to target (their L1)   RB  snap to other target (their R1)
+ *   GAMEPAD 2, the operator RT  shoot                 LT  intake
+ *                           D-RIGHT preset 1   D-UP preset 2   D-LEFT preset 3   D-DOWN preset 4
+ *                           (their 100 / 90 / 80 / 40 % by default — the player sets each one)
+ *                           LB  shoot green (BIOBUZZ: POLLEN)   RB  shoot purple (BIOBUZZ: NECTAR)
+ *
+ * What their code does not cover had to go somewhere, and each choice is a free button, never a
+ * steal from their layout:
+ *  - A on gamepad 1 SHOOTS. Their driver cannot; but a driver alone on gamepad 1 would otherwise
+ *    have no way to fire. Gamepad 2's RT is still their shoot.
+ *  - LB and RB are the snaps, so the place/catalyst role moves to X and the wheel-set swap to B.
+ *    Flip front and Park mode are unbound: slow mode is their precision control.
+ *  - Their Options heading reset is gone (DSIM's field-centric frame has no zero to reset), so
+ *    Options is Start match again, as on the DSim map.
+ *  - Triangle + sticks (feeder servo calibration) has nothing to calibrate in a sim: dropped.
+ *  - The pad's MENU button stays D-RIGHT on gamepad 1, which their driver never touches; the
+ *    menu is only ever watched on the first pad, so gamepad 2's D-RIGHT (preset 1) cannot open it.
+ */
+function ftc25DualDefaults(): ControlBindings {
+  const b = cloneBindings(DEFAULT_BINDINGS);
+  Object.assign(b.pad.buttons, {
+    fire: [0], // A
+    intake: [6], // LT
+    slowHold: [7], // RT
+    snapAim: [4], // LB (their L1)
+    snapAlt: [5], // RB (their R1)
+    catalyst: [2], // X — the place role, off LB
+    bbPlace: [2], // X — shared with `catalyst` by role, as on the DSim map
+    driveMode: [1], // B — off RB
+    flipFront: [],
+    park: [],
+  } satisfies Partial<Record<PadAction, number[]>>);
+  const pad2: PadSecond = { buttons: NO_BUTTONS(), combos: NO_COMBOS() };
+  Object.assign(pad2.buttons, {
+    intake: [6], // LT
+    fire: [7], // RT
+    shotPreset1: [15], // D-RIGHT
+    shotPreset2: [12], // D-UP
+    shotPreset3: [14], // D-LEFT
+    shotPreset4: [13], // D-DOWN
+    bbFirePollen: [4], // LB — BIOBUZZ's first kind (their operator's green bumper)
+    bbFireNectar: [5], // RB
+  } satisfies Partial<Record<PadAction, number[]>>);
+  b.pad2 = pad2;
+  return b;
+}
+
+/**
+ * THE FTC25 CONTROLS ON ONE CONTROLLER — both of team 2627's drivers on a single pad, for one
+ * person practising alone or each player of a Local versus. Built from their two pads, with the
+ * fewest moves that let both fit; where two of their controls wanted one button, the one a driver
+ * HOLDS while driving keeps the shoulder:
+ *
+ *   sticks       drive and turn, as on gamepad 1
+ *   RT  shoot (their gamepad 2 RT)              LT  intake (both of their pads)
+ *   LB  slow mode, held (their gamepad 1 RT — RT is the shot now)
+ *   RB  snap to target (their L1)               Y   snap to other target (their R1)
+ *   X   shoot POLLEN                            B   shoot NECTAR (their gamepad 2 bumpers)
+ *   D-pad  presets 1–4 exactly as on their gamepad 2 (R, U, L, D)
+ *   A   place / catalyst (DSim's role, off LB)  L3 pass / catapult   R3 ramp   D-UP / D-LEFT place
+ *       NECTAR / human player (BIOBUZZ — no season has both those and the presets)
+ *   OPTIONS  start match                        BACK  the in-match MENU (D-RIGHT is preset 1)
+ *
+ * Unbound on the pad: Restart (the on-screen RESET and the keyboard still have it), Swap wheel
+ * set, Switch drive style, Flip front, Park mode — every button is spoken for.
+ */
+function ftc25SingleDefaults(): ControlBindings {
+  const b = cloneBindings(DEFAULT_BINDINGS);
+  Object.assign(b.pad.buttons, {
+    fire: [7], // RT
+    intake: [6], // LT
+    slowHold: [4], // LB
+    snapAim: [5], // RB
+    snapAlt: [3], // Y
+    bbFirePollen: [2], // X
+    bbFireNectar: [1], // B
+    shotPreset1: [15], // D-RIGHT
+    shotPreset2: [12], // D-UP — shared with BIOBUZZ's Place NECTAR; no game has both
+    shotPreset3: [14], // D-LEFT — shared with BIOBUZZ's human player
+    shotPreset4: [13], // D-DOWN
+    catalyst: [0], // A
+    bbPlace: [0], // A
+    driveMode: [],
+    flipFront: [],
+    park: [],
+    restart: [],
+  } satisfies Partial<Record<PadAction, number[]>>);
+  b.pad.menuButton = 8; // BACK
+  return b;
+}
+
+export const FTC25_DEFAULT_BINDINGS: ControlBindings = ftc25DualDefaults();
+export const FTC25_SINGLE_DEFAULT_BINDINGS: ControlBindings = ftc25SingleDefaults();
+
+/** the two control schemes (`GameSettings.controlScheme`) */
+export type ControlScheme = 'dsim' | 'ftc25';
+export const CONTROL_SCHEMES: readonly ControlScheme[] = ['dsim', 'ftc25'];
+/** how many controllers the FTC25 controls are laid out for (`GameSettings.ftc25Pads`) */
+export type Ftc25Pads = 1 | 2;
+
+/** a scheme's own defaults — what Reset puts back and what a stored map is merged over */
+export function schemeDefaults(scheme: ControlScheme, pads: Ftc25Pads = 2): ControlBindings {
+  if (scheme !== 'ftc25') return DEFAULT_BINDINGS;
+  return pads === 1 ? FTC25_SINGLE_DEFAULT_BINDINGS : FTC25_DEFAULT_BINDINGS;
+}
 
 /**
  * WHERE A NEW ACTION GOES WHEN ITS DEFAULT KEY IS TAKEN in a stored map (`mergeBindings`), tried
@@ -610,7 +880,18 @@ export function cloneBindings(b: ControlBindings): ControlBindings {
   };
   const pg = clonePerGame(b.perGame);
   if (pg) out.perGame = pg;
+  if (b.pad2) out.pad2 = clonePad2(b.pad2);
   return out;
+}
+
+function clonePad2(p: PadSecond): PadSecond {
+  const buttons = {} as Record<PadAction, number[]>;
+  const combos = {} as Record<PadAction, PadChord[]>;
+  for (const a of PAD_ACTIONS) {
+    buttons[a] = [...(p.buttons[a] ?? [])];
+    combos[a] = (p.combos[a] ?? []).map((c) => [...c]);
+  }
+  return { buttons, combos };
 }
 
 /** deep-copy the override map, or `undefined` when there is nothing to copy (which is what
@@ -678,8 +959,14 @@ export function padBinds(pad: PadBindings, action: PadAction): PadChord[] {
 
 /** validate a possibly-stale/corrupt saved value field by field; anything
  * that doesn't check out falls back to the default for that action */
-export function mergeBindings(saved: unknown): ControlBindings {
-  const out = cloneBindings(DEFAULT_BINDINGS);
+export function mergeBindings(saved: unknown, base: ControlBindings = DEFAULT_BINDINGS): ControlBindings {
+  // `base` is the scheme's own defaults (`schemeDefaults`): the DSim map unless an FTC25 map is
+  // being loaded, so an action the blob lacks takes THAT scheme's default
+  const out = cloneBindings(base);
+  // gamepad 2 first: it has no bearing on the rules below, which are about one pad and the keys
+  const p2 = mergePad2((saved as { pad2?: unknown } | null)?.pad2, base.pad2);
+  if (p2) out.pad2 = p2;
+  else delete out.pad2;
   if (typeof saved !== 'object' || saved === null) return out;
   const s = saved as { keys?: unknown; pad?: unknown };
   /** pad actions the stored map has never had a button list for — see the rule after `perGame` */
@@ -709,7 +996,7 @@ export function mergeBindings(saved: unknown): ControlBindings {
       out.keys.bbPlace.length === 1 &&
       out.keys.bbPlace[0] === 'z'
     ) {
-      out.keys.bbRamp = [...DEFAULT_BINDINGS.keys.bbRamp];
+      out.keys.bbRamp = [...base.keys.bbRamp];
       fresh.push('bbRamp');
     }
     // AN ACTION NEWER THAN THE BLOB takes its default only where no bind the player MADE holds
@@ -823,6 +1110,100 @@ export function mergeBindings(saved: unknown): ControlBindings {
         ),
     );
   }
+  return out;
+}
+
+/**
+ * GAMEPAD 2 from a stored blob, validated like the main pad's lists: an action whose list checks
+ * out takes it, anything else keeps `base`'s (the scheme's default, or none). `undefined` when
+ * neither the blob nor the base has a gamepad 2, which keeps such a map's shape unchanged.
+ */
+function mergePad2(saved: unknown, base: PadSecond | undefined): PadSecond | undefined {
+  const hasSaved = typeof saved === 'object' && saved !== null;
+  if (!hasSaved && !base) return undefined;
+  const out: PadSecond = base ? clonePad2(base) : { buttons: NO_BUTTONS(), combos: NO_COMBOS() };
+  if (!hasSaved) return out;
+  const s = saved as { buttons?: unknown; combos?: unknown };
+  const bt = typeof s.buttons === 'object' && s.buttons !== null ? (s.buttons as Record<string, unknown>) : {};
+  const cb = typeof s.combos === 'object' && s.combos !== null ? (s.combos as Record<string, unknown>) : {};
+  for (const a of PAD_ACTIONS) {
+    const v = bt[a];
+    if (Array.isArray(v) && v.every(isButtonIndex)) out.buttons[a] = [...new Set(v as number[])];
+    const c = cb[a];
+    if (Array.isArray(c)) {
+      const seen = new Set<string>();
+      const clean: PadChord[] = [];
+      for (const raw of c) {
+        const n = normalizeChord(raw);
+        if (!n || seen.has(chordKey(n))) continue;
+        seen.add(chordKey(n));
+        clean.push(n);
+      }
+      out.combos[a] = clean;
+    }
+    const over = out.buttons[a].length + out.combos[a].length - BIND_SLOTS_MAX;
+    if (over > 0) {
+      out.combos[a] = out.combos[a].slice(0, Math.max(0, out.combos[a].length - over));
+      out.buttons[a] = out.buttons[a].slice(0, BIND_SLOTS_MAX - out.combos[a].length);
+    }
+  }
+  return out;
+}
+
+/**
+ * GAMEPAD 2 AS AN EDITABLE MAP. The Controls screen edits gamepad 2 with the SAME editors it uses
+ * for the main pad, by handing them this view: the main map with gamepad 2's lists in the pad's
+ * place and no per-game pad overrides (gamepad 2 has none). Conflicts are therefore found among
+ * gamepad 2's own binds, which is the rule: the same index on the other pad is another button.
+ * `fromPad2View` writes an edited view back. Both are DOM-free so `npm test` holds the round trip.
+ */
+export function pad2View(b: ControlBindings): ControlBindings {
+  const v = cloneBindings(b);
+  const p2 = b.pad2 ? clonePad2(b.pad2) : { buttons: NO_BUTTONS(), combos: NO_COMBOS() };
+  v.pad.buttons = p2.buttons;
+  v.pad.combos = p2.combos;
+  // gamepad 2's triggers never turn the robot, so none of its binds is ever paused by them
+  v.pad.turnWith = 'stick';
+  delete v.pad2;
+  if (v.perGame) {
+    for (const g of GAME_IDS) {
+      const ov = v.perGame[g];
+      if (!ov) continue;
+      delete ov.padButtons;
+      delete ov.padCombos;
+      if (!ov.keys) delete v.perGame[g];
+    }
+    if (!Object.keys(v.perGame).length) delete v.perGame;
+  }
+  return v;
+}
+
+/** an edited `pad2View` back onto `orig`: the keys and pad settings as edited, the main pad's
+ *  lists and per-game pad overrides untouched, and gamepad 2 from the view's pad lists */
+export function fromPad2View(orig: ControlBindings, edited: ControlBindings): ControlBindings {
+  const out = cloneBindings(edited);
+  out.pad.buttons = Object.fromEntries(PAD_ACTIONS.map((a) => [a, [...orig.pad.buttons[a]]])) as Record<PadAction, number[]>;
+  out.pad.combos = Object.fromEntries(PAD_ACTIONS.map((a) => [a, orig.pad.combos[a].map((c) => [...c])])) as Record<
+    PadAction,
+    PadChord[]
+  >;
+  out.pad2 = clonePad2({ buttons: edited.pad.buttons, combos: edited.pad.combos });
+  // `turnWith` belongs to the main pad and the view pinned it (see `pad2View`)
+  out.pad.turnWith = orig.pad.turnWith;
+  // keep the main pad's per-game overrides, which the view never showed; take the edited keys'
+  const pg: Partial<Record<GameId, GameBindingOverride>> = {};
+  for (const g of GAME_IDS) {
+    const keys = edited.perGame?.[g]?.keys;
+    const o = orig.perGame?.[g];
+    const entry: GameBindingOverride = {};
+    if (keys) entry.keys = keys;
+    if (o?.padButtons) entry.padButtons = o.padButtons;
+    if (o?.padCombos) entry.padCombos = o.padCombos;
+    if (entry.keys || entry.padButtons) pg[g] = entry;
+  }
+  const clean = clonePerGame(pg);
+  if (clean) out.perGame = clean;
+  else delete out.perGame;
   return out;
 }
 
@@ -1021,6 +1402,15 @@ export function effectiveBindings(b: ControlBindings, game: GameId): ControlBind
     if (!padDesynced(b, game, a)) continue;
     out.pad.buttons[a] = [...(ov?.padButtons?.[a] ?? b.pad.buttons[a])];
     out.pad.combos[a] = (ov?.padCombos?.[a] ?? b.pad.combos[a]).map((c) => [...c]);
+  }
+  // gamepad 2 has no overrides, only the same emptying — for the same reason (its chord resolver
+  // has no idea what a game is either)
+  if (out.pad2) {
+    for (const a of PAD_ACTIONS) {
+      if (actionUsedBy(a, game)) continue;
+      out.pad2.buttons[a] = [];
+      out.pad2.combos[a] = [];
+    }
   }
   return out;
 }
@@ -1425,7 +1815,8 @@ export function syncGame(b: ControlBindings, game: GameId): ControlBindings {
  * everywhere, and resetting BIOBUZZ must not put Place POLLEN back on top of it. Nothing outside
  * this one season moves: the shared controls, the other seasons, and main's Intake and Shoot.
  */
-export function resetGame(b: ControlBindings, game: GameId): ControlBindings {
+export function resetGame(b: ControlBindings, game: GameId, base: ControlBindings = DEFAULT_BINDINGS): ControlBindings {
+  const DEFAULT_BINDINGS = base; // the scheme's own defaults (`schemeDefaults`)
   const next = syncGame(b, game);
   const eff = effectiveBindings(next, game);
   const keys = new Set<string>();
@@ -1455,12 +1846,28 @@ export function resetGame(b: ControlBindings, game: GameId): ControlBindings {
  * rather than leaving the player to find out in a match. A pad bind paused by the triggers
  * turning (`turnWith`) does not count: it cannot fire.
  */
-export function seasonUnbound(b: ControlBindings, game: GameId): KeyAction[] {
+export function seasonUnbound(
+  b: ControlBindings,
+  game: GameId,
+  scheme: ControlScheme = 'dsim',
+): KeyAction[] {
   const eff = effectiveBindings(b, game);
   const pad = new Set<KeyAction>(seasonPadActions(game));
-  return seasonKeyActions(game).filter(
-    (a) => eff.keys[a].length === 0 || (pad.has(a) && livePadBinds(eff.pad, a as PadAction).length === 0),
-  );
+  const ftc = new Set<KeyAction>(FTC25_ONLY);
+  return seasonKeyActions(game).filter((a) => {
+    // an FTC25 action is not on the DSim screen at all, so it cannot be the thing to look at;
+    // under FTC25 it is a pad control first (most have no key), so ANY bind on any device counts
+    if (ftc.has(a)) {
+      if (scheme === 'dsim') return false;
+      const p = a as PadAction;
+      return (
+        eff.keys[a].length === 0 &&
+        livePadBinds(eff.pad, p).length === 0 &&
+        (eff.pad2?.buttons[p].length ?? 0) + (eff.pad2?.combos[p].length ?? 0) === 0
+      );
+    }
+    return eff.keys[a].length === 0 || (pad.has(a) && livePadBinds(eff.pad, a as PadAction).length === 0);
+  });
 }
 
 /** display label for a bound key */

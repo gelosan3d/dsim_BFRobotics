@@ -17,7 +17,6 @@ import type {
 import type { RobotSetup } from '../sim/spawn';
 import type { Replay, ReplayResult } from '../sim/replay';
 import { clamp } from '../math';
-import { flywheelSpinTarget } from '../sim/field';
 
 /**
  * Wire protocol for the SERVER-AUTHORITATIVE netcode (Phase 0). All messages are
@@ -79,8 +78,22 @@ const BTN_BBRAMP = 256;
 // new client NOTHING against an old server: the packet is accepted, the bit is simply
 // ignored by a step that has no pass in it.
 const BTN_BBPASS = 512;
+// FTC25 CONTROLS (team 2627's TeleOp layout, `GameSettings.controlScheme`). Two 2-bit LEVELS,
+// not edges: `shotPower` is the index of the operator's d-pad preset (`FTC25_SHOT_POWERS`, read
+// by no game since DECODE left this fork — RESERVED for BIOBUZZ's launcher), and `fireSel` asks for one kind of element
+// (1 green/POLLEN, 2 purple/NECTAR). Both are 0 for every other driver, so their bits are clear
+// and a DSim-controls packet, replay key and track are bit-identical to before. Inside the 16
+// bits `buttons` has had since 2026-09-20, so an older server's sanitizer accepts the packet and
+// its step ignores the bits — which is exactly "auto-aim online until the server knows them".
+const SHOT_POWER_SHIFT = 10; // bits 1024, 2048
+const FIRE_SEL_SHIFT = 12; // bits 4096, 8192
+const TWO_BITS = 3;
 /** the widest `buttons` an honest sender can produce — every bit above is refused. */
 const BUTTONS_MAX = 0xffff;
+
+/** a 0..3 level field, or 0 for anything absent or out of range */
+const twoBits = (v: number | undefined): number =>
+  v !== undefined && Number.isInteger(v) && v >= 0 && v <= TWO_BITS ? v : 0;
 
 export function quantizeCommand(c: RobotCommand): QCommand {
   return {
@@ -97,7 +110,9 @@ export function quantizeCommand(c: RobotCommand): QCommand {
       (c.bbPlace ? BTN_BBPLACE : 0) |
       (c.bbNectar ? BTN_BBNECTAR : 0) |
       (c.bbRamp ? BTN_BBRAMP : 0) |
-      (c.bbPass ? BTN_BBPASS : 0),
+      (c.bbPass ? BTN_BBPASS : 0) |
+      (twoBits(c.shotPower) << SHOT_POWER_SHIFT) |
+      (twoBits(c.fireSel) << FIRE_SEL_SHIFT),
     ld: Math.round(clamp(c.leftDrive ?? 0, -1, 1) * 127),
     rd: Math.round(clamp(c.rightDrive ?? 0, -1, 1) * 127),
   };
@@ -146,6 +161,17 @@ export function sanitizeQCommand(raw: unknown): QCommand | null {
 }
 
 export function dequantizeCommand(q: QCommand): RobotCommand {
+  const out = dequantizeBase(q);
+  // the FTC25 levels are written only when set, so a DSim-controls command dequantizes to
+  // exactly the object it always did (several checks compare them whole)
+  const shotPower = (q.buttons >> SHOT_POWER_SHIFT) & TWO_BITS;
+  const fireSel = (q.buttons >> FIRE_SEL_SHIFT) & TWO_BITS;
+  if (shotPower) out.shotPower = shotPower;
+  if (fireSel) out.fireSel = fireSel;
+  return out;
+}
+
+function dequantizeBase(q: QCommand): RobotCommand {
   return {
     driveX: q.dx / 127,
     driveY: q.dy / 127,
@@ -207,8 +233,8 @@ export interface RoomConfig {
   kind: RoomKind;
   /** set when kind === 'record' */
   record?: RecordKind;
-  /** which game the room plays. Absent ⇒ 'decode' (old clients / back-compat).
-   * The server resolves the game module from this; matchmaking buckets by it. */
+  /** which game the room plays. Absent ⇒ `DEFAULT_GAME` (BIOBUZZ; it was DECODE until this
+   * fork removed it). The server resolves the game module from this; matchmaking buckets by it. */
   game?: GameId;
   /**
    * WHICH PHYSICS BACKEND THIS ROOM'S WORLD RUNS ON — ⚠️ **NO LONGER READ BY THE SERVER**
@@ -219,7 +245,7 @@ export interface RoomConfig {
    * the record board is one solve. There is no host choice left for this field to carry.
    *
    * It stays on the wire as the room's DECLARED solve, and it is omitted entirely for a game
-   * with no 3D solve, which keeps DECODE and Chain Reaction's handshake byte-identical.
+   * with no 3D solve, which keeps Chain Reaction's handshake byte-identical.
    *
    * ⚠️ IT IS NOT A BACK-COMPAT PATH. An older server does not read this field at all — the
    * `RoomConfig` on main has no `physics` key and the decoder drops config keys it does not
@@ -778,8 +804,8 @@ export type ClientMsg =
       accessMs: number;
       noWiden?: boolean;
       caps?: string[];
-      /** which game to queue for. Absent ⇒ 'decode'. The matchmaker buckets by it
-       * so a Chain-Reaction queuer never pairs into a DECODE authoritative room. */
+      /** which game to queue for. Absent ⇒ `DEFAULT_GAME`. The matchmaker buckets by it
+       * so a Chain Reaction queuer never pairs into a BIOBUZZ authoritative room. */
       game?: GameId;
       /** release channel (see `join.channel`): alpha queues only pair with alpha */
       channel?: string;
@@ -996,8 +1022,8 @@ export type ServerMsg =
       seed: number;
       setups: RobotSetup[];
       yourRobotId: number;
-      /** which game to build the world for. Absent ⇒ 'decode' (old servers); the
-       * client also falls back to the first snapshot's `world.game`. */
+      /** which game to build the world for. Absent ⇒ a DECODE room (only a server that
+       * predates every other game omits it), which `LobbyClient` refuses. */
       game?: GameId;
       /**
        * WHICH PHYSICS THE ROOM'S WORLD RUNS ON (`RoomConfig.physics`). Absent ⇒ `'2d'` — an
@@ -1258,9 +1284,9 @@ const finiteOr = (v: unknown, fallback: number): number =>
 function backfillRobot(r: RobotState): RobotState {
   return {
     ...r,
-    // flywheel spin is DERIVED from distance to the robot's own goal; seed it at
-    // the position target (like spawn) so there's no phantom spin-up spike.
-    flywheelSpin: finiteOr(r.flywheelSpin, flywheelSpinTarget(r.alliance, r.pos)),
+    // DECODE derived the spin from the distance to its own goal; no game left in this fork
+    // has one, so a missing spin is a wheel at rest
+    flywheelSpin: finiteOr(r.flywheelSpin, 0),
     flywheelSpinRate: finiteOr(r.flywheelSpinRate, 0),
     powerDraw: finiteOr(r.powerDraw, 0),
     moduleAngles:
@@ -1341,8 +1367,9 @@ export function unslimWorld(
 ): World {
   return {
     ...w,
-    // old servers omit `game`; default it so gameOf/moduleFor resolve to DECODE
-    game: w.game ?? 'decode',
+    // a session only steps a world of a game this build has (`LobbyClient` refuses the rest at
+    // `matchStart`); the servers that omit `game` predate every game but DECODE
+    game: w.game,
     robots: w.robots.map((r) => backfillRobot({ ...r, spec: specById(r.id) })),
     balls,
   };

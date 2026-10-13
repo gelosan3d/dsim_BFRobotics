@@ -792,8 +792,16 @@ export interface BbShot {
 export function bbLaunch(world: World, r: RobotState, cmd: RobotCommand, enabled: boolean, shot?: BbShot): void {
   const launcher = bbLauncherOf(r.spec, BB_HOOD_DEFAULT_DEG);
   const dumper = launcher.kind === 'dumper';
-  /** the exits this launcher has: both turrets of a double, one for everything else. */
-  const exits: readonly (0 | 1)[] = launcher.kind === 'twinturret' ? [0, 1] : [0];
+  /**
+   * the exits this launcher has: both turrets of a double, one for everything else. An FTC25
+   * driver's element button (`RobotCommand.fireSel`, 1 POLLEN / 2 NECTAR) picks ONE turret of a
+   * double, which is the only BIOBUZZ launcher that can choose: it feeds each kind to its own
+   * turret. A single turret or a dumper fires its LIFO top whatever is asked, so `fireSel` is
+   * not read there.
+   */
+  const sel = cmd.fireSel ?? 0;
+  const exits: readonly (0 | 1)[] =
+    launcher.kind === 'twinturret' ? (sel === 1 ? [0] : sel === 2 ? [1] : [0, 1]) : [0];
   /**
    * THE LIFO-TOP ELEMENT `which` IS FED, or `undefined` when that exit has nothing to fire.
    *

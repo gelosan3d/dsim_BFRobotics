@@ -19,8 +19,8 @@ shared file instead of adding a third arm to a two-valued branch.
 **FOUR registrations, and all four are silent when missed:**
 1. `src/games/index.ts` — `GAMES` (the CLIENT module: renderers + UI slots).
 2. `src/games/sim.ts` — `SIM_GAMES` (the SERVER-SAFE module). Missing here and the
-   authoritative server runs your players a DECODE room without saying so.
-   ⚠️ Add it as a **GETTER**, like the three already there — there is an import cycle
+   authoritative server runs your players a `DEFAULT_GAME` (BIOBUZZ) room without saying so.
+   ⚠️ Add it as a **GETTER**, like the two already there — there is an import cycle
    through this file (`src/sim/spawn.ts` needs `simModuleFor` for the start-index clamp)
    and a plain `id: MODULE` entry is a module-eval-time read, which is exactly what a
    cycle cannot survive.
@@ -37,8 +37,8 @@ need not differ between games — BIOBUZZ opens at Act 1) and
 `startPoseCount` (the legal range of a `startIndex`; every clamp reads it).
 
 **The OPTIONAL UI slots** (`GameModule`, `src/games/module.ts`) — each wired at its
-consumer as `mod.X ? <slot> : <the existing branch, unchanged>`, so DECODE's and CR's
-inline branches stay untouched:
+consumer as `mod.X ? <slot> : <the existing branch, unchanged>`, so CR's inline branches
+stay untouched (DECODE's went with DECODE):
 
 | slot | consumer |
 |---|---|
@@ -58,7 +58,7 @@ the game's own HUD slice, opaque (`unknown`) because only its own components rea
 `GameSimModule.artifactSolids?(r, held, radius)`, the game's own answer to "what on this robot
 is SOLID to a ground element". Absent ⇒ the shared `robotSolids`, i.e. DECODE's front funnel;
 BIOBUZZ fills it because its sweeper is a roller bar on whichever edge `intakeMount` names, and
-DECODE/CR leave it empty so `src/sim/world.ts` is untouched.
+Chain Reaction, which runs no ground-element solve, leaves it empty.
 
 `GameUiSpec` (`ui`) is an earlier attempt at the same idea and has never had a reader.
 It is left alone deliberately; do not build on it.

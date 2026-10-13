@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { DEFAULT_GAME } from '../games/types';
 
 /**
  * WHAT THE APP IS SHOWING, for the two things mounted BESIDE `<App/>` in `main.tsx` that need
@@ -13,7 +14,7 @@ export interface ShellState {
   game: string;
 }
 
-let state: ShellState = { inMatch: false, game: 'decode' };
+let state: ShellState = { inMatch: false, game: DEFAULT_GAME };
 const subs = new Set<() => void>();
 
 export function setShellState(patch: Partial<ShellState>): void {

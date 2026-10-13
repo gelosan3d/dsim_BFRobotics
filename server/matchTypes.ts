@@ -26,15 +26,13 @@ export interface PendingRosterEntry {
   alliance: Alliance;
   /** overall ELO snapshot for the pre-match intro overlay (null if unrated/DB-off) */
   introElo: number | null;
-  autoPath?: string;
-  autoPathEnabled?: boolean;
   /** release channel of this player (all entries share one — the matchmaker only
    * groups a single channel). Stored in the roster jsonb so the host region can
    * recover `PendingMatch.channel` without a schema column. */
   channel?: string;
   /** which game the match plays (all entries share one — bucketed by game). Stored
    * in the roster jsonb so the host recovers `PendingMatch.game` without a schema
-   * column (same trick as `channel`). Absent ⇒ 'decode'. */
+   * column (same trick as `channel`). Absent ⇒ `DEFAULT_GAME`. */
   game?: GameId;
   /** which PHYSICS the staged room runs on — the same jsonb trick again, for the same
    * reason: no schema column, and every entry in one staged match shares the value.
@@ -56,7 +54,7 @@ export interface PendingMatch {
   seed: number;
   roster: PendingRosterEntry[];
   ranked: boolean;
-  /** which game the staged match plays (Absent ⇒ 'decode'). The host resolves the
+  /** which game the staged match plays (Absent ⇒ `DEFAULT_GAME`). The host resolves the
    * sim module from it; the matchmaker only ever groups one game (bucketKey). */
   game?: GameId;
   /** release channel of the paired players ('alpha' | 'stable' | …); the matchmaker

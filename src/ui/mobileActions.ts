@@ -113,8 +113,6 @@ export interface TouchLive {
   held: readonly ArtifactColor[];
   /** the hopper's capacity for this build */
   cap: number;
-  /** DECODE only fires from a launch zone; true for every other season */
-  launchZoneOk: boolean;
   chain?: { carrying: boolean; ringAction: 'pickup' | 'place' | 'fling' | null };
   bb?: { flowerInReach: boolean; nectarOk: boolean };
 }
@@ -180,7 +178,7 @@ export const SHARED_TOUCH_BUTTONS: readonly TouchButton[] = [
     // every sim reads `cmd.fire || r.autoFire`, so under auto fire the press adds nothing —
     // unless this season's build does something with the button that auto fire does not
     present: (c) => !c.autoFire || (GAME_TOUCH[c.game].manualFireCounts?.(c) ?? false),
-    ready: (l) => l.held.length > 0 && l.launchZoneOk,
+    ready: (l) => l.held.length > 0,
   },
   {
     action: 'intake',
@@ -231,10 +229,6 @@ export const SHARED_TOUCH_BUTTONS: readonly TouchButton[] = [
 
 /** the per-game tables, one per season. A new game is a compile error until it has a row. */
 const GAME_TOUCH: Record<GameId, GameTouch> = {
-  // DECODE's only actions are the shared ones — its artifacts are intaken and shot, and the
-  // gate, basin and rail are field mechanisms the driver pushes with the chassis. Its turret
-  // tracks on its own, so a held SHOOT never steers.
-  decode: { buttons: [] },
   chain: CHAIN_TOUCH,
   biobuzz: BB_TOUCH,
 };
@@ -269,6 +263,18 @@ export const TOUCH_OTHER_ACTIONS: Readonly<Record<string, string>> = {
   // every device does, before the match (Configure ▸ Robot ▸ Driving); a sixth utility button
   // for a press a touch driver makes once a season would only crowd the thumb columns.
   driveFrame: 'Robot ▸ Drive style',
+  // THE FTC25 CONTROLS' OWN ACTIONS are team 2627's GAMEPAD layout (`FTC25_ONLY`): a touch
+  // driver plays DSim controls, where every one of them is unbound. SHOOT on the touch pad still
+  // shoots, picking the element the way DSim always has.
+  shotPreset1: 'FTC25 controls, gamepad only',
+  shotPreset2: 'FTC25 controls, gamepad only',
+  shotPreset3: 'FTC25 controls, gamepad only',
+  shotPreset4: 'FTC25 controls, gamepad only',
+  bbFirePollen: 'FTC25 controls, gamepad only',
+  bbFireNectar: 'FTC25 controls, gamepad only',
+  slowHold: 'FTC25 controls, gamepad only',
+  snapAim: 'FTC25 controls, gamepad only',
+  snapAlt: 'FTC25 controls, gamepad only',
 };
 
 /** every button `game` could show, in thumb order — the shared ones interleaved with its own
@@ -314,8 +320,6 @@ export function touchLiveOf(hud: HudSnapshot): TouchLive {
     parked: hud.parked,
     held: hud.hopper,
     cap: hud.chain?.storage ?? bb?.robot?.cap ?? HOPPER_CAPACITY,
-    // `inLaunchZone` is DECODE geometry; another season's robot is never "in" one
-    launchZoneOk: hud.game === 'decode' ? hud.inLaunchZone : true,
     chain: hud.chain && { carrying: hud.chain.carrying, ringAction: hud.chain.ringAction },
     bb: bb && {
       flowerInReach: bb.robot?.flowerInReach ?? false,

@@ -1,4 +1,5 @@
 import type { DodgeVerdict } from '../dodge';
+import { isGameId } from '../games/types';
 import type { GameId, Physics } from '../types';
 import type { RobotSetup } from '../sim/spawn';
 import type { Transport } from './transport';
@@ -24,7 +25,8 @@ export interface MatchStart {
   seed: number;
   setups: RobotSetup[];
   yourRobotId: number;
-  /** which game the match plays (DECODE by default) — passed to the ServerSession */
+  /** which game the match plays — always one this build has (a `matchStart` for any other is
+   *  refused before it gets here) — passed to the ServerSession */
   game?: GameId;
   /**
    * WHICH PHYSICS THE ROOM RUNS ON (`matchStart.physics`; absent ⇒ `'2d'`).
@@ -373,6 +375,18 @@ export class LobbyClient {
       this.hostId = m.hostId;
       this.handlers.roster?.(m.players, m.hostId);
     } else if (m.t === 'matchStart') {
+      // A GAME THIS BUILD DOES NOT HAVE is refused here, once, for every screen that mints a
+      // session — never built as the fallback game. DECODE was removed from this fork
+      // (2026-10-12) and DSIM's servers still run it: a player cannot reach such a room (the
+      // server refuses the join as `game_mismatch`), but a SPECTATOR can. An absent `game` is
+      // DECODE too, by the protocol's own rule, from a server older than the second game.
+      const game: unknown = m.game; // typed `GameId`, but it is what the server sent
+      if (!isGameId(game)) {
+        this.handlers.error?.(
+          `That match is playing ${typeof game === 'string' ? game.toUpperCase() : 'DECODE'}, which this version of DSIM does not include.`,
+        );
+        return;
+      }
       this.handlers.matchStart?.(m);
     } else if (m.t === 'queued') {
       this.handlers.queued?.(m.mode, m.size, m.need);

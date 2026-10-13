@@ -37,7 +37,7 @@ import {
   CHAIN_STORAGE_DEFAULT,
   CHAIN_CLEARANCE_DEFAULT,
 } from '../games/chain/config';
-import type { DrivetrainType, GameId, IntakeStyle, RobotSpec } from '../types';
+import type { DrivetrainType, GameId, RobotSpec } from '../types';
 
 type Kind = 'records' | 'ranked';
 
@@ -51,11 +51,6 @@ const BOARDS: { id: Board; label: string }[] = [
   { id: 'overall', label: 'Overall' },
   ...BOARD_ORDER.map((id) => ({ id, label: DT_LABEL[id] })),
 ];
-const INTAKE_LABEL: Record<IntakeStyle, string> = {
-  sloped: 'Sloped',
-  vector: 'Vector',
-  triangle: 'Triangle',
-};
 
 /** a driver's name on a board: display handle + muted @username, clickable to
  * their public profile when they have a username (legacy rows without one render
@@ -110,12 +105,10 @@ function DriverName({
   );
 }
 
-/** one robot's spec stats (shared by solo + each half of a duo). Game-aware: a
- * Chain Reaction robot shows its CR config (archetype / sweeper mount / hopper /
- * clearance), NOT the DECODE intake-preset + flywheel — those fields are unused in
- * CR and would read as a "weird" random configuration. */
+/** one robot's spec stats (shared by solo + each half of a duo). Game-aware: a game that owns
+ * its config sentence prints that; a Chain Reaction robot shows its CR config (archetype /
+ * sweeper mount / hopper / clearance). */
 function RobotSpecSummary({ spec, game }: { spec: RobotSpec; game?: GameId }) {
-  const isChain = game === 'chain';
   // a game that owns its config sentence (the module's `labels.configSummary`
   // slot) prints THAT instead of tiles naming fields it may not have
   const own = moduleFor(game).labels?.configSummary;
@@ -149,17 +142,12 @@ function RobotSpecSummary({ spec, game }: { spec: RobotSpec; game?: GameId }) {
         {stat(spec.driveRpm, 'drive rpm')}
         {own ? (
           stat(own(spec), 'config', true)
-        ) : isChain ? (
+        ) : (
           <>
             {stat(archetype, 'archetype', true)}
             {stat(sweeper, 'intake', true)}
             {stat(Math.round(spec.ballStorage ?? CHAIN_STORAGE_DEFAULT), 'hopper')}
             {stat(`${(spec.groundClearance ?? CHAIN_CLEARANCE_DEFAULT).toFixed(1)}"`, 'clearance')}
-          </>
-        ) : (
-          <>
-            {stat(`${INTAKE_LABEL[spec.intake]}${spec.canSort ? ' +sort' : ''}`, 'intake', true)}
-            {stat(spec.flywheelInertia.toFixed(2), 'flywheel')}
           </>
         )}
         {stat(`${spec.length}×${spec.width}"`, 'size')}

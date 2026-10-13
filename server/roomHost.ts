@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { availableParallelism } from 'node:os';
 import { Room, type Client } from './room';
 import { DEFAULT_ROOM_CONFIG, roomCapacity, type ClientMsg, type LiveRoom, type RoomConfig, type ServerMsg } from '../src/net/protocol';
-import { serverPhysics } from '../src/games/types';
+import { DEFAULT_GAME, serverPhysics } from '../src/games/types';
 import { simModuleFor } from '../src/games/sim';
 import type { GameId, Physics } from '../src/types';
 import type { PendingMatch } from './matchTypes';
@@ -193,7 +193,7 @@ interface Callbacks {
 function initialFacts(code: string, config: RoomConfig, capacity: number): RoomFacts {
   return {
     ack: 0,
-    lobby: { code, players: 0, capacity, kind: config.kind, game: config.game ?? 'decode', joinable: true, state: 'lobby' },
+    lobby: { code, players: 0, capacity, kind: config.kind, game: config.game ?? DEFAULT_GAME, joinable: true, state: 'lobby' },
     seats: [],
     staging: false,
     summary: null,
@@ -272,7 +272,7 @@ export class RemoteRoom implements RoomHandle {
 
   get gameId(): GameId {
     // Room.game, verbatim
-    return this.pending?.game ?? this.config.game ?? 'decode';
+    return this.pending?.game ?? this.config.game ?? DEFAULT_GAME;
   }
   get physics(): Physics {
     return serverPhysics(simModuleFor(this.gameId));

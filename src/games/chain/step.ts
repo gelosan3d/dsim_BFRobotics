@@ -71,7 +71,7 @@ export function chainStep(world: World, dt: number, commands: Map<number, RobotC
   // same placement as DECODE's `step`; see `MOTOR_SHOVE_BRAKE`.
   world.rrContacts.length = 0;
   // Rapier owns robot translation/velocity + wall containment on the CR field.
-  const preVels = solveRobots(world, dt, chainColliders, undefined, drive);
+  const preVels = solveRobots(world, dt, chainColliders, drive);
   // square a tilted chassis flush against the walls (and other robots) — the same
   // contact-torque pass DECODE runs, restricted to CR's perimeter walls.
   squareUpRobotsWalls(world, preVels, CHAIN_HALF_X, CHAIN_HALF_Y);

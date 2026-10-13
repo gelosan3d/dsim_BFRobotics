@@ -1,29 +1,9 @@
-import type {
-  Alliance,
-  Artifact,
-  ArtifactColor,
-  AssistConfig,
-  DrivetrainType,
-  GameId,
-  GameMode,
-  GoalState,
-  Motif,
-  RobotSpec,
-  RobotState,
-  World,
-  AutoPathData, // Import AutoPathData
-  GameSettings, // Import GameSettings
-  PathPoint, // Import PathPoint
-  PathLine,
-  SequenceItem,
-  ControlPoint, // Import ControlPoint
-  StartPose,
-} from '../types';
+import type { Alliance, AssistConfig, DrivetrainType, GameId, Motif, RobotSpec, StartPose } from '../types';
 import * as C from '../config';
 /**
  * The start-anchor COUNT is per game, so the spawn chokepoint has to ask the
- * registry for it. This is a genuine import CYCLE (`games/sim` → `decode/sim` →
- * here) and it is safe only because nothing is read at module-eval time:
+ * registry for it. This is a genuine import CYCLE (`games/sim` → a game's `sim.ts` →
+ * its spawn → here) and it is safe only because nothing is read at module-eval time:
  * `simModuleFor` is a hoisted function declaration and `coerceSetup` calls it at
  * runtime. Do not move a registry read to this file's top level.
  */
@@ -60,8 +40,6 @@ import {
   chainMountFits,
 } from '../games/chain/config';
 import {
-  CHAIN_DEFAULT_INTAKE_MOUNT,
-  CHAIN_DEFAULT_SHOOTER_MOUNT,
   CHAIN_CATALYST_MOUNTS,
   CHAIN_RAIL_MOUNTS,
   intakeMountOf,
@@ -74,13 +52,15 @@ import {
   shooterEdgeOf,
   shooterMountOf,
 } from '../games/chain/mounts';
-import { nextRandom, wrapAngle, rot, clamp } from '../math'; // Import wrapAngle
+import { clamp } from '../math';
 import { COSMETIC_AXES, clampCosmetics, type Cosmetics } from '../cosmetics';
 import { butterflyTankRpmLimits, lengthLimits, massLimits, rpmLimits, widthLimits } from './drivetrain';
-import { heldSlotPos } from './physics';
-import { flywheelSpinTarget, loadPreStage, spikeMarkBalls, startPose } from './field';
-import { emptyScore } from './scoring';
 
+/**
+ * DECODE's three motifs (obelisk AprilTags 21–23). DECODE is gone from this fork (2026-10-12),
+ * but `World.motif` is not: Chain Reaction and BIOBUZZ fill it with `MOTIFS[0]`, inert, because
+ * `worldHash`, the snapshot diff and DSIM's own servers all read the field. Kept for that.
+ */
 export const MOTIFS: Motif[] = [
   ['green', 'purple', 'purple'], // obelisk AprilTag 21: GPP
   ['purple', 'green', 'purple'], // 22: PGP
@@ -336,27 +316,6 @@ export function coerceSpec(raw: unknown, base: RobotSpec = DEFAULT_SPEC, game?: 
   // that changes archetype later can never keep a mount that archetype cannot have.
   if (!isTurreted(out.scoreMode)) out.shooterMount = shooterEdgeOf({ shooterMount: out.shooterMount });
 
-  // MOUNTS BELONG TO THE GAMES THAT HAVE THEM. They are the one CR field with a SHARED
-  // physics effect — the intake mount moves the collision footprint (`footprintExtents`), so a
-  // CR build's side sweeper leaking into DECODE would widen its flanks and delete its front
-  // intake reach. The builder only offers mounts for the games that use them and `switchGame`
-  // keeps a per-game spec, but a spec can still arrive from a hand-edited store, a pre-loadouts
-  // save, or an untrusted client whose build doesn't match the room's game — so normalize here,
-  // the chokepoint every one of those passes.
-  // Only when the game is EXPLICITLY known and does not use the fields: `game` is optional on
-  // several call paths, and treating "unspecified" as DECODE would silently wipe a real build.
-  //
-  // BIOBUZZ IS EXEMPT because it rides these same two fields (see `games/biobuzz/mounts.ts`:
-  // reusing them rather than minting `bb*` twins is what lets the shared footprint reader work
-  // for it), and its own arm below is the authority on them — it enum-checks both against this
-  // game's lists, folds a corner mount off a turretless launcher, re-derives the size envelope
-  // from the intake mount and re-mirrors the legacy booleans. Wiping them here instead spawned
-  // every turretless build with a front drum whatever edge was picked and bolted every turret
-  // to the front whatever the nine positions offered.
-  if (game !== undefined && game !== 'chain' && game !== 'biobuzz') {
-    out.intakeMount = CHAIN_DEFAULT_INTAKE_MOUNT;
-    out.shooterMount = CHAIN_DEFAULT_SHOOTER_MOUNT;
-  }
   // MIRROR the deprecated booleans so a spec routed through an older peer/server (which drops
   // the fields it doesn't know) round-trips to the nearest legal mount instead of resetting.
   out.intakeSide = out.intakeMount === 'side';
@@ -559,6 +518,13 @@ export function coerceAssists(raw: unknown, base: AssistConfig = DEFAULT_ASSISTS
     for (const k of ['fieldCentric', 'aimAssist', 'autoIntake', 'autoFire'] as const) {
       if (typeof a[k] === 'boolean') out[k] = a[k];
     }
+    // FTC25 shot controls: kept only when ON — a table of exactly FTC25_PRESET_COUNT finite
+    // fractions, each clamped to the launcher's range — so a setup without them is byte-identical
+    // to one written before the field existed (`AssistConfig.manualShot`). Anything else is off.
+    const m = a.manualShot;
+    if (Array.isArray(m) && m.length === C.FTC25_SHOT_POWERS.length && m.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+      out.manualShot = m.map((v: number) => Math.min(1, Math.max(C.FTC25_MIN_POWER, v)));
+    } else delete out.manualShot;
   }
   // AIM ASSIST IS ALWAYS ON, in BOTH games — the menu toggle is gone, and this is what
   // makes that true rather than merely unreachable. It has to be HERE, because a stored
@@ -573,86 +539,6 @@ export function coerceAssists(raw: unknown, base: AssistConfig = DEFAULT_ASSISTS
   // the toggle back in Menu.tsx.
   out.aimAssist = true;
   return out;
-}
-
-/** clamp a single path point's coordinates to the field (finite, in-bounds) so a
- * spoofed auto path can never teleport a robot out of the world or to NaN */
-function coercePathPoint(p: PathPoint): PathPoint {
-  const out: PathPoint = { ...p };
-  out.x = clampFinite(p.x, -C.FIELD_HALF, C.FIELD_HALF, 0);
-  out.y = clampFinite(p.y, -C.FIELD_HALF, C.FIELD_HALF, 0);
-  for (const k of ['startDeg', 'endDeg', 'degrees'] as const) {
-    if (out[k] !== undefined) out[k] = clampFinite(out[k], -720, 720, 0);
-  }
-  return out;
-}
-
-/** Auto-path size bounds. An auto path arrives from a hand-editable file picker AND
- * from the wire, is stored on `RobotState`, and rides every snapshot and replay, so
- * each unbounded array is a size amplifier rather than an exploit (`readBody` already
- * caps an upload at 512 KiB). `lines` was the only one bounded. */
-const PATH_MAX_LINES = 200;
-const PATH_MAX_SEQUENCE = 400; // read every tick by `pathTraversal`; 2 items per line is the real shape
-const PATH_MAX_CONTROL_POINTS = 8;
-const PATH_MAX_WAIT_MS = 30000; // one match; a longer wait is indistinguishable from "never move"
-
-/** Structurally validate + bound-clamp an auto path from untrusted input. Returns
- * null when the shape is not a usable AutoPathData (the caller then disables auto
- * pathing). Coordinates are clamped to the field so `pathTraversal` cannot be
- * driven to spawn a robot at an absurd / NaN position. */
-export function coerceAutoPath(raw: unknown): AutoPathData | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const d = raw as Record<string, unknown>;
-  if (typeof d.fileName !== 'string') return null;
-  if (typeof d.startPoint !== 'object' || d.startPoint === null) return null;
-  if (!Array.isArray(d.lines)) return null;
-  try {
-    const out: AutoPathData = {
-      fileName: d.fileName.slice(0, 120),
-      startPoint: coercePathPoint(d.startPoint as PathPoint),
-      lines: (d.lines as PathLine[]).slice(0, PATH_MAX_LINES).map((line) => {
-        const l: PathLine = { ...line };
-        l.endPoint = coercePathPoint(line.endPoint);
-        if (Array.isArray(line.controlPoints)) {
-          // ⚠️ NEVER slice to 2. `renderer.ts` and `pathTraversal` both read LENGTH as the
-          // curve order (1 ⇒ quadratic, 2 ⇒ cubic, 0 ⇒ straight), so truncating a long list
-          // to 2 silently turns a linear segment into a cubic Bézier through junk points.
-          // 8 is well past any real .pp file and is a runaway guard, not a reshape.
-          l.controlPoints = line.controlPoints.slice(0, PATH_MAX_CONTROL_POINTS).map((c) => ({
-            x: clampFinite(c.x, -C.FIELD_HALF, C.FIELD_HALF, 0),
-            y: clampFinite(c.y, -C.FIELD_HALF, C.FIELD_HALF, 0),
-          }));
-        }
-        // every wait reaches `robot.pathWaitTimer` — all THREE of them, or the cap is
-        // incoherent (see the sequence `durationMs` below)
-        for (const k of ['waitBeforeMs', 'waitAfterMs'] as const) {
-          if (l[k] !== undefined) l[k] = clampFinite(l[k], 0, PATH_MAX_WAIT_MS, 0);
-        }
-        // unread anywhere outside the importer — do not carry them into the world, a
-        // snapshot or a stored replay
-        delete l.waitBeforeName;
-        delete l.waitAfterName;
-        return l;
-      }),
-      // `shapes` is DROPPED, not capped: nothing reads it — no renderer, no sim, no HUD.
-      // It was carried from the .pp importer through the coercer, the mirror and every
-      // snapshot for nothing. Deletion beats a bound.
-      sequence: Array.isArray(d.sequence)
-        ? (d.sequence as SequenceItem[]).slice(0, PATH_MAX_SEQUENCE).map((it) => {
-            const item: SequenceItem = { ...it };
-            if (item.durationMs !== undefined) {
-              item.durationMs = clampFinite(item.durationMs, 0, PATH_MAX_WAIT_MS, 0);
-            }
-            return item;
-          })
-        : undefined,
-      version: typeof d.version === 'string' ? d.version.slice(0, 40) : undefined,
-      timestamp: typeof d.timestamp === 'string' ? d.timestamp.slice(0, 40) : undefined,
-    };
-    return out;
-  } catch {
-    return null;
-  }
 }
 
 /** Coerce a whole RobotSetup from untrusted input into a spawn-safe one: legal
@@ -680,37 +566,17 @@ export function coerceStartPose(raw: unknown): StartPose | null {
 
 export function coerceSetup(s: RobotSetup, game?: GameId): RobotSetup {
   // EVERY per-game answer this function needs comes off the module, not off `game ===`:
-  // the anchor count, whether start legality exists, whether paths run at all. An
-  // absent/unknown game resolves to DECODE, like every other module lookup.
+  // the anchor count and the start snap. An absent/unknown game resolves to `DEFAULT_GAME`,
+  // like every other module lookup.
   const mod = simModuleFor(game);
-  // A PATH A GAME CANNOT RUN IS DROPPED HERE. Only DECODE's step drives path traversal
-  // (`autoPaths`), so for the others this was state that survived localStorage, the wire,
-  // the world and the replay while doing nothing — and an `autoPathActive` robot whose
-  // game never advances the path is the one shape `pathTraversal` has no answer for.
-  const autoPath = mod.autoPaths && s.autoPath !== undefined ? coerceAutoPath(s.autoPath) : null;
   const alliance = s.alliance === 'red' || s.alliance === 'blue' ? s.alliance : 'blue';
-  // THE GAME IS PASSED ON, EXCEPT FOR DECODE — narrowed on purpose. `coerceSpec`'s per-game
-  // arms (CR's mount fits, BIOBUZZ's own clamps) were being skipped at this chokepoint, which
-  // is supposed to be the last line of defence, so CR and BIOBUZZ both pass `game` straight
-  // through. An explicit `'decode'` is different: it also arms the mount-reset branch in
-  // `coerceSpec`, which rewrites `intakeMount` to 'front'. `intakeMount` is PHYSICS —
-  // `footprintExtents` grows the collider on the mounted edge and `worldHash` mixes robot
-  // positions — so arming it for DECODE here would make every stored replay carrying a
-  // non-front mount re-simulate as a different robot, i.e. a SIM_VERSION bump that retires
-  // the whole archive. The stale-`intakeMount` leak that branch exists to close therefore
-  // STAYS OPEN on this path for DECODE. It is a separate pre-existing bug and wants its own
-  // fix at a deliberate version boundary — do NOT "complete" the threading for DECODE.
-  const spec = coerceSpec(s.spec, DEFAULT_SPEC, game === 'decode' ? undefined : game);
-  // a custom pose overrides the preset; snap it G304-legal for THIS spec+alliance
-  // so no spawn path (localStorage, wire, staged match) can place an illegal robot.
-  //
-  // ONLY THROUGH THE GAME'S OWN SNAP (`startSnap`). `snapStartToLegal` is G304 geometry —
-  // launch lines, goal faces, DECODE's alliance halves, an x-mirror between alliances — so
-  // it is DECODE's slot and nobody else's. It used to be gated on `startLegality`, which
-  // BIOBUZZ also sets, so a BIOBUZZ pose was seated against DECODE's field and mirrored the
-  // wrong way (BIOBUZZ is point-symmetric). A game without the slot keeps the structurally
-  // validated, field-clamped pose and supplies its own fit pass if it has one, as BIOBUZZ's
-  // spawn does.
+  // THE GAME IS PASSED ON: `coerceSpec`'s per-game arms (CR's mount fits, BIOBUZZ's own
+  // clamps) belong at this chokepoint, which is the last line of defence.
+  const spec = coerceSpec(s.spec, DEFAULT_SPEC, game);
+  // a custom pose overrides the preset; snap it legal for THIS spec+alliance so no spawn path
+  // (localStorage, wire, staged match) can place an illegal robot — ONLY THROUGH THE GAME'S
+  // OWN SNAP (`startSnap`). A game without the slot keeps the structurally validated,
+  // field-clamped pose and supplies its own fit pass if it has one, as BIOBUZZ's spawn does.
   let startPose: StartPose | undefined;
   const raw = coerceStartPose(s.startPose);
   if (raw) startPose = mod.startSnap ? mod.startSnap(spec, alliance, raw) : raw;
@@ -719,14 +585,11 @@ export function coerceSetup(s: RobotSetup, game?: GameId): RobotSetup {
     alliance,
     spec,
     assists: coerceAssists(s.assists),
-    // the anchor count is PER GAME (DECODE 5, CR 4) — see `coerceStartIndex`. An
-    // absent/unknown game resolves to DECODE, like every other module lookup.
+    // the anchor count is PER GAME (`startPoseCount`) — see `coerceStartIndex`
     startIndex: Number.isFinite(s.startIndex)
       ? clamp(Math.round(s.startIndex), 0, mod.startPoseCount - 1)
       : 0,
     startPose,
-    autoPath: autoPath ?? undefined,
-    autoPathEnabled: autoPath ? s.autoPathEnabled === true : false,
     passive: s.passive,
   };
 }
@@ -737,245 +600,12 @@ export interface RobotSetup {
   alliance: Alliance;
   spec: RobotSpec;
   assists: AssistConfig;
-  /** index into START_POSES (mirrored per alliance) — the quick-pick fallback */
+  /** index into the game's named start anchors (mirrored per alliance) — the quick-pick fallback */
   startIndex: number;
-  /** a fully-placed CUSTOM start pose (canonical goalSide=+1 frame). Overrides
-   * startIndex when present; `coerceSetup` snaps it G304-legal at spawn. */
+  /** a fully-placed CUSTOM start pose (canonical frame). Overrides startIndex when present;
+   * `coerceSetup` snaps it legal at spawn. */
   startPose?: StartPose;
-  // New fields for auto pathing
-  autoPath?: AutoPathData;
-  autoPathEnabled?: boolean;
   /** an inert obstacle (practice dummy): skips all per-tick action compute (see
    * `RobotState.passive`). */
   passive?: boolean;
-}
-
-/** the off-field human-player box holds ONLY the alliance-area preload set(s) no
- * present robot claimed (each present robot consumes one 3-ball set): 2 robots ->
- * 0 (empty), 1 -> 3 (PPG), 0 -> 6 (PGP+PPG). The 3 pre-staged loading-zone
- * artifacts are NOT in here — they sit on the field in the loading-zone corner. */
-function hpBox(present: number): ArtifactColor[] {
-  return [[...C.PRELOAD], [...C.HP_INITIAL_STOCK]].slice(present).flat();
-}
-
-function goalState(alliance: Alliance): GoalState {
-  return {
-    alliance,
-    gateOpen: false,
-    gatePos: 0,
-    gateVel: 0,
-    gateHoldTime: 0,
-    gateLatch: 0,
-    classifiedCount: 0,
-    overflowCount: 0,
-  };
-}
-
-// Helper function to mirror a PathPoint across the x=0 axis
-function mirrorPathPoint(pathPoint: PathPoint): PathPoint {
-  const mirrored: PathPoint = { ...pathPoint, x: -pathPoint.x };
-  if (mirrored.degrees !== undefined) {
-    // Mirror angle: new_angle = 180 - old_angle (in degrees)
-    mirrored.degrees = wrapAngle((180 - mirrored.degrees) * Math.PI / 180) * 180 / Math.PI;
-  }
-  if (mirrored.startDeg !== undefined) {
-    mirrored.startDeg = wrapAngle((180 - mirrored.startDeg) * Math.PI / 180) * 180 / Math.PI;
-  }
-  if (mirrored.endDeg !== undefined) {
-    mirrored.endDeg = wrapAngle((180 - mirrored.endDeg) * Math.PI / 180) * 180 / Math.PI;
-  }
-  // The 'reverse' property should logically remain the same, as it indicates
-  // whether to drive the segment in reverse, not a direction relative to the field.
-  return mirrored;
-}
-
-// Helper function to mirror a ControlPoint across the x=0 axis
-function mirrorControlPoint(controlPoint: ControlPoint): ControlPoint {
-  return { ...controlPoint, x: -controlPoint.x };
-}
-
-// Helper function to deep copy and mirror AutoPathData
-function mirrorAutoPathData(autoPath: AutoPathData): AutoPathData {
-  const mirroredAutoPath: AutoPathData = JSON.parse(JSON.stringify(autoPath)); // Deep copy
-
-  mirroredAutoPath.startPoint = mirrorPathPoint(mirroredAutoPath.startPoint);
-
-  mirroredAutoPath.lines = mirroredAutoPath.lines.map((line) => {
-    const mirroredLine = { ...line };
-    mirroredLine.endPoint = mirrorPathPoint(mirroredLine.endPoint);
-    if (mirroredLine.controlPoints) {
-      mirroredLine.controlPoints = mirroredLine.controlPoints.map(mirrorControlPoint);
-    }
-    return mirroredLine;
-  });
-
-  // `shapes` is dropped by `coerceAutoPath` (nothing reads it), so there is nothing here to mirror.
-
-  return mirroredAutoPath;
-}
-
-
-export function createWorld(mode: GameMode, seed: number, setups: RobotSetup[], gameSettings?: GameSettings): World {
-  const rng = nextRandom(seed || 1);
-  const motif = MOTIFS[Math.floor(rng.value * 3) % 3];
-
-  const balls: Artifact[] = [];
-  let id = 1;
-  const addBall = (pos: { x: number; y: number }, color: ArtifactColor): void => {
-    balls.push({
-      id: id++,
-      color,
-      state: { kind: 'ground' },
-      pos: { x: pos.x, y: pos.y },
-      vel: { x: 0, y: 0 },
-      z: 0,
-      vz: 0,
-    });
-  };
-
-  for (const a of ['red', 'blue'] as Alliance[]) {
-    for (const s of spikeMarkBalls(a)) addBall(s.pos, s.color);
-    // the 3 pre-staged loading-zone artifacts (manual setup), in the corner
-    // against the alliance wall — on the field from the start; the human player
-    // arranges them into the grab row once teleop begins.
-    for (const s of loadPreStage(a)) addBall(s.pos, s.color);
-  }
-
-  // preloads come from the alliance area's 6 balls (4P+2G): the first robot
-  // takes PRELOAD (PGP), the second takes HP_INITIAL_STOCK (PPG). Any set no
-  // present robot claims seeds the human-player box instead (see hpBox).
-  const robots: RobotState[] = [];
-  const allianceCount: Record<Alliance, number> = { red: 0, blue: 0 };
-  // FINAL sanitization pass: no matter how these setups were assembled (client
-  // localStorage, wire message, DB-staged ranked match), force every robot to a
-  // legal, spawn-safe config here. Deterministic + idempotent, so live play and
-  // replay re-runs agree. See coerceSetup / coerceSpec above.
-  for (const s of [...setups].map((st) => coerceSetup(st, 'decode')).sort((p, q) => p.id - q.id)) {
-    const pose = startPose(s.alliance, s.startIndex, s.startPose, s.spec);
-    const nth = allianceCount[s.alliance]++;
-
-    let robotAutoPath = s.autoPath;
-    if (s.alliance === 'red' && s.autoPathEnabled && s.autoPath) {
-      robotAutoPath = mirrorAutoPathData(s.autoPath);
-    }
-
-    robots.push({
-      id: s.id,
-      alliance: s.alliance,
-      spec: s.spec,
-      pos: pose.pos,
-      heading: pose.heading,
-      vel: { x: 0, y: 0 },
-      angVel: 0,
-      turretHeading: pose.heading,
-      moduleAngles: [0, 0, 0, 0], // swerve pods (FL,FR,BL,BR) start pointing forward
-      moduleTargets: [0, 0, 0, 0], // and their commanded targets
-      catalystRail: 0, // CR rail carriage (unused in DECODE)
-      // BUTTERFLY starts on its MECANUM set — a robot that begins holonomic can always
-      // drop traction, and it matches DRIVETRAIN_PRESETS.butterfly (the mecanum half).
-      butterflyTank: false,
-      driveModeHeld: false,
-      twinBarrel: false,
-      hopper: nth === 0 ? [...C.PRELOAD] : [...C.HP_INITIAL_STOCK],
-      fieldCentric: s.assists.fieldCentric,
-      aimAssist: s.assists.aimAssist,
-      autoIntake: s.assists.autoIntake,
-      autoFire: s.assists.autoFire,
-      passive: s.passive,
-      lastFireAt: -10,
-      lastIntakeAt: -10,
-      fireReadyAt: 0,
-      // seed at the spawn-distance target so the first tick sees no phantom spin-up
-      flywheelSpin: flywheelSpinTarget(s.alliance, pose.pos),
-      flywheelSpinRate: 0,
-      powerDraw: 0,
-      // Initialize new auto pathing fields
-      autoPathActive: !!(s.autoPathEnabled && robotAutoPath !== undefined),
-      currentPathSegmentIndex: 0,
-      pathSegmentProgress: 0,
-      pathWaitTimer: 0,
-      pathWaitedBefore: -1,
-      pathSequenceIndex: 0,
-      pathTargetPoint: null,
-      pathTargetHeading: null,
-      isAligningHeading: false, // Initialize new state
-      targetAlignmentHeading: null, // Initialize new state
-      autoPath: robotAutoPath, // Assign the (potentially mirrored) autoPath
-    });
-
-    // If auto path is enabled, override initial position and heading
-    if (s.autoPathEnabled && robotAutoPath) {
-      const robot = robots[robots.length - 1]; // Get the newly added robot
-      robot.pos = { x: robotAutoPath.startPoint.x, y: robotAutoPath.startPoint.y };
-      // Convert degrees to radians for initial heading
-      if (robotAutoPath.startPoint.heading === 'constant' && robotAutoPath.startPoint.degrees !== undefined) {
-        robot.heading = robotAutoPath.startPoint.degrees * Math.PI / 180;
-        robot.turretHeading = robot.heading;
-      } else if (robotAutoPath.startPoint.heading === 'linear' && robotAutoPath.startPoint.startDeg !== undefined) {
-        robot.heading = robotAutoPath.startPoint.startDeg * Math.PI / 180;
-        robot.turretHeading = robot.heading;
-      }
-      // For tangential, initial heading will be determined by the first path segment.
-      // The path follower will handle this dynamically.
-    }
-
-    // preloaded artifacts are PHYSICAL held balls (the hopper mirrors their colors);
-    // step()'s positionHeldBalls parks them at the storage slots
-    const created = robots[robots.length - 1];
-    created.hopper.forEach((color, slot) => {
-      const side = slot >= 1 ? (slot === 1 ? -1 : 1) : 0; // triangle front row: opposite sides
-      const lp = heldSlotPos(created.spec, slot, side);
-      const wp = rot(lp, created.heading);
-      balls.push({
-        id: id++,
-        color,
-        state: { kind: 'held', robot: created.id, slot, lx: lp.x, ly: lp.y, side },
-        pos: { x: created.pos.x + wp.x, y: created.pos.y + wp.y },
-        vel: { x: 0, y: 0 },
-        z: 0,
-        vz: 0,
-      });
-    });
-  }
-
-  return {
-    mode,
-    time: 0,
-    tick: 0,
-    rngState: rng.state,
-    motif,
-    robots,
-    balls,
-    goals: { red: goalState('red'), blue: goalState('blue') },
-    humanPlayers: {
-      red: { box: hpBox(allianceCount.red), nextPlaceAt: 0 },
-      blue: { box: hpBox(allianceCount.blue), nextPlaceAt: 0 },
-    },
-    match: {
-      phase: mode === 'match' ? 'pre' : 'freeplay',
-      phaseTimeLeft: mode === 'match' ? C.AUTO_DURATION : 0,
-      scores: { red: emptyScore(), blue: emptyScore() },
-      provisionalPattern: { red: 0, blue: 0 },
-      fouls: { red: { minor: 0, major: 0 }, blue: { minor: 0, major: 0 } },
-    },
-    events: [],
-    rrContacts: [],
-    pinnedArtifacts: [],
-    penalties: {
-      episodes: {},
-      pins: {},
-      pinFouls: {},
-      possession: {},
-      possessionBilled: {},
-      possessionRebill: {},
-      controlHeld: {},
-      ballHold: {},
-      ballAnchor: {},
-      controlInstances: {},
-      carded: {},
-      gateCulprit: { red: null, blue: null },
-      rampBallIds: { red: [], blue: [] },
-    },
-    gameSettings: gameSettings, // Pass gameSettings to the world
-  };
 }

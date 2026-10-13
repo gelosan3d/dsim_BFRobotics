@@ -1,4 +1,5 @@
 import { lazy, useCallback, useEffect, useState } from 'react';
+import { DEFAULT_GAME } from '../games/types';
 import { LoadBoundary } from './LoadBoundary';
 import {
   adminAnnounce,
@@ -170,7 +171,7 @@ export function Admin({
   const [seasonBusy, setSeasonBusy] = useState(false);
 
   // moderation — leaderboard records
-  const [recGame, setRecGame] = useState<GameId>('decode');
+  const [recGame, setRecGame] = useState<GameId>(DEFAULT_GAME);
   const [recMode, setRecMode] = useState<RecMode>('solo');
   const [recDt, setRecDt] = useState<string>('overall');
   const [records, setRecords] = useState<AdminRecordRow[]>([]);

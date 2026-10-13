@@ -1,6 +1,5 @@
-import type { GameId } from './types';
+import { DEFAULT_GAME, type GameId } from './types';
 import type { GameModule } from './module';
-import { DECODE_MODULE } from './decode';
 import { CHAIN_MODULE } from './chain';
 import { BIOBUZZ_MODULE } from './biobuzz';
 
@@ -13,22 +12,20 @@ export type { GameModule } from './module';
  * world's/settings' `GameId`. The server uses the DOM-free `./sim.ts` registry.
  *
  * Typed PARTIAL on purpose: a game that hasn't been built yet is simply absent,
- * and BOTH resolvers fall back to DECODE — the single back-compat rule (old
- * worlds/snapshots/replays carry no `game`; an unknown id degrades to DECODE).
- * `'decode'` must always be present.
+ * and BOTH resolvers fall back to `DEFAULT_GAME` (BIOBUZZ). `DEFAULT_GAME` must
+ * always be present.
  */
 export const GAMES: Partial<Record<GameId, GameModule>> = {
-  decode: DECODE_MODULE,
   chain: CHAIN_MODULE,
   biobuzz: BIOBUZZ_MODULE,
 };
 
-/** the module for a game id, defaulting to DECODE (undefined / unknown / old). */
+/** the module for a game id, defaulting to `DEFAULT_GAME` (undefined / unknown). */
 export function moduleFor(id: GameId | undefined | null): GameModule {
-  return (id && GAMES[id]) || DECODE_MODULE;
+  return (id && GAMES[id]) || GAMES[DEFAULT_GAME] || BIOBUZZ_MODULE;
 }
 
-/** the module a world belongs to (its `game`, defaulting to DECODE). */
+/** the module a world belongs to (its `game`, defaulting to `DEFAULT_GAME`). */
 export function gameOf(world: { game?: GameId } | null | undefined): GameModule {
   return moduleFor(world?.game);
 }

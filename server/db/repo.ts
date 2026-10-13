@@ -11,7 +11,7 @@ import {
   type EquippedBadge,
 } from '../../src/badges';
 import type { RecordPlacement, RewardItem, RewardReason, RewardSource } from '../../src/rewards';
-import { coerceGameId, GAME_IDS, serverPhysics } from '../../src/games/types';
+import { coerceGameId, DEFAULT_GAME, GAME_IDS, serverPhysics } from '../../src/games/types';
 import { simModuleFor } from '../../src/games/sim';
 import { COSMETIC_AXES } from '../../src/cosmetics';
 import {
@@ -27,9 +27,10 @@ import {
 } from '../../src/net/protocol';
 import { scrubSpecNames } from '../moderation';
 
-/** every board/period is keyed by game; old callers/rows default to DECODE. */
+/** every board/period is keyed by game; a caller that names none means `DEFAULT_GAME`. (Rows
+ *  DSIM's own database holds for DECODE are keyed 'decode'; this fork's build reads none of them.) */
 type Game = GameId;
-const g = (game?: Game): Game => game ?? 'decode';
+const g = (game?: Game): Game => game ?? DEFAULT_GAME;
 
 /**
  * WHICH ERA A BOARD READ OF THIS GAME MEANS — the record board's half of the owner's ruling
@@ -96,8 +97,8 @@ export interface RecordConfig {
  */
 
 // ------------------------------------------------------------- seasons ------
-// Periods are PER GAME: each game runs its own Act → Season progression, so DECODE
-// and Chain Reaction never share a live season or an act. `game` defaults to DECODE.
+// Periods are PER GAME: each game runs its own Act → Season progression, so no two games
+// ever share a live season or an act. `game` defaults to `DEFAULT_GAME`.
 /**
  * (game, balanceVersion) pairs this process has already seeded. `ensureSeason` is
  * two WRITES, and `GET /api/seasons` - the leaderboard's season picker, hit on
@@ -2241,7 +2242,7 @@ export async function getReplay(id: string): Promise<Replay | null> {
     sim: r.behaviour_version ?? undefined,
     // the rules it re-simulates under (0055); NULL ⇒ absent ⇒ patch 0, the old rules
     patch: r.sim_patch ?? undefined,
-    game: r.game ?? 'decode', // picks the sim module to re-simulate (CR vs DECODE)
+    game: r.game ?? 'decode', // a row with none is DECODE's (the column's own default), which `replayGameOf` refuses
     // WHICH SOLVE to re-simulate it on. Left UNDEFINED for anything that is not the one known
     // non-default value — a pre-0039 row, a null, or a string this build does not know — every
     // one of which reads '2d' downstream, which is what such a row actually ran.
@@ -4261,7 +4262,7 @@ export async function submitScoreReport(r: {
      values ($1, $2, $3, $4, $5)
      on conflict do nothing
      returning id::text as id`,
-    [r.reporterId, r.matchId ? String(r.matchId) : null, r.roomCode ?? '', g(r.game ?? 'decode'), r.detail],
+    [r.reporterId, r.matchId ? String(r.matchId) : null, r.roomCode ?? '', g(r.game), r.detail],
   );
   return rows.length > 0;
 }
@@ -5016,7 +5017,7 @@ export interface EloBoardRow {
 const LEGACY_PLACEMENT = 5;
 /** each game's first season on `RANKED_PLACEMENT` — the live season when it shipped (2026-10-03).
  *  Earlier seasons were ranked and AWARDED at 5 games, and their archived boards stay that way. */
-const PLACEMENT_FROM_SEASON: Readonly<Record<string, number>> = { decode: 7, chain: 5, biobuzz: 5 };
+const PLACEMENT_FROM_SEASON: Readonly<Record<string, number>> = { chain: 5, biobuzz: 5 };
 
 /**
  * The games a player needs on a board to be RANKED on it: on the leaderboard, with a rank on

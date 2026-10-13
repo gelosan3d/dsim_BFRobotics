@@ -99,6 +99,8 @@ const REFUSAL_TEXT: Record<ReplayRefusal, (r: Replay) => string> = {
   tank: () =>
     'Recorded in an early format that had nowhere to store tank drive input, so the robot ' +
     'would not move.',
+  // the only game a replay can be of that this build lacks is DECODE (removed 2026-10-12)
+  game: () => 'Recorded in DECODE, which this version of DSIM does not include.',
 };
 
 /**
@@ -783,7 +785,8 @@ export function ReplayView({
   const filename = (ext: string): string => {
     const r = replay.current;
     const id = replayId ?? r?.seed ?? 0;
-    return `dsim-${r?.game ?? 'decode'}-s${r?.balanceVersion ?? 0}-v${r?.sim ?? 0}-${id}.${ext}`;
+    // a replay with no `game` is refused before it can be exported (`replayRefusal`)
+    return `dsim-${r?.game ?? 'replay'}-s${r?.balanceVersion ?? 0}-v${r?.sim ?? 0}-${id}.${ext}`;
   };
 
   const downloadData = (): void => {
@@ -915,7 +918,7 @@ export function ReplayView({
      * it and every exported frame came out black. (Measured exactly that way: a composite whose
      * average luminance was 0.)
      *
-     * So the labels and auto paths are drawn onto a transparent sheet of their own and
+     * So the labels are drawn onto a transparent sheet of their own and
      * composited, which is the same stack the live view has, one canvas later.
      */
     let overlay: HTMLCanvasElement | null = null;

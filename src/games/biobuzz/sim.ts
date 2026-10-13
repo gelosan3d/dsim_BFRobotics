@@ -21,6 +21,7 @@ import { bbSettled } from './settle';
 import { createBiobuzzWorld } from './spawn';
 import { bbActiveStartLegal } from './start';
 import { biobuzzStep } from './step';
+import { bbSnapHeading } from './snapAim';
 
 /**
  * BIOBUZZ (FTC 2026-27) — the SIMULATION half of the game module.
@@ -126,12 +127,12 @@ export const BIOBUZZ_SIM: GameSimModule = {
   startDefaultIndex: bbDefaultIndex,
   startRoleLabel: bbRoleLabel,
   startAnchorName: bbAnchorName,
-  // BIOBUZZ's step never calls `updatePathTraversal`, so an imported `.pp` path would be inert
-  autoPaths: false,
   bounds: { halfX: BB_HALF_X, halfY: BB_HALF_Y, viewMargin: BB_VIEW_MARGIN },
   colliders: biobuzzColliders,
   createWorld: createBiobuzzSimWorld,
   step: biobuzzStep,
+  // FTC25 target snap: the shooter at the robot's own HIVE — the taking cell, or the other one
+  aimHeading: bbSnapHeading,
   // this game's UI may offer either physics (Day 1 seam) — DECODE and Chain Reaction leave
   // this absent, which reads as '2d' only.
   physicsOptions: ['2d', '3d'],

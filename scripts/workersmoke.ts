@@ -71,7 +71,7 @@ function makePlayer(name: string, alliance: Alliance, startIndex: number): Omit<
   };
 }
 
-/** a full-throw stick whose direction turns slowly. A straight one pins a DECODE start pose
+/** a full-throw stick whose direction turns slowly. A straight one pins a start pose
  *  against its wall (0.1 in on BOTH servers), and one that wanders in magnitude can sit near
  *  zero for the whole window (2.2 in, again on both) — either way the check measures nothing. */
 function wander(tSec: number): RobotCommand {
@@ -156,7 +156,7 @@ async function partA(): Promise<void> {
     () => {
       emptied++;
     },
-    { kind: 'record', record: 'solo', game: 'decode' },
+    { kind: 'record', record: 'solo', game: 'chain' },
     undefined,
     (uid) => events.push(`on:${uid}`),
     (uid) => events.push(`off:${uid}`),
@@ -233,7 +233,7 @@ async function partA(): Promise<void> {
     () => {
       emptied2++;
     },
-    { kind: 'versus', game: 'decode' },
+    { kind: 'versus', game: 'chain' },
   );
   const s2 = fakeSocket();
   const c2 = clientOn(s2, 'b1', 'u-b', 'red');
@@ -257,7 +257,7 @@ async function partA(): Promise<void> {
   check('A: ...and is forgotten again when it empties', gone, JSON.stringify(workerPerf()?.map((x) => x.rooms)));
 
   // ---- reattach and the report resolvers answer across the thread ----------------------------
-  const vs = createRoom('wt-vs', () => {}, { kind: 'versus', game: 'decode' });
+  const vs = createRoom('wt-vs', () => {}, { kind: 'versus', game: 'chain' });
   const sx = fakeSocket();
   const sy = fakeSocket();
   const cx = clientOn(sx, 'x1', 'u-x', 'red');
@@ -469,7 +469,7 @@ async function scenarios(s: Server): Promise<void> {
 
   // ---- a custom 1v1, lobby to match ------------------------------------------------------------
   const code = newCode();
-  const versus: RoomConfig = { kind: 'versus', game: 'decode' };
+  const versus: RoomConfig = { kind: 'versus', game: 'chain' };
   const A = await open();
   A.join(code, versus, 'A', 'red');
   check(L('the host is welcomed'), !!(await A.until('welcome')));
@@ -478,7 +478,7 @@ async function scenarios(s: Server): Promise<void> {
   check(L('the roster reaches both seats'), !!(await A.until('roster', (m) => m.players.length === 2)));
   check(L('a joiner with another season is refused by name'), await (async () => {
     const X = await open();
-    X.join(code, { kind: 'versus', game: 'chain' }, 'X', 'red');
+    X.join(code, { kind: 'versus', game: 'biobuzz' }, 'X', 'red'); // the room is Chain Reaction's
     const e = await X.until('error');
     X.close();
     return e?.code === 'game_mismatch';
@@ -594,7 +594,7 @@ async function spread(s: Server): Promise<void> {
   const socks: Sock[] = [];
   for (let i = 0; i < 4; i++) {
     const x = await new Sock(s.url).open();
-    x.join(newCode(), { kind: 'versus', game: 'decode' }, `P${i}`, 'red');
+    x.join(newCode(), { kind: 'versus', game: 'chain' }, `P${i}`, 'red');
     await x.until('welcome');
     socks.push(x);
   }

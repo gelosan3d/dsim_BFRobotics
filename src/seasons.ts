@@ -2,14 +2,13 @@
  * App branding + the SEASON registry.
  *
  * The product is **DSIM** — a 2D/3D FTC driver-practice simulator. Each FTC-style
- * game is a "season"; three are playable today (DECODE, Chain Reaction, BIOBUZZ).
- * `src/sim/` is the SHARED deterministic core used by every season — DECODE's own
- * geometry/scoring rules also live there, predating the game seam, and were never
- * relocated. A season's own rules live in `src/games/<id>/`. This module is the
+ * game is a "season"; this fork plays two (BIOBUZZ, Chain Reaction — DECODE was
+ * removed on 2026-10-12). `src/sim/` is the SHARED deterministic core used by every
+ * season; a season's own rules live in `src/games/<id>/`. This module is the
  * seam for adding a future season: register another `Season` here, flip
  * `playable: true` once its rules land, and the UI (season badge/picker) picks it
  * up automatically. Keep the APP name ("DSIM") separate from the SEASON name
- * (e.g. "DECODE") everywhere in the UI — the brand is the app, a season is just
+ * (e.g. "BIOBUZZ") everywhere in the UI — the brand is the app, a season is just
  * whichever game is currently loaded.
  */
 
@@ -44,7 +43,7 @@ export type ReleaseChannel = 'stable' | 'alpha';
 export interface Season {
   /** stable key (used for future save bucketing / URLs) — matches a `GameId` */
   key: GameId;
-  /** short game name, e.g. "DECODE" */
+  /** short game name, e.g. "BIOBUZZ" */
   name: string;
   /**
    * Presenting sponsor, e.g. "RTX" — omitted when a game has none. Kept as its
@@ -74,25 +73,12 @@ export interface Season {
   channels?: readonly ReleaseChannel[];
 }
 
+/**
+ * In display order, and the FIRST playable entry is `CURRENT_SEASON` — keep it in step with
+ * `DEFAULT_GAME` (`src/games/types.ts`). DECODE (FTC 2025–26) was removed from this fork on
+ * 2026-10-12; its row, module and rules are gone, not hidden.
+ */
 export const SEASONS: readonly Season[] = [
-  {
-    key: 'decode',
-    name: 'DECODE',
-    presenter: 'RTX',
-    program: 'FIRST Tech Challenge',
-    years: '2025–26',
-    blurb: 'Classify artifacts into cross-court goals, match the motif, park on base.',
-    playable: true,
-  },
-  {
-    key: 'chain',
-    name: 'Chain Reaction',
-    presenter: 'goBILDA',
-    program: 'Unofficial FTC · CAD Competition',
-    years: '2026',
-    blurb: 'Shoot particles through the accelerator, hook catalysts for a multiplier, then ascend the ring stand or park in the Lab.',
-    playable: true,
-  },
   {
     // PUBLIC since 2026-09-13 (the promotion to production). It was alpha-only while it was
     // built before kickoff; `channels` is still the switch if a future season needs the same.
@@ -102,6 +88,15 @@ export const SEASONS: readonly Season[] = [
     program: 'FIRST Tech Challenge',
     years: '2026–27',
     blurb: 'Tip the hive, fill the flowers and park, with a turret, a double turret or a dumper.',
+    playable: true,
+  },
+  {
+    key: 'chain',
+    name: 'Chain Reaction',
+    presenter: 'goBILDA',
+    program: 'Unofficial FTC · CAD Competition',
+    years: '2026',
+    blurb: 'Shoot particles through the accelerator, hook catalysts for a multiplier, then ascend the ring stand or park in the Lab.',
     playable: true,
   },
 ] as const;
@@ -144,7 +139,7 @@ export function gameVisibleOn(game: GameId, channel: string): boolean {
 }
 
 /**
- * "DECODE presented by RTX" — the game's name plus its presenting sponsor, or
+ * "BIOBUZZ presented by RTX" — the game's name plus its presenting sponsor, or
  * just the name when it has none. For plain-text surfaces (the <title>, meta
  * descriptions). Anything that UPPERCASES its text should render `name` and
  * `presenter` separately instead, so a mixed-case brand isn't flattened.
@@ -157,7 +152,7 @@ export function fullNameOf(s: Season): string {
 export const CURRENT_SEASON: Season =
   SEASONS.find((s) => s.playable) ?? SEASONS[0];
 
-/** the season record for a game id (defaults to the first entry, DECODE). */
+/** the season record for a game id (defaults to the first entry, BIOBUZZ). */
 export function seasonFor(game: GameId): Season {
   return SEASONS.find((s) => s.key === game) ?? SEASONS[0];
 }

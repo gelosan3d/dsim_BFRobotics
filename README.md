@@ -1,7 +1,5 @@
 # DSIM
 
-![DSIM](./dsim-logo.png)
-
 > ## About this fork
 >
 > This is **gelosan3d's fork** of [genius0412/dsim](https://github.com/genius0412/dsim), the
@@ -17,6 +15,16 @@
 >   restarting puts you back. The key can be rebound, and a gamepad button assigned, under
 >   *Configure → Controls → All games → Driving → Switch drive style* (the gamepad starts
 >   unbound). A pure tank drivetrain ignores it.
+>
+> **What this fork removes**
+>
+> - **DECODE presented by RTX** (FTC 2025–26). Its simulator, field, scoring, fouls, tutorial,
+>   start-position editor and auto paths are gone; **BIOBUZZ** is the default game and
+>   **Chain Reaction** is the other. The controls stay, including both control schemes; the
+>   FTC25 shooter presets are kept (still bindable, with their powers) for BIOBUZZ's launcher,
+>   which does not read them yet. DECODE replays and runs recorded earlier will not play here,
+>   and an old `/decode/…` link opens that screen in whichever game you last picked. The
+>   original README below still lists DECODE.
 >
 > **Branches**
 >
@@ -61,7 +69,7 @@
 > To check nothing is broken after a change: `npm test` (headless simulation checks,
 > a few minutes) and `npm run build`.
 >
-> **What works when you run it yourself.** All three games, solo practice, free drive, the
+> **What works when you run it yourself.** Both games, solo practice, free drive, the
 > tutorial, the robot builder, and every control and setting (saved in your browser).
 >
 > **What does not.** Accounts, sign-in, ranked play, leaderboards and records all depend on the
@@ -72,6 +80,8 @@
 > two browser tabs, with no leaderboards.
 
 ---
+
+![DSIM](./dsim-logo.png)
 
 A 2D/3D driver-practice simulator for FIRST Tech Challenge. Vite + React +
 TypeScript on Canvas 2D, with a Rapier3D + Three.js path for games that use it.

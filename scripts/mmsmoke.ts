@@ -360,7 +360,7 @@ const namesOf = (m: PendingMatch | undefined): string =>
 // both entries carry the challenge's own game.
 {
   const { staged } = await pair([
-    entry('a', '1v1', { party: 'tok', partySize: 2, partyOnly: true, game: 'decode' }),
+    entry('a', '1v1', { party: 'tok', partySize: 2, partyOnly: true, game: 'biobuzz' }),
     entry('b', '1v1', { party: 'tok', partySize: 2, partyOnly: true, game: 'chain' }),
   ]);
   check('challenge: a pair split across GAMES never stages (bucket rule holds)', staged.length === 0);
@@ -397,17 +397,17 @@ const namesOf = (m: PendingMatch | undefined): string =>
 
 // ---- queue depth is PER GAME ------------------------------------------------
 // Pairing buckets by game, so a combined count advertised a pool the reader could
-// never match from: one Chain Reaction queuer made every DECODE menu read "1V1 1".
+// never match from: one Chain Reaction queuer made every other game's menu read "1V1 1".
 {
   const { mm } = await pair([
-    entry('d1', '1v1', { game: 'decode' }),
+    entry('d1', '1v1', { game: 'biobuzz' }),
     entry('c1', '1v1', { game: 'chain' }),
     entry('c2', '2v2', { game: 'chain' }),
   ]);
   const byGame = mm.queueSizesByGame();
-  check('per-game depth: DECODE counts only its own queuer', byGame.decode?.['1v1'] === 1, JSON.stringify(byGame));
+  check('per-game depth: BIOBUZZ counts only its own queuer', byGame.biobuzz?.['1v1'] === 1, JSON.stringify(byGame));
   check('per-game depth: Chain Reaction counts only its own', byGame.chain?.['1v1'] === 1);
-  check('per-game depth: ...in each bucket separately', byGame.chain?.['2v2'] === 1 && byGame.decode?.['2v2'] === 0);
+  check('per-game depth: ...in each bucket separately', byGame.chain?.['2v2'] === 1 && (byGame.biobuzz?.['2v2'] ?? 0) === 0);
   check('per-game depth: a game with nobody waiting has no entry at all', !byGame.nope);
   // the combined shape stays correct too — older clients still read it
   check('per-game depth: the combined total is unchanged for old clients', mm.queueSizes()['1v1'] === 2);
@@ -415,10 +415,10 @@ const namesOf = (m: PendingMatch | undefined): string =>
 {
   // a CLOSED challenge is not an open pool in either shape
   const { mm } = await pair([
-    entry('p1', '1v1', { game: 'decode', party: 'tok', partySize: 2, partyOnly: true }),
+    entry('p1', '1v1', { game: 'biobuzz', party: 'tok', partySize: 2, partyOnly: true }),
   ]);
   check('per-game depth: a closed challenge is not advertised as available',
-    (mm.queueSizesByGame().decode?.['1v1'] ?? 0) === 0);
+    (mm.queueSizesByGame().biobuzz?.['1v1'] ?? 0) === 0);
 }
 
 // ---- the operator view of the queue -----------------------------------------
@@ -1112,12 +1112,12 @@ const namesOf = (m: PendingMatch | undefined): string =>
 {
   check('physics: a BIOBUZZ pairing stages a 3D room', Matchmaker.stagedPhysics('biobuzz') === '3d',
     Matchmaker.stagedPhysics('biobuzz'));
-  check('physics: DECODE stages 2D — it has no 3D solve to offer',
-    Matchmaker.stagedPhysics('decode') === '2d', Matchmaker.stagedPhysics('decode'));
   check('physics: Chain Reaction stages 2D, same reason',
     Matchmaker.stagedPhysics('chain') === '2d', Matchmaker.stagedPhysics('chain'));
-  check('physics: an ABSENT game stages 2D (an old client that advertises none is a DECODE queuer)',
-    Matchmaker.stagedPhysics(undefined) === '2d', Matchmaker.stagedPhysics(undefined));
+  // a client that advertises no game is read as DEFAULT_GAME (BIOBUZZ since DECODE was removed
+  // from this fork, 2026-10-12), so it stages what BIOBUZZ stages
+  check('physics: an ABSENT game stages as the default game (BIOBUZZ, 3D)',
+    Matchmaker.stagedPhysics(undefined) === '3d', Matchmaker.stagedPhysics(undefined));
 }
 {
   const { staged } = await pair([
@@ -1136,26 +1136,22 @@ const namesOf = (m: PendingMatch | undefined): string =>
   check('physics: the staged match still names its game', m?.game === 'biobuzz', `game=${m?.game}`);
 }
 {
-  // DECODE and Chain Reaction are UNTOUCHED, and that is the half worth checking: this
-  // change reaches every staged room on the server, and the two games that have played every
-  // ranked match to date must come out of it exactly as they went in.
-  const dec = await pair([entry('d1', '1v1'), entry('d2', '1v1')]);
-  check('physics: a DECODE pairing stages 2D', dec.staged[0]?.physics === '2d',
-    `physics=${dec.staged[0]?.physics}`);
-  check('physics: ...and its roster entries do too',
-    (dec.staged[0]?.roster ?? []).every((r) => r.physics === '2d'),
-    (dec.staged[0]?.roster ?? []).map((r) => String(r.physics)).join(','));
+  // Chain Reaction is UNTOUCHED, and that is the half worth checking: this change reaches
+  // every staged room on the server, and a 2D game must come out of it exactly as it went in.
   const cr = await pair([entry('c1', '1v1', { game: 'chain' }), entry('c2', '1v1', { game: 'chain' })]);
   check('physics: a Chain Reaction pairing stages 2D', cr.staged[0]?.physics === '2d',
     `physics=${cr.staged[0]?.physics}`);
+  check('physics: ...and its roster entries do too',
+    (cr.staged[0]?.roster ?? []).every((r) => r.physics === '2d'),
+    (cr.staged[0]?.roster ?? []).map((r) => String(r.physics)).join(','));
 }
 {
-  // THE BUCKET IS UNCHANGED BY ANY OF THIS. A BIOBUZZ queuer and a DECODE queuer were never
+  // THE BUCKET IS UNCHANGED BY ANY OF THIS. A BIOBUZZ queuer and a 2D-game queuer were never
   // pairable (`bucketKey` splits on game) and they must not become pairable now that the two
   // stage different physics — which would be the worst version of this bug, since the room
   // would be built once, on one solve, for two clients expecting different ones.
-  const { staged } = await pair([entry('x1', '1v1', { game: 'biobuzz' }), entry('x2', '1v1')]);
-  check('physics: a BIOBUZZ queuer and a DECODE queuer still never pair', staged.length === 0,
+  const { staged } = await pair([entry('x1', '1v1', { game: 'biobuzz' }), entry('x2', '1v1', { game: 'chain' })]);
+  check('physics: a BIOBUZZ queuer and a Chain Reaction queuer still never pair', staged.length === 0,
     `${staged.length} staged`);
 }
 

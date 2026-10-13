@@ -260,7 +260,6 @@ export function fieldChecks(check: Check): void {
   // ── THE PERIMETER ─────────────────────────────────────────────────────────
   {
     check('field: exactly four perimeter walls', BB_WALL_COUNT === 4, `count=${BB_WALL_COUNT}`);
-    check('field: no dynamic colliders (BIOBUZZ has no known moving geometry)', biobuzzColliders.dynamic === undefined);
     // Every wall's INNER FACE must sit exactly on the bound it is the wall for. A wall placed
     // a hair inside shrinks the field silently; a hair outside leaves a gap a pollen rests in.
     // Only the first `BB_WALL_COUNT` statics are walls — the HIVE frame bars and the FLOWER
