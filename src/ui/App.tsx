@@ -81,7 +81,6 @@ import { ProfileMenu } from './ProfileMenu';
 import { Download } from './Download';
 import { Contributors } from './Contributors';
 import { Privacy, Terms } from './Legal';
-import { Donate } from './Donate';
 import { Changelog } from './Changelog';
 import { Profile } from './Profile';
 import { TermsGate } from './TermsGate';
@@ -144,7 +143,6 @@ type Screen =
   | 'contributors'
   | 'privacy'
   | 'terms'
-  | 'donate'
   | 'changelogs'
   | 'profile'
   | 'account'
@@ -257,8 +255,6 @@ function screenSuffix(screen: Screen, a: RouteArgs): string {
       return '/privacy';
     case 'terms':
       return '/terms';
-    case 'donate':
-      return '/donate';
     case 'changelogs':
       return '/changelogs';
     case 'account':
@@ -326,7 +322,6 @@ function parseScreen(rest: string): { screen: Screen } & RouteArgs {
   if (rest.startsWith('/contributors')) return at('contributors');
   if (rest.startsWith('/privacy')) return at('privacy');
   if (rest.startsWith('/terms')) return at('terms');
-  if (rest.startsWith('/donate')) return at('donate');
   if (rest.startsWith('/changelogs')) return at('changelogs');
   // BEFORE the bare `/account`, which is a prefix of both
   if (rest.startsWith('/account/reset')) return at('accountreset');
@@ -2165,7 +2160,6 @@ export function App() {
         onChangelog={() => navigate('changelogs')}
         onPrivacy={() => navigate('privacy')}
         onTerms={() => navigate('terms')}
-        onDonate={() => navigate('donate')}
         signedIn={signedIn}
         onOpenProfile={openProfile}
         onJoinInvite={onJoinInvite}
@@ -2431,7 +2425,6 @@ export function App() {
           AdSense review fetches /privacy directly */}
       {screen === 'privacy' && <Privacy />}
       {screen === 'terms' && <Terms />}
-      {screen === 'donate' && <Donate signedIn={signedIn} />}
       {screen === 'changelogs' && <Changelog />}
       {screen === 'account' && route.sub === 'appearance' && (
         <Appearance
@@ -2442,7 +2435,7 @@ export function App() {
         />
       )}
       {screen === 'account' && route.sub !== 'appearance' && (
-        <Account settings={settings} onChange={update} onDonate={() => navigate('donate')} onTab={profileTab} />
+        <Account settings={settings} onChange={update} onTab={profileTab} />
       )}
       {screen === 'accountreset' && <AccountReset onAccount={() => navigate('account')} />}
       {screen === 'accountverify' && <AccountVerify onAccount={() => navigate('account')} />}

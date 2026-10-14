@@ -1,18 +1,18 @@
-# PRIMARY ROUTER for production (dohun-sim-decode). See router/primaryRouter.mjs and
+# PRIMARY ROUTER for production (bfsim-server). See router/primaryRouter.mjs and
 # src/net/primaryHost.ts. Deploy with ./scripts/fly-deploy.sh --router, never a bare
 # `fly deploy` from the repo root (that reads the GAME app's fly.toml).
 #
 # Its machines must only ever be in iad. A router machine in another region would sit nearest
 # some players, start for their polls, and bring back the cost this exists to remove.
 
-app = 'dsim-primary'
+app = 'bfsim-primary'
 primary_region = 'iad'
 
 [build]
   dockerfile = 'Dockerfile'
 
 [env]
-  TARGET_APP = 'dohun-sim-decode'
+  TARGET_APP = 'bfsim-server'
   TARGET_REGION = 'iad'
 
 [http_service]

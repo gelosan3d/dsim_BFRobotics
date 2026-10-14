@@ -20,7 +20,7 @@
  * `items`, so it is a stable KEY — never a label. Five exist:
  *   ranked-gold / -silver / -bronze   #1 / #2 / #3 on a ranked ladder when an ACT ends
  *   record-holder                     top 3 overall or #1 of a drivetrain when a SEASON ends
- *   stargazer                         starred the original DSIM on GitHub — revocable, never counts past 1
+ *   stargazer                         starred BFSIM on GitHub — revocable, never counts past 1
  * The podium is three badges rather than one with a rank inside it because the COUNT has to
  * mean one thing: "3× Ranked Champion" is a sentence, "3× podium (some golds)" is not.
  * Game-agnostic on purpose — a player who wins the DECODE ladder and the BIOBUZZ ladder has
@@ -51,7 +51,7 @@ export const BADGE_EARN: Record<BadgeId, string> = {
   'ranked-silver': 'Finish #2 on a ranked ladder when an act ends.',
   'ranked-bronze': 'Finish #3 on a ranked ladder when an act ends.',
   'record-holder': 'Finish top 3 on the overall record board, or #1 for a drivetrain, when a season ends.',
-  stargazer: 'Star the original DSIM on GitHub and connect GitHub under Account. It stays while the star does.',
+  stargazer: 'Star BFSIM on GitHub and connect GitHub under Account. It stays while the star does.',
 };
 
 /** the visual family — drives the art and the dialog's treatment. The podium is the special

@@ -5,7 +5,7 @@ import { seatAssists } from '../settings';
 import { markLanSession } from '../net/forkScope';
 import { CHAIN_START_POSES } from '../games/chain/config';
 import { savedStartCap } from './startPositions';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import { ChainStartEditor } from './ChainStartEditor';
 import { moduleFor } from '../games';
 import { serverPhysics } from '../games/types';
@@ -391,7 +391,7 @@ export function Lobby({
   // DECODE gates on G304, CR on G04 Lab-Area containment.
   const startLegal = !me || startSelectionLegal(settings.game, me.spec, me.alliance, me.startPose);
   // the saved-pose cap a game's own start editor is handed (it cannot read the ads context itself)
-  const maxSaved = savedStartCap(useAds().supporter);
+  const maxSaved = savedStartCap(useEntitlements().supporter);
   // a duo record run needs BOTH drivers present before it can start (it's 2v0);
   // versus custom rooms can start with fewer (1v1, etc.)
   const enoughPlayers = !isRecord || players.length >= capacity;

@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react';
-import { showConsentSettings } from '../ads/adsense';
 import { APP_NAME, seasonFor } from '../seasons';
-import { SUPPORT_ENABLED } from '../net/env';
 import { inDiscordActivity } from '../net/discordActivity';
 import { useLanEnabled } from './useLanEnabled';
 import type { GameId } from '../games/types';
-import { MenuAd } from './AdSlot';
 import { FriendsPanel } from './FriendsPanel';
 import { FriendToasts } from './friendsContext';
 import { Logo } from './Logo';
@@ -54,7 +51,6 @@ export function AppShell({
   onContributors,
   onPrivacy,
   onTerms,
-  onDonate,
   onChangelog,
   signedIn,
   onOpenProfile,
@@ -79,8 +75,6 @@ export function AppShell({
   onPrivacy: () => void;
   /** Terms of use — public, paired with the privacy policy */
   onTerms: () => void;
-  /** Support/donate page — Ko-fi link + the supporter-membership claim flow */
-  onDonate: () => void;
   /** Changelog, likewise a footer destination (public) — replaces the old bare GitHub link */
   onChangelog: () => void;
   /** drives the friends panel: signed out it shows a sign-in prompt and never polls */
@@ -177,12 +171,6 @@ export function AppShell({
           <NavRail active={active} onNav={onNav} showAdmin={showAdmin} />
           <main className="ds-main">
             {children}
-            {/* The SAFE ad inventory: a shell page is not a gameplay page, so
-                there is no clearance rule and no frame budget to protect. It
-                sits BELOW the page content, after the thing the visitor came
-                for — an ad above the leaderboard would be the interstitial
-                pattern AdSense's own policies discourage. */}
-            <MenuAd />
           </main>
           <FriendsPanel
             signedIn={signedIn}
@@ -228,14 +216,6 @@ export function AppShell({
             <FootLink href={`/${game}/contributors`} go={onContributors}>
               Contributors
             </FootLink>
-            {/* hidden until the tier is actually open for business - see
-                SUPPORT_ENABLED. A link to a page that cannot take a payment is a
-                dead end, and a broken purchase path is a cited AdSense rejection. */}
-            {SUPPORT_ENABLED && (
-              <FootLink href={`/${game}/donate`} go={onDonate}>
-                Support
-              </FootLink>
-            )}
             <FootLink href={`/${game}/changelogs`} go={onChangelog}>
               Changes
             </FootLink>
@@ -297,43 +277,16 @@ function FootLink({
 }
 
 /**
- * "Data" — reopens the consent message, or explains why it cannot. It was labelled
- * "Privacy & cookie settings" until 2026-09-23 (owner); the policy names it by its label
- * (legalText.ts), so the two change together.
- *
- * Required rather than a nicety: consent that cannot be withdrawn as easily as it was given is
- * not valid consent, and the privacy policy points at this exact link BY NAME, so it has to
- * exist wherever that policy is served.
- *
- * ⚠️ IT USED TO DELETE ITSELF, and that was the bug this is the fix for. `showConsentSettings()`
- * answers false whenever Funding Choices has no revocation entry — which is not an edge case, it
- * is the NORMAL case everywhere outside the EEA, the UK and Switzerland — so the link vanished
- * on first click for most of the world, from a footer whose own privacy policy promises it is
- * there. "A footer link that silently does nothing is worse than no link" was the right
- * premise and the wrong conclusion: the fix is for the link to LEAD somewhere, not to stop
- * existing.
- *
- * So the fallback is the privacy page's "Your data" panel, which carries the same controls plus
- * the sentence saying why no dialog opened (`CONSENT_UNAVAILABLE`). It renders whether or not
- * this build ships a CMP at all, because the panel behind it is useful either way — it is where
- * the analytics switch, the storage inventory, the export and the delete live.
- *
- * The scroll is DEFERRED because `onPrivacy` navigates by React state — the heading does not
- * exist yet when this handler runs — and on the privacy page itself, where navigating is a
- * no-op, the jump is the only feedback there is.
- *
- * ⚠️ `setTimeout` AND NOT `requestAnimationFrame`. rAF does not fire in a hidden or backgrounded
- * tab, so the version that used it scrolled nowhere whenever the page was not being painted —
- * which is exactly the state a tab is in while something else is in front of it. A frame
- * callback is the right tool for "before the next paint" and the wrong one for "after React has
- * committed", which is all this needs.
+ * "Data": the footer link to the privacy page's "Your data" panel (the analytics switch, the
+ * storage inventory, the export and the delete). The privacy text names it by this label.
+ * It scrolls to the panel after React has committed the navigation; `setTimeout` and not
+ * `requestAnimationFrame`, because rAF does not fire in a hidden tab.
  */
 function ConsentLink({ onPrivacy }: { onPrivacy: () => void }) {
   return (
     <button
       className="ds-foot-link legal"
       onClick={() => {
-        if (showConsentSettings()) return;
         onPrivacy();
         setTimeout(() => {
           document.getElementById('your-data')?.scrollIntoView({ block: 'start' });

@@ -1,7 +1,9 @@
-<!-- governs: src/ads/**, server/kofi.ts, src/legalText.ts, src/analytics.ts, src/analyticsPref.ts, src/pageviews.ts, src/pathScrub.ts, src/storageKeys.ts, server/analytics.ts, server/analyticsImport.ts -->
-# Monetization — ads and the supporter tier
+<!-- governs: server/kofi.ts, src/ui/EntitlementsProvider.tsx, src/legalText.ts, src/analytics.ts, src/analyticsPref.ts, src/pageviews.ts, src/pathScrub.ts, src/storageKeys.ts, server/analytics.ts, server/analyticsImport.ts -->
+# Monetization — REMOVED in this fork; analytics, privacy and the storage registry remain
 
-Perks are cosmetic or convenience ONLY — never anything affecting how a robot drives or scores.
+BFSIM has **no ads, no payments and no paid tier**. This file keeps what is still true (analytics,
+the privacy text, the storage registry) and records what was taken out, so nobody re-adds it by
+accident.
 
 *Split out of `CLAUDE.md` on 2026-09-16, **verbatim** — CLAUDE.md is loaded into every
 session and this is not needed by most of them. The `governs:` line above is read by
@@ -9,62 +11,33 @@ session and this is not needed by most of them. The `governs:` line above is rea
 
 ---
 
-## Monetization (branch `monetization`) — ads + supporter tier
+## What was removed (BFSIM, 2026-10-14) and what was kept
 
-Not yet deployed. `HANDOFF.md` has the full write-up; the load-bearing rules:
+- **Ads are gone.** `src/ads/` (the AdSense loader, consent tool and provider), `AdSlot`, the
+  `ads.txt`/verification plugins in `vite.config.ts`, the hard-coded AdSense tag in `index.html`
+  (it carried the ORIGINAL author's publisher id) and the `.game-ad`/`.ad-slot`/`.menu-ad` CSS no
+  longer exist. Nothing may re-add an ad tag: it would earn for whoever's id it carries.
+- **The Ko-fi webhook, claim route and `/api/pricing` are gone** from `server/api.ts`; the Donate
+  page, the Membership panel and the footer "Support" link with them. `server/kofi.ts` (a pure
+  policy module) and the `repo.ts` grant/claim functions are KEPT as dormant plumbing, so the
+  migrations, `dbtest` and an admin grant still work. A payment can no longer arrive.
+- **Supporter perks are free for everyone.** `cosmeticAllowed` allows `free` AND `supporter`-tier
+  keys (only `earned` keys are gated) and `savedStartCap` always returns the larger cap
+  (`MAX_SAVED_STARTS_SUPPORTER`). The server enforces through the same shared functions, so a
+  client and the server agree. The `supporter` flag, `supporter_until` and the badge component
+  still exist, and nothing reads them as a gate.
+- **`EntitlementsProvider`** (`src/ui/EntitlementsProvider.tsx`, was `AdsProvider`) still fetches
+  the account's EARNED cosmetic unlocks; `useEntitlements()` replaces `useAds()`.
+- **Legal text** (`src/legalText.ts`) is rewritten for a noncommercial fork: no operator
+  jurisdiction, no memberships, no advertising section, and the contact is the repository's issue
+  tracker (`LEGAL_CONTACT`, a URL, not an email). `LEGAL_UPDATED` is 2026-10-14, so a signed-in
+  account is asked to accept once. `LEGAL_VERSION` is DERIVED from `LEGAL_UPDATED`
+  (`legalVersionOf`); moving the date prompts every signed-in account to accept again.
+- ⚠️ **The sponsor slot is NOT monetization here**: it reads "BF Robotics" with placeholder
+  artwork (`docs/area/sponsor.md`).
+- **Not removed:** first-party analytics (below). It runs only with `VITE_ANALYTICS=1` and a
+  connected server, so an offline or LAN build sends nothing.
 
-- **`src/ads/adsense.ts` is the single gate.** Ads are OFF unless `VITE_ADSENSE_CLIENT`
-  is set, and are suppressed unconditionally in the Electron build (AdSense forbids app
-  wrappers), on touch, and for supporters. `AdsProvider` FAILS CLOSED — ads stay off
-  until the entitlement check settles, so a supporter never sees a flash of them.
-- **Ads are NON-PERSONALIZED by default and tagged TFUAC.** BFSIM simulates FTC
-  (grades 7–12) and the sim is fully playable SIGNED OUT, so most impressions carry no
-  age signal. `VITE_ADSENSE_PERSONALIZED=1` is a deliberate opt-in. TFCD (COPPA) stays
-  off: the terms set 13+, so asserting child-directed would be inaccurate, not cautious.
-- **A CMP (Google Funding Choices) is REQUIRED, not optional** — without a certified CMP
-  Google serves EEA/UK/CH users no ads at all. It loads with the client id; the message
-  itself is authored in the AdSense dashboard. The footer "Data" (was "Privacy & cookie settings")
-  link must keep existing (consent you can't withdraw isn't consent).
-- **Three ad units, each with its own slot id**: `menu` (shell pages) and `results`
-  (post-match) are SAFE; `game` (columns flanking the live field) is the risky one —
-  60 Hz canvas + AdSense's 150px game-clearance rule. **Do not enable
-  `VITE_ADSENSE_SLOT_GAME` without first comparing p95 frame time via `?perf=1`**
-  (`GameController.getFrameStats`).
-- **`/ads.txt` is GENERATED** from `VITE_ADSENSE_CLIENT` in `vite.config.ts` — never
-  commit one, it would drift.
-- **Supporter tier is Ko-fi.** `server/kofi.ts` is a PURE policy module (no DB, no
-  import-time env) deciding what a payment buys: a subscription payment is always
-  exactly 1 month; a one-off buys `floor(amount/price)` months, capped; a foreign
-  currency buys nothing. Months are priced ONCE at webhook time and stored on the row.
-- **`profiles.kofi_email` is what makes a membership RENEW.** The first manual claim
-  links the payer address; every later webhook from it grants automatically. The UNIQUE
-  index is also the only thing stopping one subscription covering many accounts.
-- **Every write to `supporter_until` logs a `supporter_grants` audit row** (source =
-  kofi/admin/revoke). Two actors can move that column; "why does this account have a
-  membership?" has to stay answerable.
-- **Perks are cosmetic/convenience ONLY** — never anything affecting how a robot drives
-  or scores. That is a product rule AND a statement in the terms. All four advertised
-  perks are BUILT (badge, ads-off, 6 saved starts, and — since the cosmetics registry,
-  `src/cosmetics.ts` — the six premium chassis colours, every accent, the four patterned
-  decals, and the bold plate); **do not list a perk on the Donate page before it
-  exists.**
-- **The saved-start PERSIST cap is the SUPPORTER ceiling**
-  (`MAX_SAVED_STARTS_SUPPORTER`), in `coerceSettings` AND `saveStart`. Only the editor's
-  Save button applies the free cap. Sanitizing to the free cap would DELETE a supporter's
-  poses before the entitlement resolved, and on every lapse.
-- **The chassis colour is an ALLOWLIST key** (`CHASSIS_COLORS`), never a free colour
-  string on the wire, and it recolours only the FILL — alliance identity is the OUTLINE.
-- **`LobbyPlayer.supporter` is SERVER-AUTHORED** (set at join). `sanitizePlayer` is an
-  allowlist and `PlayerPatch` is a `Pick`, so a client cannot self-declare a paid badge.
-- **`LEGAL_VERSION` is DERIVED from `LEGAL_UPDATED`** (`legalVersionOf`), not written beside it:
-  two hand-kept spellings of one date is how the version everybody re-accepts ends up disagreeing
-  with the date on the page they are accepting. ⚠️ **Moving `LEGAL_UPDATED` prompts EVERY
-  signed-in account to accept again, once** (`termsGateState`, `src/ui/TermsGate.tsx`) — that is
-  the point of it, so move it for a material change and not for a typo. It is a CLIENT change AND
-  a SERVER change (the accept route records the server’s own constant), so deploy both.
-- ⚠️ **`LEGAL_OPERATOR`/`LEGAL_JURISDICTION` in `src/legalText.ts` are PLACEHOLDERS.**
-  Until filled, the Terms page shows a visible warning to every visitor. Fill them
-  before taking a payment; do not guess them from a timezone or an email domain.
 - **FIRST-PARTY ANALYTICS — the admin console's Analytics tab.** BFSIM measures itself now
   (`server/analytics.ts`, migration `0042`, `src/pageviews.ts`, `src/ui/AdminAnalytics.tsx`),
   and since September 2026 ONLY itself: the host's analytics script was dropped once the tab

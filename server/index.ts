@@ -4426,7 +4426,7 @@ if (dbEnabled) {
  * `uncaughtException` the process-level hook only logs, and a sweep that dies quietly is
  * indistinguishable from one that ran and found nothing.
  */
-const STAR_REPO = process.env.GITHUB_STAR_REPO ?? 'genius0412/dsim';
+const STAR_REPO = process.env.GITHUB_STAR_REPO ?? 'gelosan3d/dsim_BFRobotics';
 /* ⚠️ SAID AT BOOT, NOT AT THE FIRST SWEEP. The sweep is HOURLY, so a warning raised inside it
    arrives an hour after the deploy that got the configuration wrong — long after whoever ran
    the deploy has stopped reading the log. `warnNoToken` is once-per-process, so this is the

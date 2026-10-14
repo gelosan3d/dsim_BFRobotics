@@ -9,7 +9,6 @@ import {
 } from '../storageKeys';
 import { analyticsEnabled } from '../analytics';
 import { analyticsAllowed, setAnalyticsAllowed } from '../analyticsPref';
-import { adsConfigured, cmpEnabled, showConsentSettings, AD_TFUAC } from '../ads/adsense';
 import { authClient, authEnabled } from '../lib/authClient';
 import { ExportUnavailableError, fetchMyExport } from '../net/api';
 import { LEGAL_CONTACT } from '../legalText';
@@ -49,7 +48,6 @@ export function YourData() {
 
       <StorageInventory />
       <AnalyticsRow />
-      <AdsRow />
       <ExportRow />
       <DeleteRow />
     </>
@@ -197,86 +195,6 @@ function AnalyticsRow() {
   );
 }
 
-/**
- * THE COPY FOR "there is no consent dialog to reopen", in one place.
- *
- * Exported because the footer's "Data" link (was "Privacy & cookie settings") used to DELETE ITSELF when
- * `showConsentSettings()` answered false, which is the normal case outside the EEA/UK/CH — so
- * the one control the privacy policy names by name would silently not exist for most of the
- * world, and the only way to find that out was to read the source. The link now lands here
- * instead, and this is the sentence it lands on.
- */
-export const CONSENT_UNAVAILABLE =
-  'Consent settings are provided by Google’s consent tool, and there is no consent to withdraw in your region or on this build. Where the tool does apply (the UK, the EEA and Switzerland), this button reopens it.';
-
-/**
- * ADS PERSONALISATION — a door to Google's consent tool, plus the facts that are true whether
- * or not the tool opens.
- *
- * Three states, and the point of the row is that NONE of them is "nothing here":
- *
- *  1. this build ships no ads at all (desktop, touch, or no publisher id) — say so;
- *  2. a CMP is loaded and has a revocation entry — the button reopens it;
- *  3. a CMP is loaded and has none, because the visitor is outside the regions the message
- *     targets — the button was pressed, nothing opened, and the row says why.
- *
- * `showConsentSettings()` is the only way to find out which of 2 and 3 you are in: the entry
- * point exists only once Funding Choices has loaded AND the visitor is in a targeted region, so
- * it cannot be known before the click. Hence a button that reports its own failure rather than a
- * button that is disabled on a guess.
- */
-function AdsRow() {
-  const [tried, setTried] = useState(false);
-  const cmp = cmpEnabled();
-
-  return (
-    <section className="ds-panel">
-      <div className="ds-panel-h">
-        <h3 className="ds-panel-title">Ads and cookies</h3>
-      </div>
-      <div className="ds-panel-body stack start">
-        <p className="ds-hint">
-          BFSIM sets no cookies of its own. Where the web version shows advertising, Google
-          AdSense and its partners may set cookies or read a device identifier to serve and
-          measure ads. Ads are <strong>non-personalised by default</strong>
-          {AD_TFUAC ? ', and every request is tagged as being for a user below the age of consent'
-            : ''}
-          , because this is a simulator for a school competition and most of the people driving
-          it are not signed in. No ads are shown in the desktop app, on touch devices, or to
-          supporters.
-        </p>
-        {!adsConfigured() && !cmp && (
-          <p className="ds-hint">
-            This build shows no advertising, so there is nothing here to consent to.
-          </p>
-        )}
-        {cmp && (
-          <button
-            className="ds-btn"
-            onClick={() => {
-              if (!showConsentSettings()) setTried(true);
-            }}
-          >
-            Open consent settings
-          </button>
-        )}
-        {cmp && tried && (
-          <p className="ds-hint" role="status">
-            {CONSENT_UNAVAILABLE}
-          </p>
-        )}
-        <p className="ds-hint">
-          You can review Google’s own ad settings at{' '}
-          <a href="https://adssettings.google.com" target="_blank" rel="noreferrer">
-            adssettings.google.com
-          </a>
-          .
-        </p>
-      </div>
-    </section>
-  );
-}
-
 /** `YYYY-MM-DD` in the viewer's own timezone — a filename, not a timestamp, so local is right */
 function today(): string {
   const d = new Date();
@@ -324,7 +242,7 @@ function ExportRow() {
           ? `This server can’t build an export yet. Email ${LEGAL_CONTACT} and you will be sent one.`
           : /^One export a minute/.test(raw)
             ? raw
-            : `Couldn’t build the export. Email ${LEGAL_CONTACT} and you will be sent one.`;
+            : `Couldn’t build the export. Open an issue at ${LEGAL_CONTACT} and one will be sent to you.`;
       setMsg({ text, err: true });
     } finally {
       setBusy(false);
@@ -390,8 +308,8 @@ function DeleteUnavailable() {
         <p className="ds-hint">
           Sign in to delete your account. It removes your profile, username, settings, robot
           presets, records and practice runs with their replays, rating and rating history, and
-          every friendship, block and invite, immediately and permanently. Email{' '}
-          {LEGAL_CONTACT} if you cannot sign in and it will be done by hand.
+          every friendship, block and invite, immediately and permanently. If you cannot sign in, open an issue at{' '}
+          {LEGAL_CONTACT} and it will be done by hand.
         </p>
       </div>
     </section>

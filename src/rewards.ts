@@ -152,7 +152,7 @@ export function rewardWhy(g: Pick<RewardGrant, 'reason'>): string[] {
       (p) => `#${p.rank} on the ${boardWords(p)}, ${period}.${p.score != null ? ` Best run ${Math.round(p.score)}.` : ''}`,
     );
   }
-  if (r.kind === 'stargazer') return ['You starred the original DSIM on GitHub. It stays while the star does.'];
+  if (r.kind === 'stargazer') return ['You starred BFSIM on GitHub. It stays while the star does.'];
   return r.note ? [r.note] : [];
 }
 

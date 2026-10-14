@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameSettings, RobotSpec } from '../types';
 import { CHAIN_START_POSES } from '../games/chain/config';
 import { savedStartCap } from './startPositions';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import { ChainStartEditor } from './ChainStartEditor';
 import { selectStart, switchCategory, saveStart, deleteSavedStart, indexCategory, startSelectionLegal } from './startPositions';
 import { useRoleSwap, useDismissable } from './useRoleSwap';
@@ -178,7 +178,7 @@ export function MatchStrategy({
   const mySpec = me?.spec ?? settings.spec;
   // the saved-pose cap a game's own start editor is handed (it cannot read the ads context
   // itself). Up here, before the `building` early return, so the hook runs on every render.
-  const maxSaved = savedStartCap(useAds().supporter);
+  const maxSaved = savedStartCap(useEntitlements().supporter);
   // my start pose must be legal for my (possibly just-swapped) chassis to ready up —
   // DECODE gates on G304, CR on G04 Lab-Area containment (both games now offer free
   // placement, so neither is legal-by-construction any more).

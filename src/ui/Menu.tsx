@@ -10,12 +10,11 @@ import {
   accentFill,
   clampCosmetics,
   cosmeticAllowed,
-  cosmeticTier,
   type CosmeticId,
   type Decal,
   type Plate,
 } from '../cosmetics';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import {
   CHAIN_CLEARANCE_DEFAULT,
   CHAIN_CLEARANCE_MAX,
@@ -146,7 +145,6 @@ const EARN_HINT: Record<string, string> = {
 
 function lockReason(id: CosmeticId, supporter: boolean, earned: readonly string[]): string | undefined {
   if (cosmeticAllowed(id, supporter, earned)) return undefined;
-  if (cosmeticTier(id) !== 'earned') return 'Supporter perk';
   return EARN_HINT[id] ?? 'Earned — see Career';
 }
 
@@ -300,7 +298,7 @@ function CosmeticsRows({
    * an unentitled spec on join and on every re-pick. Only the PICKER believed nobody owned
    * anything, so the one surface where you choose a cosmetic was the one that said no.
    */
-  const { supporter, earnedCosmetics: earned } = useAds();
+  const { supporter, earnedCosmetics: earned } = useEntitlements();
   const current = clampCosmetics(spec);
   const chassisHex = chassisFill(current.chassisColor);
   const accentHex = accentFill(current.accent, current.chassisColor);

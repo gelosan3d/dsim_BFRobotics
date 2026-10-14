@@ -2274,21 +2274,6 @@ export async function acceptTerms(): Promise<{ termsVersion: string | null }> {
   return { termsVersion: r.termsVersion ?? null };
 }
 
-/** the tier price for a SIGNED-OUT visitor. Same never-throws contract: the
- *  Donate page falls back to "see Ko-fi for the price" rather than breaking. */
-export async function fetchPricing(): Promise<TierPrice | null> {
-  try {
-    const base = gameServerHttpUrl();
-    if (!base) return null;
-    const res = await fetch(base + '/api/pricing');
-    if (!res.ok) return null;
-    const data = (await res.json()) as { price?: TierPrice };
-    return data.price && typeof data.price.amount === 'number' ? data.price : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * EVERYTHING THE SERVER HOLDS ABOUT YOU, as one JSON document (`GET /api/user/export`).
  *
@@ -2345,24 +2330,6 @@ export async function deleteMyAccount(): Promise<boolean> {
     body: JSON.stringify({ confirm: 'DELETE' }),
   });
   return !!r.deleted;
-}
-
-/**
- * Attach a Ko-fi payment to the signed-in account by its transaction id.
- *
- * Unlike `fetchEntitlements` this DOES throw — the user is actively waiting on
- * the result of a payment they made, and silently swallowing "already claimed"
- * or "not found" would leave them staring at a page that never changes. The
- * caller shows the message.
- */
-export async function claimKofiPayment(
-  transactionId: string,
-): Promise<{ ok: boolean; supporterUntil: string | null; months: number }> {
-  const r = await authedJson<{ ok?: boolean; supporterUntil?: string | null; months?: number }>(
-    '/api/user/claim-kofi',
-    { method: 'POST', body: JSON.stringify({ transactionId }) },
-  );
-  return { ok: !!r.ok, supporterUntil: r.supporterUntil ?? null, months: r.months ?? 0 };
 }
 
 // ======================================================== admin: audit + user ==

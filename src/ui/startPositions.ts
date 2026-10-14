@@ -1,6 +1,6 @@
 import type { Alliance, GameId, GameSettings, RobotSpec, StartCat, StartPose, StartSel } from '../types';
 import type { LobbyPlayer } from '../net/protocol';
-import { MAX_SAVED_STARTS, MAX_SAVED_STARTS_SUPPORTER } from '../config';
+import { MAX_SAVED_STARTS_SUPPORTER } from '../config';
 import { chainAnchorCat, chainDefaultIndex } from '../games/chain/config';
 import { simModuleFor } from '../games/sim';
 
@@ -120,8 +120,9 @@ export function saveStart(s: GameSettings, pose: StartPose): Partial<GameSetting
 
 /** how many saved starts per category this player gets — the ONE place the perk
  *  is decided. */
-export function savedStartCap(supporter: boolean): number {
-  return supporter ? MAX_SAVED_STARTS_SUPPORTER : MAX_SAVED_STARTS;
+export function savedStartCap(_supporter: boolean): number {
+  // no paid tier in BFSIM: every player gets the larger slot count
+  return MAX_SAVED_STARTS_SUPPORTER;
 }
 
 /** patch: delete a saved pose from a category */

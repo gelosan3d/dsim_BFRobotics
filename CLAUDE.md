@@ -51,7 +51,7 @@ mostly of the form "the obvious thing is wrong, and here is the measurement that
 | `src/games/chain/**` | [docs/area/chain.md](docs/area/chain.md) | 4.5k |
 | `src/games/biobuzz/**` · `scripts/smoke-biobuzz/**` | [docs/area/biobuzz.md](docs/area/biobuzz.md) | 2.1k |
 | adding a game — `src/games/types.ts`, `index.ts`, `sim.ts`, `src/seasons.ts` | [docs/area/adding-a-game.md](docs/area/adding-a-game.md) | 1.0k |
-| `src/ads/**` · `server/kofi.ts` · `src/legalText.ts` · `src/storageKeys.ts` | [docs/area/monetization.md](docs/area/monetization.md) | 2.2k |
+| `server/kofi.ts` (dormant) · `src/legalText.ts` · `src/storageKeys.ts` · analytics | [docs/area/monetization.md](docs/area/monetization.md) | 2.2k |
 | `src/sponsor.ts` · `src/ui/Sponsor.tsx` · `electron/**` | [docs/area/sponsor.md](docs/area/sponsor.md) | 0.9k |
 
 `src/sim/` used to be TWO guides (DECODE's rules lived there too); with DECODE gone it is the
@@ -181,7 +181,7 @@ here because getting them wrong is expensive and none of them is obvious from th
   and say which branch you are deploying when you ask.
 - ⚠️ **NEVER a bare `flyctl deploy`.** `fly.toml` expresses only ONE `[[vm]]` size, so a bare
   deploy re-applies `shared-cpu-4x` to EVERY machine and silently upsizes the cheap satellites.
-  Use `./scripts/fly-deploy.sh`; verify with `fly machine list -a dohun-sim-decode`.
+  Use `./scripts/fly-deploy.sh`; verify with `fly machine list -a bfsim-server`.
 - **The one Fly app serves EVERY client version** (alpha/beta/main bake the same
   `VITE_GAME_SERVER_URL`), so protocol changes MUST stay backward-compatible. New clients
   advertise `caps` on `join`/`queue` and the server feature-gates on them.

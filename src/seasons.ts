@@ -23,10 +23,6 @@ export const APP_BLURB = 'An online driving simulator for FIRST Tech Challenge.'
 /** external links surfaced in the footer / download page */
 export const LINKS = {
   repo: 'https://github.com/gelosan3d/dsim_BFRobotics',
-  /** Ko-fi page - donations + the supporter membership tier. The Donate screen
-   *  reads it from this one place; the webhook (server/api.ts) is what actually
-   *  grants the tier once a payment is claimed. */
-  kofi: 'https://ko-fi.com/playdsim',
 } as const;
 
 import type { GameId } from './games/types';

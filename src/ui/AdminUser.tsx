@@ -7,11 +7,8 @@ import {
   adminDeleteRecord,
   adminDeleteUser,
   adminFetchUser,
-  adminGrantSupporter,
   adminLiftSuspension,
-  adminRefundPayment,
   adminRenameUser,
-  adminRevokeSupporter,
   adminSuspendUser,
   type AdminUserDetail,
 } from '../net/api';
@@ -57,7 +54,6 @@ export function AdminUser({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [rename, setRename] = useState('');
-  const [months, setMonths] = useState('1');
   const [note, setNote] = useState('');
   const [showStanding, setShowStanding] = useState(false);
   const [susDays, setSusDays] = useState('7');
@@ -124,29 +120,6 @@ export function AdminUser({
     }
     if (!confirmed('Rename', `“${u.handle ?? userId}” to “${next}”`, 'Their old name is kept in the audit log.')) return;
     void act(async () => (await adminRenameUser(userId, next)) !== null, `Renamed to “${next}”.`, 'rename the player');
-  };
-
-  const doGrant = (): void => {
-    const n = Math.floor(Number(months));
-    if (!Number.isFinite(n) || n < 1 || n > 60) {
-      setStatus('Months must be 1–60.');
-      return;
-    }
-    if (!confirmed(`Give ${n} month${n === 1 ? '' : 's'} of supporter to`, name, `Reason recorded: “${why}”.`)) return;
-    void act(
-      async () => (await adminGrantSupporter(userId, n, why)) !== null,
-      `Granted ${n} month${n === 1 ? '' : 's'}.`,
-      'grant the membership',
-    );
-  };
-
-  const doRevoke = (): void => {
-    if (!confirmed('Revoke the supporter membership of', name, `Reason recorded: “${why}”.`)) return;
-    void act(
-      async () => (await adminRevokeSupporter(userId, why)) !== null,
-      'Membership ended.',
-      'revoke the membership',
-    );
   };
 
   const doClearRecords = (): void => {
@@ -226,7 +199,7 @@ export function AdminUser({
   const doDelete = (): void => {
     const expect = u.username ?? userId;
     const typed = window.prompt(
-      `Delete ${name} and everything they own: records, matches, reports, replays, membership.\n\n` +
+      `Delete ${name} and everything they own: records, matches, reports, replays.\n\n` +
         'This cannot be undone. The audit log keeps the record of it.\n\n' +
         `Type ${expect} to confirm.`,
       '',
@@ -265,7 +238,6 @@ export function AdminUser({
               <span className="adm-nouser">no username yet</span>
             )}
             {u.role && <span className={`ds-badge ${u.role === 'owner' ? 'accent' : 'staff'}`}>{u.role}</span>}
-            {u.supporter && <span className="ds-badge">supporter</span>}
             {suspendedUntil !== null && <span className="ds-badge danger">suspended</span>}
             {!u.known && (
               <span className="ds-badge" title="No profiles row exists for this account id">
@@ -319,19 +291,6 @@ export function AdminUser({
       <dl className="adm-facts">
         <Fact k="Joined" v={<When at={u.createdAt} />} />
         <Fact
-          k="Membership"
-          v={
-            u.supporter ? (
-              <>
-                until {u.supporterUntil ? new Date(u.supporterUntil).toLocaleDateString() : '—'}
-                {u.autoRenews ? ' · auto-renews' : ' · manual claims only'}
-              </>
-            ) : (
-              <span className="ds-muted">none{u.autoRenews ? ' · Ko-fi linked (lapsed)' : ''}</span>
-            )
-          }
-        />
-        <Fact
           k="Terms"
           v={
             u.termsAcceptedAt ? (
@@ -361,7 +320,7 @@ export function AdminUser({
           required
           maxLength={200}
           value={reason}
-          placeholder="e.g. chargeback, repeated griefing"
+          placeholder="e.g. repeated griefing"
           onChange={(e) => setReason(e.target.value)}
         />
       </label>
@@ -372,24 +331,6 @@ export function AdminUser({
         </label>
         <button className="ds-btn ghost small" disabled={busy || rename.trim() === (u.handle ?? '')} onClick={doRename}>
           Rename
-        </button>
-        <label className="admin-field">
-          <span>Supporter</span>
-          <input
-            type="number"
-            min={1}
-            max={60}
-            className="ds-input admin-months"
-            aria-label={`Months to grant ${name}`}
-            value={months}
-            onChange={(e) => setMonths(e.target.value)}
-          />
-        </label>
-        <button className="ds-btn ghost small" disabled={busy || !why} onClick={doGrant}>
-          Grant
-        </button>
-        <button className="ds-btn danger small" disabled={busy || !why || !u.supporter} onClick={doRevoke}>
-          Revoke
         </button>
         {/* a DISCLOSURE, not an action: it opens the editor below. It flipped to a green
             primary to show "open", which in a row of actions read as "the recommended one". */}
@@ -644,87 +585,6 @@ export function AdminUser({
             </div>
           ))}
         </div>
-      )}
-
-      {u.grants.length > 0 && (
-        <>
-          <h3 className="adm-h3">Membership history</h3>
-          <ul className="adm-notes">
-            {u.grants.map((g, i) => (
-              <li key={i}>
-                <span className="adm-note-body">
-                  <b>{g.source}</b>
-                  {g.months ? ` +${g.months}mo` : ''}
-                  {g.note ? ` · ${g.note}` : ''}
-                </span>
-                <span className="ds-muted">
-                  <When at={g.createdAt} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {/* ⚠️ PAYMENTS, NOT GRANTS — and that is why the refund route had no caller. A GRANT is
-          months; a PAYMENT is a transaction, and `/api/admin/supporter/refund` is keyed by the
-          second. The membership history above showed only the first, so the id the route needs
-          appeared nowhere in the console and a chargeback could not be recorded from it at all.
-          Flagging a payment deliberately does NOT end the membership: it may cover other
-          payments, so revoking is a second decision and Revoke above is where it lives. */}
-      {(u.payments?.length ?? 0) > 0 && (
-        <>
-          <h3 className="adm-h3">Payments claimed</h3>
-          <ul className="adm-notes">
-            {(u.payments ?? []).map((p, i) => (
-              <li key={p.transactionId ?? i}>
-                <span className="adm-note-body">
-                  <b>
-                    {p.amount ?? '—'} {p.currency ?? ''}
-                  </b>{' '}
-                  · {p.kind}
-                  {p.isSubscription ? ' · subscription' : ''}
-                  {p.transactionId ? (
-                    <>
-                      {' · '}
-                      <code className="adm-guest-id">{p.transactionId}</code>
-                      <CopyId id={p.transactionId} label="transaction id" />
-                    </>
-                  ) : (
-                    <span className="ds-muted"> · no transaction id</span>
-                  )}
-                  {p.refundedAt && <span className="ds-badge danger">charged back</span>}
-                </span>
-                <span className="ds-muted">
-                  <When at={p.claimedAt} />
-                </span>
-                {p.transactionId && !p.refundedAt && (
-                  <button
-                    className="ds-btn danger small"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        !confirmed(
-                          'Flag the payment',
-                          `${p.amount ?? ''} ${p.currency ?? ''} (${p.transactionId})`,
-                          'It is marked charged back. The membership is NOT ended. Use Revoke above for that.',
-                        )
-                      )
-                        return;
-                      void act(
-                        async () => (await adminRefundPayment(p.transactionId as string))?.ok === true,
-                        'Payment flagged as charged back.',
-                        'flag the payment',
-                      );
-                    }}
-                  >
-                    Flag refunded
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
       )}
 
       {/* WHAT HAS BEEN DONE TO THIS ACCOUNT — the audit log, filtered to them. The Audit tab

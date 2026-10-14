@@ -1,7 +1,7 @@
 /**
  * Is the LAN rendezvous actually LIVE on a deployed server?
  *
- *   node scripts/lanping.mjs wss://dsim-alpha.fly.dev [wss://...]
+ *   node scripts/lanping.mjs wss://your-server.example [wss://...]
  *
  * A green `fly deploy` says an image shipped. It does not say the feature you deployed FOR
  * is reachable, and the two came apart here on 2026-09-12: alpha was serving 200s on /health

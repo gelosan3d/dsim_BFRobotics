@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { HudSnapshot, EloResultRow } from '../game';
 import { appChannel, lanActive } from '../net/env';
-import { ResultsAd } from './AdSlot';
 import { ReportDialog } from './ReportDialog';
 import { ScoreReportDialog } from './ScoreReportDialog';
 import type { MatchResultInfo } from '../net/session';
@@ -1057,10 +1056,6 @@ export function Results({
                 }}
               />
             )}
-            {/* AFTER the buttons, deliberately. The results screen is a good place for an ad —
-                the match is over and the player is reading rather than driving — but REMATCH and
-                MENU must stay the first things reachable, by mouse and by tab order. */}
-            <ResultsAd />
           </div>
         )}
       </div>

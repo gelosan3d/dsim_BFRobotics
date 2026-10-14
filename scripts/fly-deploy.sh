@@ -35,7 +35,7 @@ set -- ${ARGS+"${ARGS[@]}"}
 
 # THE PRIMARY ROUTER (router/, src/net/primaryHost.ts): a separate tiny app, pinned to iad, that
 # fly-replays every request to the game app's primary machine so idle tabs never start a
-# satellite. `--router` deploys it (production's dsim-primary, or dsim-alpha-primary with
+# satellite. `--router` deploys it (production's bfsim-primary, or bfsim-server-alpha-primary with
 # --alpha) and nothing else. One machine, iad only: a router machine anywhere else would sit
 # nearest some players and start for their polls.
 if [ "$ROUTER" -eq 1 ]; then
@@ -53,7 +53,7 @@ if [ "$ROUTER" -eq 1 ]; then
 fi
 
 if [ "$ALPHA" -eq 1 ]; then
-  APP="${FLY_ALPHA_APP:-dsim-alpha}"
+  APP="${FLY_ALPHA_APP:-bfsim-server-alpha}"
   CONFIG=fly.alpha.toml
   echo "==> ALPHA preview deploy ($APP) — production is untouched"
   # -c pins the config: without it `fly deploy` reads fly.toml and would deploy PRODUCTION
@@ -75,7 +75,7 @@ if [ "$ALPHA" -eq 1 ]; then
   exit 0
 fi
 
-APP="${FLY_APP:-dohun-sim-decode}"
+APP="${FLY_APP:-bfsim-server}"
 
 # THE FLEET, DECLARED. This line is the in-repo source of truth for which regions run
 # a machine, and `npm run test:mm` asserts that server/regions.ts agrees with it.

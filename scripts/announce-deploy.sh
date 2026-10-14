@@ -13,13 +13,13 @@
 #
 # ADMIN_SECRET must match the Fly secret of the same name (the announce endpoint
 # accepts it via ?secret=, so this needs no signed-in browser session). Set once:
-#   fly secrets set ADMIN_SECRET='<random>' -a dohun-sim-decode
+#   fly secrets set ADMIN_SECRET='<random>' -a bfsim-server
 #
 # Defaults: a generic message + a 300s (5 min) warning. Pass 0 to deploy now.
 set -euo pipefail
 
-APP="${FLY_APP:-dohun-sim-decode}"
-HOST="${DECODE_HOST:-https://dohun-sim-decode.fly.dev}"
+APP="${FLY_APP:-bfsim-server}"
+HOST="${DECODE_HOST:?set DECODE_HOST to your own game server, e.g. https://your-app.fly.dev}"
 # NOTE: no apostrophe in this default — a literal ' inside "${1:-…}" is parsed by
 # bash as an unterminated single quote (script fails to parse), so keep it out.
 MSG="${1:-Server updating shortly — you will be reconnected automatically}"

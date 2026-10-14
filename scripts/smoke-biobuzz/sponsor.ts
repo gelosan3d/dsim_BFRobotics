@@ -178,18 +178,11 @@ export function sponsorChecks(check: Check): void {
     'the in-gameplay mark must render on touch, under Electron, and for supporters',
   );
   const gameView = code('src/ui/GameView.tsx');
-  // the chip must sit AFTER the ad branch has closed, not inside it — measured as
-  // "the `)}` that ends `{ads && (` comes first", which is a structural fact rather
-  // than a distance in characters (the two are neighbours in the tree, so any
-  // proximity test just measures how many comments happen to sit between them)
-  const adStart = gameView.indexOf('{ads && (');
-  const chipAt = gameView.indexOf('<SponsorGameChip');
+  // the chip is rendered by GameView on its own: there is no ad branch for it to sit inside any
+  // more, so what is left to pin is that it is rendered and is not gated on anything ad-shaped
   check(
-    'sponsor: the in-game chip is not rendered inside the `ads &&` branch',
-    /<SponsorGameChip\s*\/>/.test(gameView) &&
-      adStart >= 0 &&
-      chipAt > adStart &&
-      gameView.slice(adStart, chipAt).includes(')}'),
+    'sponsor: the in-game chip is rendered, and nothing ad-shaped gates it',
+    /<SponsorGameChip\s*\/>/.test(gameView) && !/\{ads && \(/.test(gameView) && !/AdSlot|useAdUnitActive/.test(gameView),
     'src/ui/GameView.tsx',
   );
 

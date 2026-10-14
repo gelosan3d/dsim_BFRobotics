@@ -675,12 +675,12 @@ The old P2P lockstep/mesh/TURN/Supabase-lobby is DELETED. Full roadmap: `docs/ne
   deploy it.**
   **Rapier is pinned EXACTLY** (not a caret) for the same reason: a fresh `npm install` pulling
   a new physics engine would change `step()` output with no version bump, making every stamp a lie.
-- **DEPLOY**: Fly app `dohun-sim-decode`, `Dockerfile` + `fly.toml` + `docs/deploy.md`,
+- **DEPLOY**: Fly app `bfsim-server`, `Dockerfile` + `fly.toml` + `docs/deploy.md`,
   `GET /health`; `ws` + `tsx` are runtime `dependencies`. Protocol: commit → **`./scripts/
   fly-deploy.sh`** → verify `/health` → Vercel auto-deploys clients.
   **NEVER deploy with a bare `flyctl deploy`** — fly.toml expresses only ONE `[[vm]]` size, so
   a bare deploy re-applies `shared-cpu-4x` to EVERY machine and silently upsizes the cheap
-  satellites. The wrapper re-shrinks them; verify with `fly machine list -a dohun-sim-decode`.
+  satellites. The wrapper re-shrinks them; verify with `fly machine list -a bfsim-server`.
 - **SITE STATUS: LOCKDOWN, BANNERS, RESTART COUNTDOWN** (`server/siteState.ts`,
   `src/net/siteStatus.ts`, migrations 0051/0052; the rules are in `docs/area/accounts.md`).
   - ⚠️ **THE RESTART NOTICE USED TO REACH ONE MACHINE.** It was a variable on whichever machine

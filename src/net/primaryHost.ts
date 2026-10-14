@@ -22,10 +22,9 @@
  * A leaf module (no `import.meta.env`) so the smoke run can test it.
  */
 
-/** game-server host → its router's host. A host not listed has no router. */
+/** game-server host → its router's host. A host not listed has no router. EMPTY in BFSIM: the
+ *  original project's hosts are not listed, and `VITE_GAME_PRIMARY_URL` names a router if you run one. */
 export const PRIMARY_HOSTS: Readonly<Record<string, string>> = {
-  'dohun-sim-decode.fly.dev': 'dsim-primary.fly.dev',
-  'dsim-alpha.fly.dev': 'dsim-alpha-primary.fly.dev',
 };
 
 /**

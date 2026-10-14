@@ -35,7 +35,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$App = 'dsim-alpha'
+$App = 'bfsim-server-alpha'
 
 function Say([string]$m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Warn([string]$m) { Write-Host "!! $m" -ForegroundColor Yellow }
@@ -213,7 +213,7 @@ if ($path -and $path.V4 -ge 2 -and $path.V6 -le 1) {
 # --- 5. confirm ------------------------------------------------------------------------
 Write-Host ''
 Write-Host "About to deploy the ALPHA preview app '$App' from fly.alpha.toml." -ForegroundColor White
-Write-Host 'Production (dohun-sim-decode) is NOT touched by this script.' -ForegroundColor White
+Write-Host 'Production (bfsim-server) is NOT touched by this script.' -ForegroundColor White
 Write-Host 'This ships the LAN rendezvous to alpha, where LAN_SIGNALLING and LAN_UPLOADS are on.' -ForegroundColor White
 Write-Host ''
 if (-not $Yes) {

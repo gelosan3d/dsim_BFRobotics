@@ -23,7 +23,7 @@ import { trackEvent } from '../analytics';
  * nothing when AdSense is unconfigured — which between them is the phone, the
  * desktop app, and the most engaged players on the service. A presenting sponsor
  * was sold the app, not the leftover inventory, so none of these components read
- * `useAds()` at all. The only gate is `sponsorActive()`, i.e. the term.
+ * `useEntitlements()` at all. The only gate is `sponsorActive()`, i.e. the term.
  */
 
 /** the artwork. Two <img>s, one per theme, in the SAME reserved box.

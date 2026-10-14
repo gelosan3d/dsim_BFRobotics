@@ -6,7 +6,7 @@ import { simModuleFor } from '../src/games/sim';
 import { authorizeUrl, exchangeForId, linkConfigured, readState } from './oauthLink';
 import { runStarSweep } from './stargazers';
 import { BALANCE_VERSION, SIM_DT } from '../src/config';
-import { monthsFor, policyFromEnv, whyNoMonths } from './kofi';
+import { policyFromEnv } from './kofi';
 import { CHALLENGE_FORMATS } from '../src/net/protocol';
 import { sanitizeReplay } from '../src/net/sanitize';
 import { moderateName, scrubName } from './moderation';
@@ -75,8 +75,6 @@ import {
   getCosmeticsUnlocks,
   getTermsAcceptance,
   acceptTerms,
-  claimKofiPayment,
-  recordKofiPayment,
   deleteAccount,
   exportAccount,
   listSeasonsCached,
@@ -115,8 +113,8 @@ import { lockdownRefusal, refreshLockdown } from './siteState';
 import { LEGAL_VERSION } from '../src/legalText';
 import { DEPLOY_REGIONS, interRegionMs } from './regions';
 
-/** the two writes a closed site still takes: Ko-fi's webhook, and deleting your own account */
-const SITE_WRITE_EXEMPT = new Set(['/api/kofi/webhook', '/api/user/delete']);
+/** the one write a closed site still takes: deleting your own account */
+const SITE_WRITE_EXEMPT = new Set(['/api/user/delete']);
 
 /**
  * Public read API for the leaderboards + replay viewer (GET), plus ONE
@@ -998,7 +996,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
        */
       if (linked && provider === 'github') {
         try {
-          await runStarSweep(process.env.GITHUB_STAR_REPO ?? 'genius0412/dsim', process.env.GITHUB_TOKEN, fetch, 'link');
+          await runStarSweep(process.env.GITHUB_STAR_REPO ?? 'gelosan3d/dsim_BFRobotics', process.env.GITHUB_TOKEN, fetch, 'link');
         } catch (e) {
           console.error('[rewards] the on-link star sweep failed; the hourly pass will retry:', e);
         }
@@ -1296,95 +1294,6 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       }
     }
 
-    // Price + tier facts for a SIGNED-OUT visitor. Same numbers, no auth, no DB —
-    // the Donate page has to state a price before anyone signs in.
-    if (url.pathname === '/api/pricing' && req.method === 'GET') {
-      const policy = policyFromEnv();
-      return (
-        json(200, {
-          price: { amount: policy.monthlyPrice, currency: policy.currency },
-          maxMonths: policy.maxMonths,
-        }),
-        true
-      );
-    }
-
-    // Claim a Ko-fi payment against this account.
-    //
-    // Ko-fi identifies buyers by the email they paid with, which need not match
-    // the Neon Auth email (and often will not — a student paying through a
-    // parent's PayPal is the common case). Rather than guess, the webhook parks
-    // the payment and the buyer pastes the transaction id Ko-fi showed them.
-    // `claimKofiPayment` does the whole thing in one transaction so two accounts
-    // cannot claim the same payment.
-    if (url.pathname === '/api/user/claim-kofi' && req.method === 'POST') {
-      const user = await verifyAuthToken(bearer(req));
-      if (!user) return json(401, { error: 'sign in required' }), true;
-      if (!dbEnabled) return json(503, { error: 'payments unavailable' }), true;
-
-      let txn: unknown;
-      try {
-        txn = JSON.parse(await readBody(req)).transactionId;
-      } catch {
-        return json(400, { error: 'bad request' }), true;
-      }
-      if (typeof txn !== 'string' || !txn.trim()) {
-        return json(400, { error: 'transaction id required' }), true;
-      }
-      // `fresh`: the claim writes `claimed_by`, an FK — a stale memo must not fail a payment
-      await ensureProfile(user.userId, user.handle, true);
-      const r = await claimKofiPayment(user.userId, txn.trim());
-      if (r.outcome === 'not-found') {
-        return (
-          json(404, {
-            error: "We can't find that transaction. Ko-fi payments can take a minute to arrive - try again shortly.",
-          }),
-          true
-        );
-      }
-      if (r.outcome === 'already-claimed') {
-        return json(409, { error: 'That payment has already been claimed.' }), true;
-      }
-      // Below the tier: say exactly WHY, with the real numbers. A bare "no" on a
-      // payment someone genuinely made is the worst possible support experience,
-      // and the payment stays unclaimed so an admin can still comp it.
-      if (r.outcome === 'below-tier') {
-        return (
-          json(400, {
-            error: r.payment
-              ? whyNoMonths(
-                  {
-                    kind: r.payment.kind,
-                    amount: r.payment.amount,
-                    currency: r.payment.currency,
-                    isSubscription: r.payment.isSubscription,
-                    tierName: r.payment.tierName,
-                  },
-                  policyFromEnv(),
-                )
-              : "That payment doesn't meet the membership tier.",
-          }),
-          true
-        );
-      }
-      if (r.outcome === 'email-taken') {
-        return (
-          json(409, {
-            error:
-              'That payment came from a Ko-fi account already linked to a different BFSIM account. One membership covers one account - email us if this is wrong.',
-          }),
-          true
-        );
-      }
-      if (r.outcome === 'refunded') {
-        return json(409, { error: 'That payment was refunded.' }), true;
-      }
-      return (
-        json(200, { ok: true, supporterUntil: r.until ?? null, months: r.months ?? 0 }),
-        true
-      );
-    }
-
     /**
      * ---- DATA PORTABILITY: everything we hold about you, as one file ---------
      *
@@ -1445,89 +1354,6 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       const gone = await deleteAccount(user.userId);
       console.log(`[api] account deleted: ${user.userId} -> ${gone}`);
       return json(200, { ok: true, deleted: gone }), true;
-    }
-
-    // ---- Ko-fi webhook ------------------------------------------------------
-    // NOT an authenticated route: Ko-fi has no user JWT, so `verifyAuthToken` is
-    // deliberately absent. Authenticity rests entirely on the shared
-    // verification token Ko-fi sends in the payload, compared against
-    // KOFI_VERIFICATION_TOKEN. With that env unset the endpoint is CLOSED rather
-    // than open — an unauthenticated grant path is worse than no grant path.
-    //
-    // Ko-fi posts application/x-www-form-urlencoded with a single `data` field
-    // holding the JSON, which is why this does not just JSON.parse the body.
-    if (url.pathname === '/api/kofi/webhook' && req.method === 'POST') {
-      const secret = process.env.KOFI_VERIFICATION_TOKEN;
-      if (!secret) return json(503, { error: 'not configured' }), true;
-
-      let payload: {
-        verification_token?: string;
-        message_id?: string;
-        type?: string;
-        email?: string;
-        kofi_transaction_id?: string;
-        amount?: string;
-        currency?: string;
-        is_subscription_payment?: boolean;
-        tier_name?: string;
-      };
-      try {
-        const body = await readBody(req);
-        const raw = new URLSearchParams(body).get('data');
-        payload = JSON.parse(raw ?? body);
-      } catch {
-        return json(400, { error: 'bad request' }), true;
-      }
-
-      // Constant-time-ish compare is overkill for a webhook token, but bail on a
-      // mismatch before touching the DB either way.
-      // Token check comes BEFORE the dbEnabled guard on purpose: an
-      // unauthenticated caller should not be able to probe whether the database
-      // is up, and it keeps the auth decision independent of deploy state.
-      if (payload.verification_token !== secret) {
-        return json(401, { error: 'bad token' }), true;
-      }
-      if (!payload.message_id) return json(400, { error: 'missing message_id' }), true;
-      if (!dbEnabled) return json(503, { error: 'db unavailable' }), true;
-
-      // What the payment is WORTH is decided here, once, and stored on the row —
-      // not recomputed at claim time against env that may since have changed.
-      const event = {
-        kind: payload.type ?? 'Donation',
-        amount: payload.amount ?? null,
-        currency: payload.currency ?? null,
-        isSubscription: !!payload.is_subscription_payment,
-        tierName: payload.tier_name ?? null,
-      };
-      const months = monthsFor(event, policyFromEnv());
-
-      // `fresh` is false when Ko-fi retried an event we already stored — the
-      // insert's primary key is the idempotency guard, so a retry cannot grant a
-      // second month. Always answer 200 so Ko-fi stops retrying.
-      //
-      // `autoGrantedTo` is set when the payer's email is already linked to an
-      // account: that is the RENEWAL path, and it is why a monthly membership no
-      // longer needs the buyer to paste a new transaction id every 30 days.
-      const r = await recordKofiPayment({
-        ...event,
-        messageId: payload.message_id,
-        email: payload.email ?? null,
-        transactionId: payload.kofi_transaction_id ?? null,
-        months,
-      });
-      if (r.autoGrantedTo) {
-        console.log(
-          `[kofi] auto-renewed ${r.autoGrantedTo} +${months}mo -> ${r.until} (${payload.message_id})`,
-        );
-      } else if (r.fresh) {
-        console.log(
-          `[kofi] parked ${payload.message_id} (${event.kind}, ${event.amount ?? '?'} ${event.currency ?? '?'}, ${months}mo) - awaiting claim`,
-        );
-      }
-      return (
-        json(200, { ok: true, recorded: r.fresh, granted: !!r.autoGrantedTo, months }),
-        true
-      );
     }
 
     // ---- friends ------------------------------------------------------------

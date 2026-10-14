@@ -17,20 +17,16 @@ import { inDiscordActivity } from '../net/discordActivity';
 import { multiServer, selectedServerId } from '../net/env';
 import {
   deleteMyAccount,
-  fetchEntitlements,
   fetchReplaysPublic,
   saveReplaysPublic,
-  type Entitlements,
 } from '../net/api';
 import { AuthDisabled } from './AuthDisabled';
 import { AuthPanel } from './AuthPanel';
 import { copyText } from './copyText';
 import { DesktopUpdate } from './DesktopUpdate';
-import { fmtDay } from './fmtDate';
 import { ProfileTabs, type ProfileTab } from './ProfileTabs';
 import { ServerMenu } from './ServerMenu';
 import { VerifyEmailBanner } from './VerifyEmailBanner';
-import { SUPPORT_ENABLED } from '../net/env';
 import { LEGAL_CONTACT } from '../legalText';
 import { trackEvent } from '../analytics';
 
@@ -47,14 +43,12 @@ import { trackEvent } from '../analytics';
 export function Account({
   settings,
   onChange,
-  onDonate,
   onTab,
 }: {
   settings: GameSettings;
   onChange: (s: GameSettings) => void;
   /** navigate to the Support page — the membership card links to it rather than
    * duplicating the tier pitch here */
-  onDonate?: () => void;
   /** the Appearance | Account strip */
   onTab?: (t: ProfileTab) => void;
 }) {
@@ -111,7 +105,6 @@ export function Account({
       {showAuth && <LinkedAccounts />}
       {showAuth && <ReplayPrivacy />}
 
-      {showAuth && SUPPORT_ENABLED && <Membership onDonate={onDonate} />}
 
       {/* THE TWO IRREVERSIBLE ACTIONS, grouped under one heading at the foot of the page
           (design review 08-15) rather than as two more peers of Server and Privacy.
@@ -267,73 +260,6 @@ function ReplayPrivacy() {
 }
 
 /**
- * Membership status.
- *
- * Lives here rather than only on the Donate page because "when does my
- * subscription run out, and is it going to renew?" is an ACCOUNT question, and
- * making someone visit a page titled "Support BFSIM" to answer it reads as a
- * second sales pitch. It also surfaces the one state a supporter genuinely needs
- * warning about: a membership that is active but NOT linked to a Ko-fi address,
- * which will simply stop at the end of the period with no renewal.
- */
-function Membership({ onDonate }: { onDonate?: () => void }) {
-  const [ent, setEnt] = useState<Entitlements | null>(null);
-  const session = authClient!.useSession();
-  const userId = session.data?.user?.id ?? null;
-
-  useEffect(() => {
-    if (!userId) {
-      setEnt(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchEntitlements().then((e) => {
-      if (!cancelled) setEnt(e);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  if (!userId) return null;
-  const until = ent?.supporterUntil ? new Date(ent.supporterUntil) : null;
-
-  return (
-    <div className="ds-panel">
-      <div className="ds-panel-h">
-        <h2 className="ds-panel-title">Membership</h2>
-        {ent?.supporter && <span className="ds-count">supporter</span>}
-      </div>
-      <div className="ds-panel-body stack start">
-        {!ent ? (
-          <p className="ds-hint">Checking…</p>
-        ) : ent.supporter ? (
-          <>
-            <p className="ds-hint">
-              Supporter{until ? ` until ${fmtDay(until)}` : ''} ·{' '}
-              {ent.autoRenews ? 'renews automatically' : 'will not renew'}
-            </p>
-            {!ent.autoRenews && (
-              <p className="ds-hint warn">
-                This membership isn’t linked to a Ko-fi account, so it will stop at the end of the
-                period. Claim a payment on the Support page to link it.
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="ds-hint">No membership.</p>
-        )}
-        {onDonate && (
-          <button className="ds-btn ghost" onClick={onDonate}>
-            {ent?.supporter ? 'Manage membership' : 'Support BFSIM'}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
  * Account deletion.
  *
  * The privacy policy promises this, which means it has to be a button rather
@@ -381,8 +307,8 @@ export function DeleteAccount() {
       console.warn('[account] delete failed:', msg);
       setErr(
         /404|not found|unavailable/i.test(msg)
-          ? `Self-service deletion isn’t available on this server yet. Email ${LEGAL_CONTACT} and your account will be deleted.`
-          : `Couldn’t delete the account. Try again, or email ${LEGAL_CONTACT} and it will be deleted for you.`,
+          ? `Self-service deletion isn’t available on this server yet. Open an issue at ${LEGAL_CONTACT} and the account will be deleted.`
+          : `Couldn’t delete the account. Try again, or open an issue at ${LEGAL_CONTACT} and it will be deleted for you.`,
       );
       setBusy(false);
     }

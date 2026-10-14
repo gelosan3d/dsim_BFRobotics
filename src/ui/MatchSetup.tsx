@@ -1,6 +1,6 @@
 import type { GameSettings, Alliance, PracticeSeat, PracticeSeatKind, PracticeSeats } from '../types';
 import { savedStartCap } from './startPositions';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import { selectStart, switchCategory, saveStart, deleteSavedStart } from './startPositions';
 import { ChainStartEditor } from './ChainStartEditor';
 import { moduleFor } from '../games';
@@ -45,7 +45,7 @@ export function MatchSetup({
   // absent ⇒ the inline branch below, which is Chain Reaction's
   const StartEd = moduleFor(settings.game).startEditor;
   // the saved-pose cap a game's own editor is handed (it cannot read the ads context itself)
-  const maxSaved = savedStartCap(useAds().supporter);
+  const maxSaved = savedStartCap(useEntitlements().supporter);
   // BIOBUZZ 3D SEAM (Day 1, `docs/biobuzz/plan-3d.md` §2.1/§6): only a game whose sim can
   // actually step the second physics offers the picker — absent `physicsOptions` (Chain
   // Reaction) reads as `['2d']` only, so this never shows for it.

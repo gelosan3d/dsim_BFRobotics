@@ -2161,10 +2161,6 @@ button.ds-key:where(:not(:disabled)):active,
   width: 16px;
   height: 16px;
 }
-/* a paragraph that introduces the first panel below it */
-.ds-page-note {
-  margin-bottom: var(--ds-s-4);
-}
 /* a panel header whose only slot is its action. Compound, because `.ds-panel-h` is declared
    further down this file at the same specificity and its `space-between` put the lone button on
    the LEFT. The side padding matches `.cl-body` so the button and the notes share an edge. */
@@ -6692,29 +6688,7 @@ a.ds-cta {
   color: var(--ds-mut);
 }
 
-/* ---- support / donate page --------------------------------------------- */
-/* Perk list inside a panel. Uses --ds-ink-dim like other body copy; the marker
-   is the accent so the list reads as benefits rather than prose. */
-.ds-perks {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--ds-ink-dim);
-  font-size: var(--ds-t-control);
-}
-.ds-perks li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.ds-perks li::before {
-  content: '✓';
-  color: var(--ds-accent);
-  font-weight: 800;
-  flex: none;
-}
-
+/* ---- claim rows ------------------------------------------------------ */
 /* Claim row: the transaction-ID field plus its button. Wraps rather than
    squashing the input on narrow viewports. */
 .ds-claim-row {

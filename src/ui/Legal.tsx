@@ -83,9 +83,8 @@ export function Terms() {
           most needs to see it is whoever is about to pay. */}
       {!LEGAL_IDENTIFIED && (
         <p className="legal-warn" role="alert">
-          These terms are incomplete: the operator and governing law have not been
-          filled in yet. Don’t rely on them. Email {LEGAL_CONTACT} with any question
-          about your account or a payment.
+          These terms are incomplete: no operator has been named yet. Open an issue at
+          {LEGAL_CONTACT} with any question about your account.
         </p>
       )}
       <div className="ds-legal-col">

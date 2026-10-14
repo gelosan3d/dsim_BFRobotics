@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for dohun-sim-decode on 2026-07-06T18:01:15-04:00
+# fly.toml app configuration file generated for bfsim-server on 2026-07-06T18:01:15-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'dohun-sim-decode'
+app = 'bfsim-server'
 primary_region = 'iad'
 
 [build]

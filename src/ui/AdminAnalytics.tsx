@@ -3,7 +3,6 @@ import { gameServerHttpUrl } from '../net/env';
 import { getAuthToken } from '../lib/authClient';
 import { GAME_IDS } from '../games/types';
 import { SEASONS } from '../seasons';
-import { SPONSOR_PLACEMENTS } from '../sponsor';
 import { adminFail } from './adminCopy';
 // The console's own CSV writer, with the BOM and the quoting every other export here uses.
 import { downloadCsv } from './adminBits';
@@ -464,7 +463,6 @@ export function AdminAnalytics() {
 
           <EventsPanel events={report.events} props={report.eventProps} />
 
-          <SponsorReport events={report.events} props={report.eventProps} sessions={t?.sessions ?? 0} sessionsFrom={ownOnly} />
         </>
       )}
 
@@ -674,141 +672,6 @@ function HistoryNote({ history: h, historyStart }: { history: History | null; hi
   );
 }
 
-// ---- the sponsor report -------------------------------------------------------
-
-/** the dwell buckets `sponsor_dwell` sends, shortest first */
-const DWELL_ORDER = ['<5s', '5-15s', '15-60s', '1-5m', '5m+'];
-
-/**
- * THE MONTHLY SPONSOR REPORT (`docs/sponsor.md`), laid out as its lines rather than left for
- * somebody to assemble from the events table. Pick "Last month" and export.
- *
- * Impressions and clicks are per placement; the dwell and format lines are distributions over
- * all placements, because each event property is counted on its own.
- */
-function SponsorReport({
-  events,
-  props,
-  sessions,
-  sessionsFrom,
-}: {
-  events: EventRow[];
-  props: EventPropRow[];
-  sessions: number;
-  /** "from Sep 22" when the range reaches imported days, which counted no sessions */
-  sessionsFrom?: string;
-}) {
-  const count = (name: string): number => events.find((e) => e.name === name)?.views ?? 0;
-  const values = (name: string, key: string): Map<string, number> => {
-    const m = new Map<string, number>();
-    for (const p of props) if (p.name === name && p.key === key) m.set(p.val, (m.get(p.val) ?? 0) + p.views);
-    return m;
-  };
-  const shown = values('sponsor_shown', 'placement');
-  const clicks = values('sponsor_click', 'placement');
-  const known: string[] = [...SPONSOR_PLACEMENTS];
-  const placements = [...known, ...[...shown.keys(), ...clicks.keys()].filter((p) => !known.includes(p))].filter(
-    (p, i, all) => all.indexOf(p) === i && ((shown.get(p) ?? 0) > 0 || (clicks.get(p) ?? 0) > 0),
-  );
-  const dwellMap = values('sponsor_dwell', 'dwell');
-  const dwell = [...DWELL_ORDER, ...[...dwellMap.keys()].filter((d) => !DWELL_ORDER.includes(d))]
-    .filter((d) => dwellMap.has(d))
-    .map((d) => ({ val: d, views: dwellMap.get(d) ?? 0, visitors: 0 }));
-  const formats = [...values('sponsor_shown', 'format')].map(([val, n]) => ({ val, views: n, visitors: 0 }));
-  const oses = [...values('desktop_download', 'os')].map(([val, n]) => ({ val, views: n, visitors: 0 }));
-  const ctr = (c: number, s: number): string => (s ? fmtPct((c / s) * 100) : '—');
-
-  const lines: [string, string, number | string][] = [
-    ...placements.map((p): [string, string, number] => ['impressions', p, shown.get(p) ?? 0]),
-    ['impressions', 'all', count('sponsor_shown')],
-    ...placements.map((p): [string, string, number] => ['clicks', p, clicks.get(p) ?? 0]),
-    ['clicks', 'all', count('sponsor_click')],
-    ...dwell.map((d): [string, string, number] => ['time on screen', d.val, d.views]),
-    ...formats.map((f): [string, string, number] => ['videos with the mark', f.val, f.views]),
-    ...oses.map((o): [string, string, number] => ['desktop downloads', o.val, o.views]),
-    ['sessions', sessionsFrom ? `site, ${sessionsFrom}` : 'site', sessions],
-    ['new players', 'player_joined', count('player_joined')],
-  ];
-
-  return (
-    <section className="ds-panel">
-      <div className="ds-panel-h">
-        <h2 className="ds-panel-title">Sponsor report</h2>
-        <button
-          type="button"
-          className="ds-btn ghost small"
-          onClick={() => downloadCsv(`dsim-sponsor-${stamp()}.csv`, ['line', 'breakdown', 'value'], lines)}
-        >
-          Export CSV
-        </button>
-      </div>
-      {count('sponsor_shown') === 0 && count('sponsor_click') === 0 ? (
-        <div className="ds-panel-body">
-          <div className="ds-empty an-empty">
-            <div className="big">No sponsor events</div>
-            Nothing from a sponsor placement was recorded in this range.
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="ds-table-scroll">
-            <table className="ds-table an-table">
-              <thead>
-                <tr>
-                  <th>Placement</th>
-                  <th className="num">Impressions</th>
-                  <th className="num">Clicks</th>
-                  <th className="num">Click-through</th>
-                </tr>
-              </thead>
-              <tbody>
-                {placements.map((p) => (
-                  <tr key={p}>
-                    <td>{p}</td>
-                    <td className="num">{fmtExact(shown.get(p) ?? 0)}</td>
-                    <td className="num">{fmtExact(clicks.get(p) ?? 0)}</td>
-                    <td className="num">{ctr(clicks.get(p) ?? 0, shown.get(p) ?? 0)}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td>
-                    <b>All placements</b>
-                  </td>
-                  <td className="num">{fmtExact(count('sponsor_shown'))}</td>
-                  <td className="num">{fmtExact(count('sponsor_click'))}</td>
-                  <td className="num">{ctr(count('sponsor_click'), count('sponsor_shown'))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="ds-panel-body">
-            <div className="an-grid">
-              <div>
-                <h3 className="ds-panel-title">Time on screen</h3>
-                <BarList rows={dwell} total={dwell.reduce((s, r) => s + r.views, 0)} empty="No dwell recorded." />
-              </div>
-              <div>
-                <h3 className="ds-panel-title">Videos with the mark</h3>
-                <BarList rows={formats} total={formats.reduce((s, r) => s + r.views, 0)} empty="No exports in this range." />
-              </div>
-              <div>
-                <h3 className="ds-panel-title">Desktop downloads</h3>
-                <BarList rows={oses} total={oses.reduce((s, r) => s + r.views, 0)} empty="No downloads in this range." />
-              </div>
-            </div>
-            <p className="ds-hint">
-              Sessions: {fmtExact(sessions)}
-              {sessionsFrom && ` (${sessionsFrom})`}.{' '}
-              New players: {fmtExact(count('player_joined'))}. An impression is a view of at least half the mark
-              for one second; videos are files exported, not views of them.
-            </p>
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
 // ---- the product half -------------------------------------------------------
 
 /** group a flat day-keyed list into the ordered columns `Columns` draws */
@@ -965,24 +828,6 @@ function ProductSection({ data }: { data: ProductReport }) {
           </div>
         </section>
 
-        <section className="ds-panel an-panel">
-          <div className="ds-panel-h">
-            <h3 className="ds-panel-title">Supporters</h3>
-          </div>
-          <div className="ds-panel-body">
-            <Legend keys={['claimed', 'comped']} />
-            <Columns
-              cols={data.supporters.map((s) => ({
-                label: s.day.slice(5),
-                parts: [
-                  { key: 'claimed', value: s.claimed },
-                  { key: 'comped', value: s.granted },
-                ],
-              }))}
-              keys={['claimed', 'comped']}
-            />
-          </div>
-        </section>
       </div>
 
       <section className="ds-panel">

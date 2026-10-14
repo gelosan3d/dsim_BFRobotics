@@ -12,7 +12,7 @@ import {
 } from '../games/chain/config';
 import { chainEvalStart, chainMirrorStart, chainSnapStartPose } from '../games/chain/state';
 import { samePose, savedStartCap } from './startPositions';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import { drawChainField } from '../games/chain/drawField';
 import { drawChainRobot } from '../games/chain/drawRobot';
 
@@ -114,7 +114,7 @@ export function ChainStartEditor({
   const savedList = saved[cat] ?? [];
   // extra saved slots are a supporter perk, read from the ONE place that decides it so the
   // cap can never differ between this editor and DECODE's
-  const maxSaved = savedStartCap(useAds().supporter);
+  const maxSaved = savedStartCap(useEntitlements().supporter);
 
   // the SAVED pose in the ACTUAL frame: a custom value mirrored out of canonical, else the
   // selected anchor (which is authored canonical too).

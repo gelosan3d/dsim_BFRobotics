@@ -413,14 +413,12 @@ export function Admin({
                     onClick={() =>
                       downloadCsv(
                         'accounts.csv',
-                        ['userId', 'handle', 'username', 'role', 'supporter', 'supporterUntil'],
+                        ['userId', 'handle', 'username', 'role'],
                         users.map((u) => [
                           u.userId,
                           u.handle,
                           u.username ?? '',
                           u.role ?? '',
-                          u.supporter ? 'yes' : 'no',
-                          u.supporterUntil ?? '',
                         ]),
                       )
                     }
@@ -440,7 +438,6 @@ export function Admin({
                     <thead>
                       <tr>
                         <th>Account</th>
-                        <th>Membership</th>
                         <th />
                       </tr>
                     </thead>
@@ -456,19 +453,6 @@ export function Admin({
                               known
                               onOpen={openAccount}
                             />
-                          </td>
-                          <td className="ds-muted">
-                            {u.supporter ? (
-                              <>
-                                Supporter until{' '}
-                                {u.supporterUntil ? new Date(u.supporterUntil).toLocaleDateString() : '—'}
-                                {u.autoRenews ? ' · auto-renews' : ''}
-                              </>
-                            ) : u.role ? (
-                              'Perks by role'
-                            ) : (
-                              <>No paid membership{u.autoRenews ? ' · Ko-fi linked (lapsed)' : ''}</>
-                            )}
                           </td>
                           <td>
                             <button className="ds-btn ghost small" onClick={() => openAccount(u.userId)}>

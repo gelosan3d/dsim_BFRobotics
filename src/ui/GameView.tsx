@@ -15,7 +15,6 @@ import { effectiveBindings, keyLabel, livePadBinds, padBindLabel } from '../inpu
 import { MobileControls } from './MobileControls';
 import { timerPanel } from './timerPanel';
 import { FoulChip } from './FoulChip';
-import { AdSlot, useAdUnitActive } from './AdSlot';
 import { SponsorGameChip } from './Sponsor';
 import { Results } from './Results';
 
@@ -284,11 +283,6 @@ export function GameView({
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [intro, setIntro] = useState<IntroPlayer[] | null>(null);
   const [editingLayout, setEditingLayout] = useState(editLayout);
-  // gates the flanking ad columns. When false the <aside>s are not rendered at all
-  // (not merely empty), so an unconfigured or supporter build leaves the field
-  // exactly where it was. GameController watches the canvas with a ResizeObserver,
-  // so the camera re-fits the moment this flips.
-  const ads = useAdUnitActive('game');
   // one subscription, not five MediaQueryList constructions per render at the 10 Hz HUD poll
   // — and, unlike reading the query during render, this actually updates when it changes
   const coarsePointer = useCoarsePointer();
@@ -639,16 +633,6 @@ export function GameView({
        going unused. The CSS gate below only reveals the columns at widths where
        that still holds — see the media query in styles.css. */
     <div className="game-shell">
-      {/* NOT aria-hidden. It was, and that hid the "Advertisement" label along
-          with the unit — the label exists precisely so an ad is distinguishable
-          from content, and hiding it from the one group that cannot see the
-          visual difference defeats it. `aria-label` names the region instead, so
-          a screen-reader user can skip past it knowingly. */}
-      {ads && (
-        <aside className="game-ad" aria-label="Advertisement">
-          <AdSlot unit="game" />
-        </aside>
-      )}
       {/* `view-3d` is the HUD's fixed dark scrim (plan-3d.md §4.7) — see `scene3d` above for why
           it tracks a live scene rather than the view preference, and the `.game-root.view-3d`
           block in styles.css for what it actually changes. */}
@@ -922,16 +906,6 @@ export function GameView({
         />
       )}
       </div>
-      {/* NOT aria-hidden. It was, and that hid the "Advertisement" label along
-          with the unit — the label exists precisely so an ad is distinguishable
-          from content, and hiding it from the one group that cannot see the
-          visual difference defeats it. `aria-label` names the region instead, so
-          a screen-reader user can skip past it knowingly. */}
-      {ads && (
-        <aside className="game-ad" aria-label="Advertisement">
-          <AdSlot unit="game" />
-        </aside>
-      )}
     </div>
   );
 }

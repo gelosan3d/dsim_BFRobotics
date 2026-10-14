@@ -539,8 +539,8 @@ const mkWorld = (
   const menuSrc = readFileSync('src/ui/Menu.tsx', 'utf8');
   check('⚠️ cosmetics: the builder reads the signed-in account earned list, not a hardcoded empty one',
     /earnedCosmetics: earned/.test(menuSrc) && !/NO_EARNED_COSMETICS/.test(menuSrc),
-    /NO_EARNED_COSMETICS/.test(menuSrc) ? 'the placeholder is BACK' : 'reads useAds()');
-  const adsSrc = readFileSync('src/ads/AdsProvider.tsx', 'utf8');
+    /NO_EARNED_COSMETICS/.test(menuSrc) ? 'the placeholder is BACK' : 'reads useEntitlements()');
+  const adsSrc = readFileSync('src/ui/EntitlementsProvider.tsx', 'utf8');
   check('...and the provider that already fetches entitlements actually carries the field',
     /setEarnedCosmetics\(e\.unlockedCosmetics/.test(adsSrc) && /earnedCosmetics }}/.test(adsSrc));
   check('...and an unowned `earned` key says HOW to earn it, not "see Career" (wrong screen for this one)',
@@ -3251,9 +3251,10 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
    */
   {
     check(
-      'primary router: production and alpha map to their routers, wss kept',
-      primaryWsBase('wss://dohun-sim-decode.fly.dev') === 'wss://dsim-primary.fly.dev' &&
-        primaryWsBase('wss://dsim-alpha.fly.dev') === 'wss://dsim-alpha-primary.fly.dev',
+      'primary router: BFSIM lists NO host (the original project servers are never contacted)',
+      Object.keys(PRIMARY_HOSTS).length === 0 &&
+        primaryWsBase('wss://dohun-sim-decode.fly.dev') === '' &&
+        primaryWsBase('wss://dsim-alpha.fly.dev') === '',
     );
     check(
       'primary router: an unknown host, a LAN box or a bad URL has none',
@@ -15220,7 +15221,7 @@ const dumperSetup = (): RobotSetup => {
   /* ---- the terms gate ------------------------------------------------------ */
   check(
     'terms gate: LEGAL_VERSION is the ISO form of LEGAL_UPDATED',
-    LEGAL_VERSION === '2026-09-25',
+    LEGAL_VERSION === '2026-10-14',
     LEGAL_UPDATED + ' -> ' + LEGAL_VERSION,
   );
   check(
@@ -15926,10 +15927,63 @@ const dumperSetup = (): RobotSetup => {
     );
     const yd = readFileSync(joinPath('src', 'ui', 'YourData.tsx'), 'utf8');
     check(
-      'footer: and what it falls back to says why no dialog opened',
-      /CONSENT_UNAVAILABLE/.test(yd) && /id="your-data"/.test(yd) && /your-data/.test(shell),
+      'footer: it lands on the Your data panel (there is no consent dialog to reopen: no ads, no CMP)',
+      /id="your-data"/.test(yd) && /your-data/.test(shell) && !/showConsentSettings|CONSENT_UNAVAILABLE/.test(yd + shell),
     );
   }
+}
+
+// ---- NO CONTACT WITH THE ORIGINAL PROJECT SERVERS (BFSIM) ---------------------------------
+// The fork must not be able to reach DSIM production or alpha servers, its auth tenant, its
+// ad account or its payment page. Scans executable source (comment lines skipped) for the
+// addresses that did, so a merge from upstream that brings one back fails here.
+{
+  const banned = [
+    "dohun-sim-decode",
+    "dsim-primary",
+    "dsim-alpha",
+    "playdsim.com",
+    "neonauth.c-3",
+    "adsbygoogle",
+    "googlesyndication",
+    "ca-pub-",
+    "ko-fi.com",
+    "discord.gg/",
+    "instagram.com/playdsim",
+  ];
+  const exts = [".ts", ".tsx", ".js", ".mjs", ".cjs", ".html", ".json", ".toml", ".webmanifest", ".txt", ".xml"];
+  const files: string[] = ["vite.config.ts", "index.html", "package.json", "fly.toml", "fly.alpha.toml"];
+  for (const root of ["src", "server", "electron", "api", "public", "router"]) {
+    for (const rel of readdirSync(root, { recursive: true }) as string[]) {
+      const f = joinPath(root, rel);
+      if (exts.some((x) => f.endsWith(x)) && !f.includes("migrations")) files.push(f);
+    }
+  }
+  const hits: string[] = [];
+  for (const f of files) {
+    let text = "";
+    try {
+      text = readFileSync(f, "utf8");
+    } catch {
+      continue;
+    }
+    text.split("\n").forEach((line, i) => {
+      const t = line.trim();
+      const slash = String.fromCharCode(47); // the slash is built here because the shard runner's scanner reads a comment opener inside a string
+      if (t.startsWith(slash + slash) || t.startsWith("*") || t.startsWith(slash + "*") || t.startsWith("{" + slash + "*") || t.startsWith("#")) return;
+      for (const word of banned) if (line.includes(word)) hits.push(f + ":" + (i + 1) + " " + word);
+    });
+  }
+  check(
+    "no executable source names the original project servers, auth tenant, ad account or payment page",
+    hits.length === 0,
+    hits.slice(0, 6).join(" | "),
+  );
+  const vite = readFileSync("vite.config.ts", "utf8");
+  check(
+    "no build bakes in a game-server list or an auth URL (the Electron block that did is gone)",
+    !vite.includes("process.env.VITE_GAME_SERVERS ??=") && !vite.includes("process.env.VITE_NEON_AUTH_URL ??="),
+  );
 }
 
 // ---- gamepad COMBOS: chords, labels, stealing, and the resolver -------------------
@@ -18473,7 +18527,7 @@ const dumperSetup = (): RobotSetup => {
     .map((a) => a.replace(/\s+/g, ' '));
   check(
     'discord activity: the loading screen still has external links to check',
-    bootExternal.length >= 3,
+    bootExternal.length >= 2,
     `${bootExternal.length} found — if this dropped to 0 the check below cannot fail`,
   );
   check(
@@ -18953,7 +19007,7 @@ const dumperSetup = (): RobotSetup => {
   );
   check(
     'download: it is given the one thing it CAN act on instead — the site it is embedded from',
-    yes.includes('playdsim.com'),
+    yes.includes('open this site'),
     yes.replace(/\s+/g, ' ').trim(),
   );
   check(
@@ -19745,7 +19799,7 @@ const dumperSetup = (): RobotSetup => {
   );
   check(
     'discord activity: the address in that copy is derived from SITE_URL, not typed out',
-    SITE_HOST === 'playdsim.com' && !/https?:|www\./.test(SITE_HOST),
+    !SITE_HOST.includes('playdsim') && !/https?:|www\./.test(SITE_HOST),
     SITE_HOST,
   );
 }

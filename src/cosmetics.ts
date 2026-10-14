@@ -27,8 +27,9 @@
  * builder's placard and accent pickers (the 3D edge line went the same day). So a fill still cannot change which alliance a robot reads as.
  *
  * ── TIERS ───────────────────────────────────────────────────────────────────────────────────
- * `free` is always allowed. `supporter` unlocks on the account's `supporter_until`
- * (`SUPPORTER_COL`, the same predicate ads-off uses). `earned` keys are permanent account state
+ * `free` is always allowed. `supporter` keys are ALSO allowed for everyone in this fork (BFSIM has
+ * no paid tier, so the former supporter perks are free; the tier name and `supporter_until` survive
+ * as plumbing only). `earned` keys are permanent account state
  * (`profiles.cosmetics`, server-written) and survive a lapsed membership — none exist yet; the
  * slot is here so the rewards ledger can fill it without a schema change to this file.
  * ENTITLEMENT IS CHECKED ONLY WHERE A CLIENT DECLARES A SPEC TO THE SERVER (`server/room.ts`),
@@ -172,11 +173,11 @@ export function clampCosmetics(c: Cosmetics): Required<Cosmetics> {
  * account's own permanent unlock list (`profiles.cosmetics`), which may also name supporter-tier
  * keys (an earned copy of a paid key stays after the membership lapses).
  */
-export function cosmeticAllowed(id: CosmeticId, supporter: boolean, earned: readonly string[]): boolean {
+export function cosmeticAllowed(id: CosmeticId, _supporter: boolean, earned: readonly string[]): boolean {
   const tier = cosmeticTier(id);
-  if (tier === 'free') return true;
-  if (earned.includes(id)) return true;
-  return tier === 'supporter' && supporter;
+  // the former supporter perks are free for everyone in BFSIM; only EARNED keys are gated
+  if (tier === 'free' || tier === 'supporter') return true;
+  return earned.includes(id);
 }
 
 /** downgrade every axis the account is not entitled to. Runs at the server's live ingress only. */

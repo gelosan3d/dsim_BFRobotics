@@ -4098,10 +4098,16 @@ async function main(): Promise<void> {
     const freeSupporter = (await repo.getSupporter('cos-free')).supporter;
     const freeEarned = await repo.getCosmeticsUnlocks('cos-free');
     const freeOut = stripUnentitledCosmetics(spoofed, freeSupporter, freeEarned);
+    // BFSIM: the former supporter perks are free for everyone, so a non-supporter KEEPS them...
     check(
-      'strip: a non-supporter declaring gold+chevron is downgraded on both unowned axes',
-      freeOut.chassisColor === 'default' && freeOut.decal === 'none',
+      'strip: a non-supporter keeps supporter-tier gold+chevron (they are free in BFSIM)',
+      freeOut.chassisColor === 'gold' && freeOut.decal === 'chevron',
       JSON.stringify(freeOut),
+    );
+    // ...and only EARNED keys are still gated: the star decal needs the account to hold it
+    check(
+      'strip: ...but an EARNED key is still stripped from an account that has not earned it',
+      stripUnentitledCosmetics({ decal: 'star' }, freeSupporter, freeEarned).decal === 'none',
     );
     check(
       'strip: ...but keeps a FREE-tier chassis colour (red)',
@@ -4119,7 +4125,7 @@ async function main(): Promise<void> {
       !earnSupporter && earnOut.decal === 'chevron',
       JSON.stringify({ supporter: earnSupporter, decal: earnOut.decal }),
     );
-    check('strip: ...but the same account still loses the gold chassis it never earned or paid for', earnOut.chassisColor === 'default');
+    check('strip: ...and the same account also keeps gold, which is free for everyone', earnOut.chassisColor === 'gold');
 
     // ⚠️ IT MUST NEVER THROW INTO A ROUTE. A moderator who has just pardoned somebody must
     // not see the pardon fail because a logging insert did — the same rule server/standing.ts

@@ -4,7 +4,7 @@ import { gameServerConfigured } from '../net/env';
 import { fetchProfile, type PublicProfile } from '../net/api';
 import { BADGE_EARN, BADGE_KEYS, BADGE_LABELS, MAX_EQUIPPED_BADGES, withBadgeEquipped, type BadgeId } from '../badges';
 import { rewardEyebrow, rewardHeadline } from '../rewards';
-import { useAds } from '../ads/AdsProvider';
+import { useEntitlements } from './EntitlementsProvider';
 import { AuthDisabled } from './AuthDisabled';
 import { AuthPanel } from './AuthPanel';
 import { inDiscordActivity } from '../net/discordActivity';
@@ -277,7 +277,7 @@ function BadgePicker() {
 
 /** THE ROBOT LOOK your rewards have unlocked. The picking itself happens in the builder. */
 function RobotLook({ onRobotBuilder }: { onRobotBuilder?: () => void }) {
-  const { earnedCosmetics } = useAds();
+  const { earnedCosmetics } = useEntitlements();
   const unlocked = earnedCosmetics.filter((id) => id === 'decal:star');
   return (
     <div className="ds-panel">
@@ -302,7 +302,7 @@ function RobotLook({ onRobotBuilder }: { onRobotBuilder?: () => void }) {
       ) : (
         <div className="ds-empty">
           <div className="big">No reward decals yet</div>
-          Star the original DSIM on GitHub, then connect it under Account, to unlock the star decal.
+          Star BFSIM on GitHub, then connect it under Account, to unlock the star decal.
         </div>
       )}
     </div>
