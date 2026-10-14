@@ -3,7 +3,7 @@
 > ## About this fork
 >
 > **BFSIM** is **BF Robotics' fork** (maintained by gelosan3d) of
-> [genius0412/dsim](https://github.com/genius0412/dsim) — **DSIM, created by Dohun Kim** — the
+> [genius0412/dsim](https://github.com/genius0412/dsim) (**DSIM, created by Dohun Kim**) the
 > simulator behind [playdsim.com](https://www.playdsim.com/). All of the simulator, game and
 > netcode work is the original author's and is used under the PolyForm Noncommercial License 1.0.0
 > (see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)). This fork is a **noncommercial** team
@@ -40,11 +40,15 @@
 > **Rebranded.** The app is named BFSIM, the icons and logos are placeholders, and the original's
 > site, Discord and Instagram links are removed or pointed at this repository. The presenting-sponsor
 > slot now reads "BF Robotics" (placeholder artwork). The desktop shell loads its bundled build; set
-> `BFSIM_SITE_URL` (and `VITE_SITE_URL` for the web build) if you host your own copy.
+> `BFSIM_SITE_URL` (and `VITE_SITE_URL` for the web build) if you host your own copy. The software
+> is intended for INTERNAL use, and we are not claiming any of Dohun Kim's work. All works are
+> attributed appropriately.
 >
 > **De-monetised.** There are no ads, no Ko-fi or payment routes and no paid tier: the former
 > supporter cosmetics and the larger saved-start limit are free for everyone. The privacy policy
-> and terms are rewritten for a noncommercial fork, with the issue tracker as the contact.
+> and terms are rewritten for a noncommercial fork, with the issue tracker as the contact. The build
+> contacts none of the original project's servers: with no game server configured it is offline, and
+> LAN play still works.
 >
 > These changes run only when you run this fork yourself. playdsim.com and the official desktop
 > app are the original project and do not include them.
