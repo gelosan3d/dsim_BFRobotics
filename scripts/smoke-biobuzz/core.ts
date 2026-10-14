@@ -899,7 +899,7 @@ export function coreChecks(check: Check): void {
   for (const s of visible) {
     check(
       `sitemap.xml lists the /${s.key} landing page`,
-      sitemap.includes(`<loc>https://www.playdsim.com/${s.key}</loc>`),
+      sitemap.includes(`<loc>https://bfsim.example/${s.key}</loc>`),
     );
     check(`robots.txt disallows /${s.key}/play`, robots.includes(`Disallow: /${s.key}/play`));
     check(`robots.txt disallows /${s.key}/replay/`, robots.includes(`Disallow: /${s.key}/replay/`));

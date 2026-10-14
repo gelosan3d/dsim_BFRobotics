@@ -123,9 +123,9 @@ status). Everything below also works from the admin console: **Live** (lockdown)
    curl -fsS -G -X POST "$GS/api/admin/maintenance" \
      --data-urlencode "active=1" \
      --data-urlencode "scope=site" \
-     --data-urlencode "msg=The alpha is open to testers only. DSIM itself is open as usual." \
+     --data-urlencode "msg=The alpha is open to testers only. BFSIM itself is open as usual." \
      --data-urlencode "redirect=https://playdsim.com" \
-     --data-urlencode "redirectLabel=Go to DSIM" \
+     --data-urlencode "redirectLabel=Go to BFSIM" \
      --data-urlencode "bypass=beta,dev,contributor" \
      --data-urlencode "secret=$ADMIN_SECRET"
    curl -s "$GS/api/status"        # lockdown.scope "site", biting true

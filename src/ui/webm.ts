@@ -163,8 +163,8 @@ export function muxWebm(
   // TimecodeScale 1e6 ns = 1 ms, so every timecode below is plain milliseconds
   const info = el(ID.Info, [
     ...el(ID.TimecodeScale, [u8(uint(1_000_000))]),
-    ...el(ID.MuxingApp, [str('DSIM')]),
-    ...el(ID.WritingApp, [str('DSIM')]),
+    ...el(ID.MuxingApp, [str('BFSIM')]),
+    ...el(ID.WritingApp, [str('BFSIM')]),
     ...el(ID.Duration, [u8(float64(durationMs))]),
   ]);
 

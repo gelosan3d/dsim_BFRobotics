@@ -128,12 +128,12 @@ function BadgeIcon({ kind, size = 'sm' }: { kind: BadgeKind; size?: 'sm' | 'md' 
 const BADGES = {
   owner: {
     label: 'Owner',
-    title: 'Owner · builds and runs DSIM',
+    title: 'Owner · builds and runs BFSIM',
     glyph: 'M64 35 71.2 57.1 94.4 57.1 75.6 70.8 82.8 92.9 64 79.2 45.2 92.9 52.4 70.8 33.6 57.1 56.8 57.1Z',
   },
   admin: {
     label: 'Admin',
-    title: 'Admin · helps run DSIM',
+    title: 'Admin · helps run BFSIM',
     glyph: 'M64 34 94 64 64 94 34 64Z',
   },
   supporter: {

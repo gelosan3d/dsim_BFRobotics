@@ -15,13 +15,13 @@
 export const config = { runtime: 'edge' };
 
 const ALLOWED = new Set([
-  'DSIM-Setup.exe',
-  'DSIM-Portable.exe',
-  'DSIM-mac.dmg',
-  'DSIM-linux.AppImage',
+  'BFSIM-Setup.exe',
+  'BFSIM-Portable.exe',
+  'BFSIM-mac.dmg',
+  'BFSIM-linux.AppImage',
 ]);
 
-const RELEASE_BASE = 'https://github.com/genius0412/dsim/releases/latest/download/';
+const RELEASE_BASE = 'https://github.com/gelosan3d/dsim_BFRobotics/releases/latest/download/';
 
 export default async function handler(req: Request): Promise<Response> {
   const asset = new URL(req.url).searchParams.get('asset') ?? '';

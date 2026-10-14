@@ -891,7 +891,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
      * name its own GitHub id.
      *
      * ⚠️ THE CALLBACK IS A BROWSER REDIRECT, NOT AN API CALL, so it cannot carry a Bearer
-     * token — which is exactly what the signed `state` is for: it carries the DSIM user id
+     * token — which is exactly what the signed `state` is for: it carries the BFSIM user id
      * across the round trip, HMAC'd with a per-boot key and expiring in ten minutes. It also
      * answers with a 302 back into the app rather than JSON, because a person is looking at
      * it.
@@ -1003,7 +1003,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
           console.error('[rewards] the on-link star sweep failed; the hourly pass will retry:', e);
         }
       }
-      // `false` means that external account already belongs to a DIFFERENT DSIM account —
+      // `false` means that external account already belongs to a DIFFERENT BFSIM account —
       // the 0047 anti-farm. It is a refusal the person needs to see, not a silent no-op.
       return back(linked ? 'ok' : 'taken');
     }
@@ -1371,7 +1371,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         return (
           json(409, {
             error:
-              'That payment came from a Ko-fi account already linked to a different DSIM account. One membership covers one account - email us if this is wrong.',
+              'That payment came from a Ko-fi account already linked to a different BFSIM account. One membership covers one account - email us if this is wrong.',
           }),
           true
         );
@@ -1430,7 +1430,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     //
     // Auth deliberately does NOT include the Neon Auth identity itself — that
     // lives in the provider and is deleted from the account settings there. This
-    // removes everything DSIM stores; the policy says so in the same words.
+    // removes everything BFSIM stores; the policy says so in the same words.
     if (url.pathname === '/api/user/delete' && req.method === 'POST') {
       const user = await verifyAuthToken(bearer(req));
       if (!user) return json(401, { error: 'sign in required' }), true;

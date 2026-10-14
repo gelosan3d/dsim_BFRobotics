@@ -76,7 +76,7 @@ export function MatchSetup({
           <h2>Alliance</h2>
           {/* ALL CAPS here is the deliberate one `docs/area/ui.md` records: an alliance reads
               RED and BLUE on the FTC scoring display and in this app's own HUD chips, and a
-              sentence-case alliance would be the only place in DSIM that disagrees. */}
+              sentence-case alliance would be the only place in BFSIM that disagrees. */}
           <div className="ds-opts two">
             <button
               className={`ds-opt red ${settings.alliance === 'red' ? 'on' : ''}`}

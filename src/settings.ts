@@ -115,7 +115,7 @@ export const FTC25_DEFAULT_POWERS: [number, number, number, number] = [100, 90, 
  * DECODE's shooter fire at the driver's power; DECODE is gone from this fork (2026-10-12) and the
  * table is KEPT for BIOBUZZ's launcher (owner, same day), which does not read it yet. It is also
  * the mark `replayIsFork` reads, so a run driven with FTC25 controls stays on the device. Only
- * for a world this device steps or a LAN room; never for a room on DSIM's own servers (`Lobby`).
+ * for a world this device steps or a LAN room; never for a room on BFSIM's own servers (`Lobby`).
  */
 export function seatAssists(s: GameSettings): AssistConfig {
   if (s.controlScheme !== 'ftc25') return s.assists;
@@ -124,14 +124,14 @@ export function seatAssists(s: GameSettings): AssistConfig {
 
 /**
  * ⚠️ THIS FORK'S SETTINGS NEVER LEAVE THE DEVICE (owner, 2026-10-12: nothing of these changes may
- * reach anything that syncs to DSIM's own servers). The settings blob is synced to the player's
- * DSIM account VERBATIM (`saveAccountSettings`), so every field this fork added is taken out of
+ * reach anything that syncs to BFSIM's own servers). The settings blob is synced to the player's
+ * BFSIM account VERBATIM (`saveAccountSettings`), so every field this fork added is taken out of
  * the copy that goes there: the scheme, both FTC25 maps, the controller count, the presets,
  * gamepad 2 on the DSim map, and a Player 2 practice seat (written as None). The account copy is
- * then exactly what an unmodified DSIM client would write.
+ * then exactly what an unmodified BFSIM client would write.
  *
  * DECODE'S SETTINGS GO BACK IN (`GameSettings.retired`). This fork has no DECODE, but the account
- * and an unmodified DSIM client still do — without this, the first save from here would delete
+ * and an unmodified BFSIM client still do — without this, the first save from here would delete
  * the player's DECODE robot, its saved autos and its binding overrides from the account copy.
  */
 export function forAccount(s: GameSettings): unknown {

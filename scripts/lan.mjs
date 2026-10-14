@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * HOST A DSIM LAN SERVER FROM A TERMINAL, on macOS, Windows and Linux, with one command.
+ * HOST A BFSIM LAN SERVER FROM A TERMINAL, on macOS, Windows and Linux, with one command.
  *
  * ⚠️ WHY THIS FILE IS JAVASCRIPT AND NOT TWO LINES IN `scripts` — the `dist` script next to it
  * is the cautionary tale. It reads `set ELECTRON=1&& npm run build`, which is `cmd.exe` syntax:
  * it works on the maintainer's Windows box and fails on every Mac and every Linux machine, and
- * the failure is `set: command not found` rather than anything about DSIM. The portable way to
+ * the failure is `set: command not found` rather than anything about BFSIM. The portable way to
  * set an environment variable for a child process is to not use a shell at all — so this script
  * builds the environment as an object and hands it to `spawn`. Nothing here is interpreted by
  * `cmd.exe`, `bash` or `zsh`, so there is nothing for them to disagree about.

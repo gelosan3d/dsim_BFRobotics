@@ -5,9 +5,10 @@ import { ACCESS_GROUP_LABEL, type AccessGroup, ACCESS_GROUPS } from '../net/prot
 import { BUILD_CLOSED, loadSiteStatus, recheckAccess, useSiteState } from '../net/siteStatus';
 import { AuthPanel } from './AuthPanel';
 import { Logo } from './Logo';
+import { SITE_URL } from '../seo';
 
 /** where a closed alpha sends people when the lockdown names nowhere itself */
-export const PROD_URL = 'https://playdsim.com';
+export const PROD_URL = SITE_URL;
 
 /**
  * THE CLOSED SCREEN — what every page shows while the site is closed to this viewer: a site
@@ -23,12 +24,12 @@ export function ClosedScreen() {
   const alpha = appChannel() === 'alpha';
   const lock = site.lockdown?.scope === 'site' && site.lockdown.biting ? site.lockdown : null;
 
-  const title = alpha ? 'Alpha is closed' : 'DSIM is closed';
+  const title = alpha ? 'Alpha is closed' : 'BFSIM is closed';
   const message =
     lock?.message?.trim() ||
-    (alpha ? 'The alpha is open to testers only. DSIM itself is open as usual.' : 'DSIM is closed for now. Check back soon.');
-  const redirect = lock?.redirectUrl || (alpha || BUILD_CLOSED ? PROD_URL : null);
-  const redirectLabel = lock?.redirectLabel || 'Go to DSIM';
+    (alpha ? 'The alpha is open to testers only. BFSIM itself is open as usual.' : 'BFSIM is closed for now. Check back soon.');
+  const redirect = lock?.redirectUrl || ((alpha || BUILD_CLOSED) && PROD_URL ? PROD_URL : null);
+  const redirectLabel = lock?.redirectLabel || 'Go to BFSIM';
   const back = lock?.endsAt
     ? `Back around ${new Date(lock.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
     : null;
@@ -44,7 +45,7 @@ export function ClosedScreen() {
       <div className="ds-closed-card">
         <div className="ds-closed-brand">
           <Logo size={40} radius={10} />
-          <span className="ds-closed-word">DSIM</span>
+          <span className="ds-closed-word">BFSIM</span>
           {alpha && <span className="ds-badge">Alpha</span>}
         </div>
         <h1 id="ds-closed-title" className="ds-closed-title">
@@ -107,7 +108,7 @@ function AccessRow({
   } else if (!site.reachable && site.loaded) {
     body = (
       <>
-        <p className="ds-closed-note">Couldn’t reach the DSIM server to check your access.</p>
+        <p className="ds-closed-note">Couldn’t reach the BFSIM server to check your access.</p>
         <button className="ds-btn ghost small" onClick={() => void loadSiteStatus({ forceToken: true })}>
           Try again
         </button>

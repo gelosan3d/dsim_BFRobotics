@@ -1,4 +1,4 @@
-# DSIM Multiplayer — Architecture Reference
+# BFSIM Multiplayer — Architecture Reference
 
 **Status:** reverse-engineered from the code on branch `alpha`, 2026-09-11. Tree was green
 when this was written (`npm test` ALL PASS · `npm run test:mm` 58 checks · `npm run
@@ -45,7 +45,7 @@ current. See §13.10.
 
 ## 1. Executive summary
 
-DSIM multiplayer is a **server-authoritative, room-per-match architecture** running on
+BFSIM multiplayer is a **server-authoritative, room-per-match architecture** running on
 Node + `ws`, deployed as one Fly app across five regions. It is not peer-to-peer, and the
 P2P era is genuinely deleted, not merely disabled.
 

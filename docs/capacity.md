@@ -1,4 +1,4 @@
-# DSIM capacity model
+# BFSIM capacity model
 
 Measured 2026-09-10 on branch `perf-load`, against the real server (`npm run server`) driven by
 `scripts/loadtest.ts` — N headless clients speaking the real protocol at a true 60 Hz, reconciling

@@ -59,7 +59,7 @@ import { butterflyTankRpmLimits, lengthLimits, massLimits, rpmLimits, widthLimit
 /**
  * DECODE's three motifs (obelisk AprilTags 21–23). DECODE is gone from this fork (2026-10-12),
  * but `World.motif` is not: Chain Reaction and BIOBUZZ fill it with `MOTIFS[0]`, inert, because
- * `worldHash`, the snapshot diff and DSIM's own servers all read the field. Kept for that.
+ * `worldHash`, the snapshot diff and BFSIM's own servers all read the field. Kept for that.
  */
 export const MOTIFS: Motif[] = [
   ['green', 'purple', 'purple'], // obelisk AprilTag 21: GPP

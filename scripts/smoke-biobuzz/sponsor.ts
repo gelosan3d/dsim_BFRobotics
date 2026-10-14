@@ -101,7 +101,7 @@ export function sponsorChecks(check: Check): void {
     const u = new URL(sponsorLink(p));
     return (
       u.origin === new URL(SPONSOR.url).origin &&
-      u.searchParams.get('utm_source') === 'dsim' &&
+      u.searchParams.get('utm_source') === 'bfsim' &&
       u.searchParams.get('utm_medium') === p &&
       !!u.searchParams.get('utm_campaign')
     );
@@ -233,7 +233,7 @@ export function sponsorChecks(check: Check): void {
   );
   check(
     'sponsor: the OG card draws the artwork',
-    ogGen.includes('offset-on-dark.png'),
+    ogGen.includes('bf-on-dark.png'),
     'scripts/og-image.cjs — the card is #20262c, so the dark-SURFACE cut',
   );
   check(
@@ -341,7 +341,7 @@ export function sponsorChecks(check: Check): void {
     uiCode.includes("trackEvent('sponsor_dwell'") && uiCode.includes('dwellBucket('),
     'src/ui/Sponsor.tsx — a 20-minute session and a 3-second bounce are one row without it',
   );
-  // The `replay` placement reaches people who never opened DSIM, and counted
+  // The `replay` placement reaches people who never opened BFSIM, and counted
   // nothing at all until the burn-in was tallied at export.
   const replayCode = code('src/ui/ReplayView.tsx');
   check(
@@ -382,8 +382,8 @@ export function sponsorChecks(check: Check): void {
   // obvious way to get a re-brand half-right, so all four are listed here and in
   // the swap procedure.
   const artwork = [
-    'src/assets/sponsors/offset-on-light.png',
-    'src/assets/sponsors/offset-on-dark.png',
+    'src/assets/sponsors/bf-on-light.png',
+    'src/assets/sponsors/bf-on-dark.png',
     'electron/sponsor-on-light.png',
     'electron/sponsor-on-dark.png',
   ];

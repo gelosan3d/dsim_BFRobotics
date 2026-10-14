@@ -182,7 +182,7 @@ export default defineConfig({
    *
    * This is not a new runtime requirement: `hostRuntime.ts` already constructs the worker with
    * `{ type: 'module' }`, so the only thing that was out of step was the BUILD format. Module
-   * workers are supported everywhere DSIM hosts from (Chromium — and therefore Electron —
+   * workers are supported everywhere BFSIM hosts from (Chromium — and therefore Electron —
    * since 80, Safari 15, Firefox 114).
    */
   worker: { format: 'es' },

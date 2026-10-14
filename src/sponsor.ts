@@ -4,15 +4,15 @@
  * Distinct from `Season.presenter` (`src/seasons.ts`) and the two must never be
  * conflated. A season's presenter is a FACT about the FTC game — DECODE and
  * BIOBUZZ are presented by RTX, Chain Reaction by goBILDA — and it is not ours to
- * sell. This module is the OTHER thing: who presents DSIM, the application. The
+ * sell. This module is the OTHER thing: who presents BFSIM, the application. The
  * home menu therefore reads
  *
- *     DSIM                                               (the app)
- *     …presented by Offset Robotics                      (this module)
+ *     BFSIM                                               (the app)
+ *     …presented by BF Robotics                      (this module)
  *     [ DECODE | Chain Reaction | BIOBUZZ ]              (the game switcher)
  *
  * The season's own presenter (RTX, goBILDA) is no longer printed on the shell (owner,
- * 2026-09-23). The footer's brand run is `DSIM` + the sponsor mark; never append the
+ * 2026-09-23). The footer's brand run is `BFSIM` + the sponsor mark; never append the
  * season to it, or the line reads as Offset presenting the game.
  *
  * DOM-FREE ON PURPOSE. The artwork is imported through Vite in
@@ -54,7 +54,7 @@ export interface Sponsor {
   /** the line the app says about them, without the name */
   presents: string;
   /**
-   * The artwork's INTRINSIC size, from the files the sponsor ships (1735×438,
+   * The artwork's INTRINSIC size, from the files the sponsor ships (1600×400,
    * i.e. 3.96:1 — a horizontal wordmark lockup). Every placement sizes by HEIGHT
    * and derives width from this ratio, so a re-cut logo at a different resolution
    * needs no CSS change, and the reserved box is exact BEFORE the image loads —
@@ -68,7 +68,7 @@ export interface Sponsor {
 }
 
 /**
- * Offset Robotics — presenting sponsor for the BIOBUZZ season.
+ * BF Robotics — presenting sponsor for the BIOBUZZ season.
  *
  * ⚠️ THE TERM ENDS ON ITS OWN. `until` is the day after the placement's last, and
  * `sponsorActive` is false from then on, so the chrome comes down without anybody
@@ -77,11 +77,11 @@ export interface Sponsor {
  * `docs/sponsor.md`), so it should not keep running by default.
  */
 export const SPONSOR: Sponsor = {
-  name: 'Offset Robotics',
-  url: 'https://offsetrobotics.com',
+  name: 'BF Robotics',
+  url: 'https://github.com/gelosan3d/dsim_BFRobotics',
   presents: 'Presented by',
-  logoW: 1735,
-  logoH: 438,
+  logoW: 1600,
+  logoH: 400,
   // BIOBUZZ kickoff (2026-09-12) through the day before the next season's.
   term: { from: '2026-09-12', until: '2027-09-12' },
 };
@@ -134,13 +134,13 @@ export function sponsorActive(now: number = Date.now()): boolean {
  */
 export function sponsorLink(placement: SponsorPlacement): string {
   const u = new URL(SPONSOR.url);
-  u.searchParams.set('utm_source', 'dsim');
+  u.searchParams.set('utm_source', 'bfsim');
   u.searchParams.set('utm_medium', placement);
   u.searchParams.set('utm_campaign', 'biobuzz-2026');
   return u.toString();
 }
 
-/** "Presented by Offset Robotics" — for plain-text surfaces (the desktop splash,
+/** "Presented by BF Robotics" — for plain-text surfaces (the desktop splash,
  *  the burned-in replay mark, a meta description). Anything that can render the
  *  ARTWORK should render the artwork; this is the fallback, not the default. */
 export function sponsorLine(): string {

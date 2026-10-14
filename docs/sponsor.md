@@ -1,6 +1,6 @@
 # The presenting sponsor
 
-**DSIM is presented by Offset Robotics** (<https://offsetrobotics.com>) for the BIOBUZZ
+**BFSIM is presented by BF Robotics** (<https://github.com/gelosan3d/dsim_BFRobotics>) for the BIOBUZZ
 season. This file is the whole of it: where the mark appears, how to swap the artwork for
 the real files, how to take it down, and how the monthly attribution report is produced.
 
@@ -46,7 +46,7 @@ One more surface carries the artwork but is **GENERATED, not rendered**:
 
 **This is the one surface a person sees WITHOUT opening the app.** Every link pasted into a
 Discord server, an iMessage thread or a Slack channel renders that PNG, and every one of those
-was a DSIM impression with the sponsor absent from it. `index.html`'s `og:image:alt` and
+was a BFSIM impression with the sponsor absent from it. `index.html`'s `og:image:alt` and
 `twitter:image:alt` name the sponsor for the same reason.
 
 ⚠️ **IT IS A BUILD ARTIFACT, SO THE TERM AND THE KILL SWITCH DO NOT REACH IT.** A scraper
@@ -80,7 +80,7 @@ re-opened every season:
 
 - **The app icons** — `public/favicon.svg`, `public/apple-touch-icon.png`,
   `public/icon-192.png`, `public/icon-512.png`, `build/icon.png`. An icon is IDENTITY: it is
-  what a tab, a home screen and a taskbar use to mean "DSIM", it renders at 16–192px, and the
+  what a tab, a home screen and a taskbar use to mean "BFSIM", it renders at 16–192px, and the
   512 is also the **maskable** source, which a launcher crops to a circle. A 3.96:1 wordmark
   inside that is illegible at every size it is actually drawn at, and a co-branded app icon is
   a different deal from a presenting sponsorship of the app. The OG card is where a mark at
@@ -134,20 +134,20 @@ two `*:image:alt` strings in `index.html`, and change the server icon by hand.
 
 The repo carries Offset's own two cuts, 1735×438 (≈3.96:1) each, as supplied:
 
-1. `src/assets/sponsors/offset-on-light.png` — for a LIGHT surface. Near-black wordmark.
-2. `src/assets/sponsors/offset-on-dark.png` — for a DARK surface. Near-white wordmark.
+1. `src/assets/sponsors/bf-on-light.png` — for a LIGHT surface. Near-black wordmark.
+2. `src/assets/sponsors/bf-on-dark.png` — for a DARK surface. Near-white wordmark.
 3. `electron/sponsor-on-light.png` — the same light-surface cut, again.
 4. `electron/sponsor-on-dark.png` — the same dark-surface cut, again.
 
 ⚠️ **The filenames say which SURFACE, not which ink, and two conventions collide here.**
-Offset ships `OffsetLogoLight.png` (a BLACK wordmark) and `OffsetLogoDark.png` (a near-white
+Offset ships `BfLogoLight.png` (a BLACK wordmark) and `BfLogoDark.png` (a near-white
 one) — named by surface — and describes the black one as "the dark logo" — named by ink.
 Both readings are reasonable and they are exact opposites, so `on-light` / `on-dark` is the
 spelling in this repo, and a new file gets placed **by looking at the pixels**, never by
 trusting the label on the download. Getting it backwards puts white ink on a white page.
 
 **Replace all four, every time — then run `npm run og` and commit the card.** `og-image.cjs`
-inlines `src/assets/sponsors/offset-on-dark.png` as base64 at generate time, so a swap that
+inlines `src/assets/sponsors/bf-on-dark.png` as base64 at generate time, so a swap that
 stops there leaves the OLD artwork in the one image every pasted link shows.
 
 1 and 2 go through a Vite `import`
@@ -179,7 +179,7 @@ whose plate is painted `rgba(18,21,26,0.86)` regardless of theme.
 
 ## The monthly attribution report
 
-All of it from DSIM's own analytics (`src/analytics.ts` → `server/analytics.ts`,
+All of it from BFSIM's own analytics (`src/analytics.ts` → `server/analytics.ts`,
 `VITE_ANALYTICS=1`, cookieless, no identifiers in any payload). The admin console's
 **Analytics** tab has a **Sponsor report** panel laid out as the lines below: pick **Last
 month** and press **Export CSV**. A month older than the 30 days of raw events still reads
@@ -187,7 +187,7 @@ correctly — events and their properties are kept in the daily rollups.
 
 Until September 2026 the report was read off Vercel Web Analytics. That was removed; its history
 (2026-09-13 onward, loaded by `scripts/import-vercel-analytics.ts`) is folded into the same panel:
-every day before DSIM's own count began is read from the import, every day after from ours, never
+every day before BFSIM's own count began is read from the import, every day after from ours, never
 both. Impressions, clicks, dwell, formats, downloads and new players include those days. Vercel
 counted no sessions, so the Sessions line covers our days only and says from when.
 
@@ -220,8 +220,8 @@ mount. Under-reporting a placement somebody paid for is the worse failure of the
 | **Sessions** | The Sessions tile for the month (a session ends after 30 minutes idle). The mark is on the shell footer, so site sessions and sponsor-exposed sessions are the same set. |
 | **New players** | Events → `player_joined`, for the month. |
 
-Offset's own side of the funnel (landing-page sessions attributable to DSIM) is read off the
-UTM tags every link carries: `utm_source=dsim`, `utm_medium=<placement>`,
+Offset's own side of the funnel (landing-page sessions attributable to BFSIM) is read off the
+UTM tags every link carries: `utm_source=bfsim`, `utm_medium=<placement>`,
 `utm_campaign=biobuzz-2026`. That is the only thing in the query string — no ids, ever.
 
 ### ⚠️ The deploy has to have it switched on
@@ -242,7 +242,7 @@ before the report month closes, not after.
   worth.
 - **`placement=replay` is files, not views.** The burn-in is counted when an export finishes
   and lands on the user's disk. A clip posted to Discord or YouTube is then watched by people
-  who never opened DSIM — real reach, and the only placement with any beyond our own traffic —
+  who never opened BFSIM — real reach, and the only placement with any beyond our own traffic —
   but we cannot see it. Report the file count as a floor and say so.
 - **The Electron splash is unmeasurable by construction.** The desktop build does not beacon a
   host it does not run on, which is the rule `src/analytics.ts` is gated by. `desktop_download`

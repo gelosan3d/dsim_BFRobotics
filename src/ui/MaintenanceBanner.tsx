@@ -38,7 +38,7 @@ export function maintenanceLine(m: MaintenanceInfo | null | undefined, now = Dat
   if (m.scope === 'site') {
     if (m.biting || !m.startsAt || m.startsAt <= now) return null;
     const mins = Math.max(1, Math.round((m.startsAt - now) / 60000));
-    return `${base || 'DSIM is closing for maintenance'}. The site closes in ${mins} minute${mins === 1 ? '' : 's'}${
+    return `${base || 'BFSIM is closing for maintenance'}. The site closes in ${mins} minute${mins === 1 ? '' : 's'}${
       win ? ` (${win})` : ''
     }.`;
   }

@@ -121,7 +121,7 @@ export const LEGAL_CONTACT = 'genius0412.tech@gmail.com';
  * WHO the terms are with, and WHOSE LAW governs them.
  *
  * These are load-bearing, not boilerplate. A contract has to name a party — "the
- * operator of DSIM" is not someone anyone can be in a dispute with — and two
+ * operator of BFSIM" is not someone anyone can be in a dispute with — and two
  * concrete things depend on it:
  *
  *  - AdSense requires an identifiable publisher; a policy that identifies nobody
@@ -130,7 +130,7 @@ export const LEGAL_CONTACT = 'genius0412.tech@gmail.com';
  *    and a geographic contact, and a recurring membership is a consumer sale.
  *    That applies to European supporters regardless of where the operator is.
  *
- * DSIM is run by an individual, which is a perfectly lawful answer — there is no
+ * BFSIM is run by an individual, which is a perfectly lawful answer — there is no
  * requirement to incorporate before accepting support. If that ever changes (an
  * LLC, a different state), update BOTH of these and the date above: the governing
  * law clause in TERMS_MD reads from them.
@@ -145,7 +145,7 @@ export const LEGAL_IDENTIFIED =
   !LEGAL_OPERATOR.startsWith('[') && !LEGAL_JURISDICTION.startsWith('[');
 
 export const PRIVACY_MD = `
-DSIM is a free FTC driver-practice simulator. This policy explains what the app
+BFSIM is a free FTC driver-practice simulator. This policy explains what the app
 collects, why, and what you can do about it. It is written to be read, not to be
 skimmed past — it is short because the app genuinely collects very little.
 
@@ -157,7 +157,7 @@ and saved records. If you never sign in, nothing below about accounts applies to
 
 ## What is stored on your own device
 
-DSIM sets no cookies. What it uses instead is your browser’s own storage, and none of
+BFSIM sets no cookies. What it uses instead is your browser’s own storage, and none of
 it is transmitted unless you sign in and your settings sync to your account. There are
 three kinds:
 
@@ -204,7 +204,7 @@ network service must. It is not stored in the database or used to build a profil
 
 ## Usage measurement, and why it cannot identify you
 
-We count how DSIM is used — which pages are reached, roughly where from, on what kind
+We count how BFSIM is used — which pages are reached, roughly where from, on what kind
 of device — because otherwise we are tuning a free tool by guesswork. This is measured
 by our own servers, not by an advertising network, and it is built so that it is unable
 to identify or follow you rather than merely promising not to.
@@ -213,7 +213,7 @@ to identify or follow you rather than merely promising not to.
 query string, and of anything that identifies a match, a player or a room), the site
 that linked you, reduced to a bare host name, your country, your device type, operating
 system and browser family, a coarse screen-size bucket, your language, and which build
-of DSIM you are running.
+of BFSIM you are running.
 
 **What it never records.** Your IP address, your full browser user-agent string, your
 account, your name, your email, your screen's exact size, what you click, or anything
@@ -271,7 +271,7 @@ list is what the “Watch Live” screen shows.
 
 ## Site administrators
 
-Administrators of DSIM can see the live snapshot described above, for moderation
+Administrators of BFSIM can see the live snapshot described above, for moderation
 (investigating cheating or abuse) and for keeping the servers running. Concretely,
 an administrator can see every connected session — signed-in accounts by name, and
 sessions without an account by the temporary connection id described above — along
@@ -280,7 +280,7 @@ with the coarse activity, the room, and the ranked queue state for each. They
 of your activity, and the connection id gives them no way to recognise a returning
 visitor.
 
-Administrators can also put DSIM into **maintenance**, which pauses new matches for
+Administrators can also put BFSIM into **maintenance**, which pauses new matches for
 everyone else while an update or a season reset is applied, or **close the site**, which
 shows a page saying so in place of the app. When one is scheduled or running you will see
 a banner or that page. An account can be put in a tester group (beta tester, developer or
@@ -294,7 +294,7 @@ publicly spectatable by anyone, so this changes who is *visible*, not what is.
 
 ## Cookies and similar technologies
 
-DSIM itself sets **no cookies**. Your settings live in your browser’s own storage
+BFSIM itself sets **no cookies**. Your settings live in your browser’s own storage
 (every key is listed under “Your data” below), and signing in uses a token held by our
 authentication provider. Neither is used to track you between sites. The usage
 measurement described above is cookieless and stores nothing on your device either — no
@@ -307,9 +307,9 @@ often you see the same one. That is the only third-party cookie use on the site.
 
 ## Advertising
 
-The web version of DSIM shows advertising served by **Google AdSense**.
+The web version of BFSIM shows advertising served by **Google AdSense**.
 
-**Ads are non-personalised by default.** DSIM is a simulator for a school
+**Ads are non-personalised by default.** BFSIM is a simulator for a school
 robotics competition, so a real share of players are young teenagers and most are
 not signed in at all — we therefore do not let advertising be targeted using
 browsing history unless we have a reason to believe otherwise. Ad requests are
@@ -338,7 +338,7 @@ or store a card number.
 
 What we do receive and store for each payment is the email address you paid with,
 the amount and currency, and Ko-fi’s own transaction and event identifiers. The
-email address is what links your payment to your DSIM account so the membership
+email address is what links your payment to your BFSIM account so the membership
 renews without you having to claim it every month; it is never displayed to anyone
 and never used to contact you. If you delete your account, that email address is
 erased, though the payment record itself is kept without it, because it is a
@@ -423,7 +423,7 @@ or anything else, email us and we will action the request.
 
 ## Age
 
-DSIM is intended for players aged **13 and over**. We do not knowingly collect
+BFSIM is intended for players aged **13 and over**. We do not knowingly collect
 information from children under 13. If you believe a child under 13 has created an
 account, email us and we will delete it.
 
@@ -438,15 +438,15 @@ Questions, corrections, and deletion requests: [${LEGAL_CONTACT}](mailto:${LEGAL
 `;
 
 export const TERMS_MD = `
-These terms cover your use of DSIM — the website, the multiplayer service, and the
+These terms cover your use of BFSIM — the website, the multiplayer service, and the
 desktop application. Using any of them means you accept what follows.
 
 ## Who you are agreeing with
 
-DSIM is operated by **${LEGAL_OPERATOR}**, and you can reach a human at
+BFSIM is operated by **${LEGAL_OPERATOR}**, and you can reach a human at
 [${LEGAL_CONTACT}](mailto:${LEGAL_CONTACT}). It is an independent project, not a company product.
 
-## Who can use DSIM
+## Who can use BFSIM
 
 You must be **13 or older** to create an account. If you are under 18, you should
 have a parent or guardian’s permission, and they must be the one to make any
@@ -460,7 +460,7 @@ affiliation with a team or organisation. We may reclaim usernames that break thi
 
 ## Fair play
 
-DSIM runs a server-authoritative simulation, and ranked play depends on that being
+BFSIM runs a server-authoritative simulation, and ranked play depends on that being
 respected. Do not modify the client to gain an advantage, automate play, exploit
 bugs for rating, or deliberately disrupt other players’ matches. Accounts that do
 may lose their rating, their records, or their access.
@@ -500,7 +500,7 @@ results, and replays.
 
 ## What we do not promise
 
-DSIM is provided **as is**, free of charge for the parts that are free. We do not
+BFSIM is provided **as is**, free of charge for the parts that are free. We do not
 guarantee it will be available, bug-free, or that records and ratings will survive
 a season reset or a balance change. It is a practice tool, not a system of record.
 
@@ -509,13 +509,13 @@ consequential loss arising from your use of it.
 
 ## Not affiliated with FIRST
 
-DSIM is an independent, unofficial project. It is **not** affiliated with,
+BFSIM is an independent, unofficial project. It is **not** affiliated with,
 endorsed by, or sponsored by *FIRST*, FTC, RTX, or any of their partners. Game
 names and rules are referenced for the purpose of simulating the competition.
 
 ## Ending things
 
-You can stop using DSIM and delete your account at any time — there is a **Delete
+You can stop using BFSIM and delete your account at any time — there is a **Delete
 account** button on your Profile page, and it takes effect immediately. We may
 suspend an account that breaks these terms, and will say why where we reasonably
 can. If we suspend a supporter's account for a reason that is not their fault, we

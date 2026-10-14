@@ -5,8 +5,8 @@ import { LINKS } from './seasons';
  *
  * The Electron desktop shell is produced with electron-builder and published to
  * GitHub Releases by `.github/workflows/release.yml` on every `v*` tag, for
- * Windows / macOS / Linux, under STABLE asset names (DSIM-Setup.exe,
- * DSIM-Portable.exe, DSIM-mac.dmg, DSIM-linux.AppImage). So by DEFAULT the
+ * Windows / macOS / Linux, under STABLE asset names (BFSIM-Setup.exe,
+ * BFSIM-Portable.exe, BFSIM-mac.dmg, BFSIM-linux.AppImage). So by DEFAULT the
  * buttons point at `releases/latest/download/<asset>` — always the newest build.
  * Override any URL with Vite env (e.g. to host on a CDN):
  *   VITE_DOWNLOAD_INSTALLER_URL / VITE_DOWNLOAD_PORTABLE_URL /
@@ -39,25 +39,25 @@ export const DESKTOP_BUILDS: DesktopBuild[] = [
     os: 'windows',
     label: 'Windows · Installer',
     note: '.exe · installs with a Start-menu shortcut',
-    url: (env.VITE_DOWNLOAD_INSTALLER_URL as string | undefined) ?? `${DL}/DSIM-Setup.exe`,
+    url: (env.VITE_DOWNLOAD_INSTALLER_URL as string | undefined) ?? `${DL}/BFSIM-Setup.exe`,
   },
   {
     os: 'windows',
     label: 'Windows · Portable',
     note: '.exe · no install, runs from a folder or USB stick',
-    url: (env.VITE_DOWNLOAD_PORTABLE_URL as string | undefined) ?? `${DL}/DSIM-Portable.exe`,
+    url: (env.VITE_DOWNLOAD_PORTABLE_URL as string | undefined) ?? `${DL}/BFSIM-Portable.exe`,
   },
   {
     os: 'mac',
     label: 'macOS · Universal',
     note: '.dmg · Apple Silicon + Intel',
-    url: (env.VITE_DOWNLOAD_MAC_URL as string | undefined) ?? `${DL}/DSIM-mac.dmg`,
+    url: (env.VITE_DOWNLOAD_MAC_URL as string | undefined) ?? `${DL}/BFSIM-mac.dmg`,
   },
   {
     os: 'linux',
     label: 'Linux · AppImage',
     note: '.AppImage · portable',
-    url: (env.VITE_DOWNLOAD_LINUX_URL as string | undefined) ?? `${DL}/DSIM-linux.AppImage`,
+    url: (env.VITE_DOWNLOAD_LINUX_URL as string | undefined) ?? `${DL}/BFSIM-linux.AppImage`,
   },
 ];
 

@@ -111,7 +111,7 @@ const BASELINE = {
   // visual decision per site, and a baseline is how that gets paid off in any order without
   // being able to grow back.
   // 46 → 45, 2026-09-22: `.ds-home-lead`'s `15px` went with the home page's lead sentence,
-  // removed once the homepage no longer needed a line saying DSIM is "2D".
+  // removed once the homepage no longer needed a line saying BFSIM is "2D".
   // 45 → 13, 2026-09-22: design review 14-06/07/08. The scale was amended to the code: 14px is
   // `--ds-t-control` (17 control/body literals became the token), the h1/h2 clamps are
   // `--ds-t-h1`/`--ds-t-h2`, and every 10px chrome label moved UP to `--ds-t-xs`, the floor.

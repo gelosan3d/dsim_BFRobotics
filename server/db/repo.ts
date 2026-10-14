@@ -28,7 +28,7 @@ import {
 import { scrubSpecNames } from '../moderation';
 
 /** every board/period is keyed by game; a caller that names none means `DEFAULT_GAME`. (Rows
- *  DSIM's own database holds for DECODE are keyed 'decode'; this fork's build reads none of them.) */
+ *  BFSIM's own database holds for DECODE are keyed 'decode'; this fork's build reads none of them.) */
 type Game = GameId;
 const g = (game?: Game): Game => game ?? DEFAULT_GAME;
 
@@ -1702,7 +1702,7 @@ async function recordSeasonGrants(game: Game, balanceVersion: number, act: numbe
 
 
 // ------------------------------------------------- linked social accounts --
-/** the providers a DSIM account can link (0047). */
+/** the providers a BFSIM account can link (0047). */
 export type LinkProvider = 'github' | 'discord';
 
 /**
@@ -1719,7 +1719,7 @@ export interface ProviderLink {
 
 /**
  * LINK an external account. Answers false when that external account is already bound to a
- * DIFFERENT DSIM account — including one that has since unlinked.
+ * DIFFERENT BFSIM account — including one that has since unlinked.
  *
  * ⚠️ THAT REFUSAL IS THE WHOLE ANTI-FARM, and it is why the row survives an unlink. Without
  * it, unlink → relink on a second account mints the reward again for free, which is the
@@ -3209,7 +3209,7 @@ export async function deleteAccount(userId: string): Promise<boolean> {
       `update kofi_payments set email = null where claimed_by = $1`,
       [userId],
     );
-    /* THE SANCTIONS STAY (0054). Deleting DSIM's data does not delete the Neon Auth identity,
+    /* THE SANCTIONS STAY (0054). Deleting BFSIM's data does not delete the Neon Auth identity,
        so without this a suspended or ranked-locked player was one DELETE away from a clean
        slate — `getSuspension` reads a missing profile as "not suspended" and `getStanding` a
        missing row as a full score. Written only when there is something to carry, and before

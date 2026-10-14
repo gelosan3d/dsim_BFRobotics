@@ -298,12 +298,12 @@ function MaxFpsRow({ value, onPick }: { value: MaxFps; onPick: (v: MaxFps) => vo
         <>
           <p className="ds-hint warn">
             {perf?.unlimitedFps
-              ? 'DSIM is still running with your display’s frame-rate limit on. The switch is set for the next launch.'
-              : 'DSIM is still running with the frame-rate limit off. Restarting puts it back.'}
+              ? 'BFSIM is still running with your display’s frame-rate limit on. The switch is set for the next launch.'
+              : 'BFSIM is still running with the frame-rate limit off. Restarting puts it back.'}
           </p>
           <div className="ds-field-row">
             <button className="ds-btn small" onClick={() => void bridge?.perf?.relaunch()}>
-              Restart DSIM
+              Restart BFSIM
             </button>
             <button className="ds-btn small ghost" onClick={() => setDismissed(true)}>
               Not now

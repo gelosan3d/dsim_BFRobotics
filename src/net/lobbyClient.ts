@@ -377,13 +377,13 @@ export class LobbyClient {
     } else if (m.t === 'matchStart') {
       // A GAME THIS BUILD DOES NOT HAVE is refused here, once, for every screen that mints a
       // session — never built as the fallback game. DECODE was removed from this fork
-      // (2026-10-12) and DSIM's servers still run it: a player cannot reach such a room (the
+      // (2026-10-12) and BFSIM's servers still run it: a player cannot reach such a room (the
       // server refuses the join as `game_mismatch`), but a SPECTATOR can. An absent `game` is
       // DECODE too, by the protocol's own rule, from a server older than the second game.
       const game: unknown = m.game; // typed `GameId`, but it is what the server sent
       if (!isGameId(game)) {
         this.handlers.error?.(
-          `That match is playing ${typeof game === 'string' ? game.toUpperCase() : 'DECODE'}, which this version of DSIM does not include.`,
+          `That match is playing ${typeof game === 'string' ? game.toUpperCase() : 'DECODE'}, which this version of BFSIM does not include.`,
         );
         return;
       }

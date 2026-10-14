@@ -28,7 +28,7 @@ no chat tunes a ball constant, it writes the observation into HANDOFF for him.
 
 ## P0-core — Opus 5
 
-You are working in the DSIM repo (2D FTC driver-practice simulator: Vite + React + TS client,
+You are working in the BFSIM repo (2D FTC driver-practice simulator: Vite + React + TS client,
 Node/ws authoritative server, shared deterministic sim). Worktree:
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-core`, branch `biobuzz-core`,
 which was cut from `biobuzz` (itself cut from `origin/alpha`). Work ONLY in that worktree;
@@ -116,7 +116,7 @@ anything blocking NOW, before starting; otherwise work to the end and report.
 
 ## P0-shell — Opus 5
 
-You are working in the DSIM repo, worktree
+You are working in the BFSIM repo, worktree
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-shell`, branch `biobuzz-shell`
 (cut from `biobuzz`, which is cut from `origin/alpha`). Work only there; never touch
 `alpha`/`main`/other worktrees; commit per item; push only your own branch.
@@ -213,7 +213,7 @@ questions NOW; otherwise work to the end and report.
 
 ## P0.5-sandbox — Opus 5 (start after core + shell are merged into `biobuzz`)
 
-You are working in the DSIM repo, worktree
+You are working in the BFSIM repo, worktree
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-sandbox`, branch `biobuzz-sandbox`
 off `biobuzz`. Push only your own branch. Read `CLAUDE.md` (Shared core → Physics, and both GAME
 sections' ball/particle parts), `docs/biobuzz-plan.md` §Phase 0.5, `docs/biobuzz-contract.md`,
@@ -263,7 +263,7 @@ otherwise do step 1 and stop.
 
 ## perf-load — Opus 5 (independent track, start now)
 
-You are working in the DSIM repo (2D FTC driver-practice sim: Vite/React client on Vercel,
+You are working in the BFSIM repo (2D FTC driver-practice sim: Vite/React client on Vercel,
 Node + `ws` authoritative game server on Fly, Neon Postgres). Worktree:
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-load`, branch `perf-load` off
 `origin/alpha`. Work only there. Commit per step. Do not push, do not deploy — the owner
@@ -423,7 +423,7 @@ radius in `solveArtifacts` / `robotSolids` goes to the owner via
 
 ## A1 — field-art (Opus 5)
 
-You are Lane A of BIOBUZZ in the DSIM repo, worktree
+You are Lane A of BIOBUZZ in the BFSIM repo, worktree
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-field`, branch `biobuzz-field`.
 First `git merge biobuzz`; the only expected conflict is `docs/biobuzz-reference.md` — take
 the `biobuzz` side for every factual section (`git checkout --theirs docs/biobuzz-reference.md`),
@@ -484,7 +484,7 @@ what is APPROX in the drawing. STOP after the push and say "look at field-labell
 
 ## A2 — solids + staging (Opus 5) — start when A1 has pushed its constants commit
 
-You are Lane A of BIOBUZZ in the DSIM repo. Make a worktree from any dsim checkout:
+You are Lane A of BIOBUZZ in the BFSIM repo. Make a worktree from any dsim checkout:
 `git worktree add "C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-field2" -b biobuzz-field-staging biobuzz-field`
 — work there, push only `biobuzz-field-staging`. Read `CLAUDE.md`,
 `docs/biobuzz-contract.md` (Lane A), `docs/biobuzz-reference.md` §2–§3,
@@ -533,7 +533,7 @@ Subagents: `Explore` once for `StaticSpec` shapes + how DECODE's spawn stages it
 
 ## A3 — hive + flower behaviour (Fable 5.1) — start after the `field-labelled` verdict
 
-You are Lane A of BIOBUZZ in the DSIM repo, worktree
+You are Lane A of BIOBUZZ in the BFSIM repo, worktree
 `C:\Users\saket\Desktop\saket\FTC\Claude Projects\dsim-bb-field`, branch `biobuzz-field`
 (merge `biobuzz-field-staging` first if it has landed). Read `CLAUDE.md`,
 `docs/biobuzz-contract.md`, `docs/biobuzz-reference.md` §4–§5, `docs/biobuzz/field-plan.md`

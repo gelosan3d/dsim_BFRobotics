@@ -30,7 +30,7 @@ const SLOT_RESULTS = (import.meta.env.VITE_ADSENSE_SLOT_RESULTS as string | unde
 /**
  * PERSONALIZED ADS ARE OPT-IN, and the default is deliberately the low-revenue one.
  *
- * DSIM simulates FIRST Tech Challenge, which is grades 7–12 — a meaningful slice
+ * BFSIM simulates FIRST Tech Challenge, which is grades 7–12 — a meaningful slice
  * of players are 12 or 13. The whole sim is playable SIGNED OUT, so for most ad
  * impressions there is no account, no stated age, and therefore no basis on which
  * to claim an adult audience. Serving behaviourally-targeted ads to that audience

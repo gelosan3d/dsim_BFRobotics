@@ -137,7 +137,7 @@ export async function lockdownRefusal(
 /** the sentence a refused caller reads */
 export function lockoutMessage(w: MaintenanceWindow = lock, now = Date.now()): string {
   const site = w.scope === 'site';
-  const base = w.message?.trim() || (site ? 'DSIM is closed right now.' : 'DSIM is down for maintenance.');
+  const base = w.message?.trim() || (site ? 'BFSIM is closed right now.' : 'BFSIM is down for maintenance.');
   if (!w.endsAt) return site ? base : `${base} Please try again shortly.`;
   const mins = Math.max(1, Math.round((w.endsAt - now) / 60000));
   return `${base} Back in about ${mins} minute${mins === 1 ? '' : 's'}.`;

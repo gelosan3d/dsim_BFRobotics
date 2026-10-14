@@ -15,7 +15,7 @@ Two overlapping primary users, both FTC (FIRST Tech Challenge) participants, gra
 
 ## Product Purpose
 
-DSIM is a 2D top-down driver-practice simulator that lets FTC teams and drivers practice driving and in-match strategy without physical access to a robot or field. It hosts more than one FTC game ("season" in-app): DECODE presented by RTX (2025–26) and Chain Reaction (2026 Unofficial-FTC CAD competition), both fully scored and ranked. Success means a driver's practice reps here transfer to real match performance — the drive feel, scoring, and penalties are meant to be trustworthy enough to train on, not just fun to click through.
+BFSIM is a 2D top-down driver-practice simulator that lets FTC teams and drivers practice driving and in-match strategy without physical access to a robot or field. It hosts more than one FTC game ("season" in-app): DECODE presented by RTX (2025–26) and Chain Reaction (2026 Unofficial-FTC CAD competition), both fully scored and ranked. Success means a driver's practice reps here transfer to real match performance — the drive feel, scoring, and penalties are meant to be trustworthy enough to train on, not just fun to click through.
 
 ## Positioning
 
@@ -35,7 +35,7 @@ Played in-browser (Vercel-hosted client) or via a thin Electron desktop wrapper 
 
 ## Brand Commitments
 
-- App brand is **DSIM**; a loaded game is a **"season"** — kept distinct in UI copy (DECODE / Chain Reaction are what's currently loaded, not the product name).
+- App brand is **BFSIM**; a loaded game is a **"season"** — kept distinct in UI copy (DECODE / Chain Reaction are what's currently loaded, not the product name).
 - `LEGAL_OPERATOR` / `LEGAL_JURISDICTION` (`src/legalText.ts`) are unfilled placeholders — the Terms page shows a visible warning until set, and no real payment should be taken before they're filled.
 
 ## Evidence on Hand

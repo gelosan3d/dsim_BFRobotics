@@ -55,7 +55,7 @@ import { BB_BOX_SLOTS, BB_BOX_T, bbNectarBoxRect, bbNectarBoxSlot } from './nect
  * `grep APPROX src/games/biobuzz/config.ts` is the tape-measure list, and a dimension typed
  * into a renderer is a dimension that list cannot find.
  *
- * WHAT THIS VIEW HAS TO SOLVE. BIOBUZZ is the first DSIM game whose central structure is
+ * WHAT THIS VIEW HAS TO SOLVE. BIOBUZZ is the first BFSIM game whose central structure is
  * genuinely THREE-DIMENSIONAL: the HIVE pivots 43.95 in overhead, one CELL tilts up to 53.5+
  * in and the other tilts down toward the tiles, and a driver's whole job is knowing WHICH ONE
  * IS UP.

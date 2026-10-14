@@ -1658,7 +1658,7 @@ export class GameController {
   }
 
   /** may this fork's FTC25 extras act in this session — solo, or a LAN room, and never a room on
-   *  DSIM's own servers (`forkFeaturesAllowed`) */
+   *  BFSIM's own servers (`forkFeaturesAllowed`) */
   private forkFeatures(): boolean {
     return forkFeaturesAllowed(this.session);
   }
@@ -3583,7 +3583,7 @@ export class GameController {
     const kept = { replay, result: worldResult(this.world) };
     if (completed) this.practice = kept;
     // LOCAL-ONLY when this fork's features played it: FTC25 controls (the setups say so too) or a
-    // second person on this device (they do not) — kept here, never sent to DSIM's servers
+    // second person on this device (they do not) — kept here, never sent to BFSIM's servers
     this.onPracticeRun?.(kept.replay, kept.result, this.settings.controlScheme === 'ftc25' || this.player2 !== null);
   }
 

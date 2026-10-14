@@ -16,7 +16,7 @@ import { trackEvent } from '../analytics';
  * Payment happens entirely on Ko-fi — we never touch card details, and there is
  * no checkout to build. What lives here is the CLAIM step: Ko-fi identifies a
  * buyer by the email they paid with, which frequently is not the email on their
- * DSIM account (a student paying through a parent's PayPal is the ordinary case,
+ * BFSIM account (a student paying through a parent's PayPal is the ordinary case,
  * not the edge case). Rather than guess at a match, the buyer pastes the
  * transaction id Ko-fi gave them and the server attaches the payment.
  *
@@ -113,14 +113,14 @@ export function Donate({ signedIn }: { signedIn: boolean }) {
   if (!SUPPORT_ENABLED) {
     return (
       <>
-        <h1 className="ds-h1">Support DSIM</h1>
+        <h1 className="ds-h1">Support BFSIM</h1>
         {/* The `.ds-sub` here read "Not open yet." — the same sentence as the
             panel's "There is nothing to pay for yet", 30px apart. The panel keeps
             it because it also says the part worth knowing. */}
         <section className="ds-panel">
           <div className="ds-panel-body">
             <p className="ds-hint">
-              DSIM is free and stays free. There is nothing to pay for yet. A way to chip in
+              BFSIM is free and stays free. There is nothing to pay for yet. A way to chip in
               for the servers is coming.
             </p>
           </div>
@@ -131,9 +131,9 @@ export function Donate({ signedIn }: { signedIn: boolean }) {
 
   return (
     <>
-      <h1 className="ds-h1">Support DSIM</h1>
+      <h1 className="ds-h1">Support BFSIM</h1>
       <p className="ds-sub">
-        DSIM is free and stays free. Servers and a database are not. This is what keeps them
+        BFSIM is free and stays free. Servers and a database are not. This is what keeps them
         running.
       </p>
 

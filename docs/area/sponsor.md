@@ -1,5 +1,5 @@
 <!-- governs: src/sponsor.ts, src/ui/sponsorAssets.ts, src/ui/Sponsor.tsx, electron/**, src/assets/sponsors/** -->
-# Presenting sponsor — DSIM presented by Offset Robotics
+# Presenting sponsor — BFSIM presented by BF Robotics
 
 A signed sponsorship: every placement here is a contracted obligation that fails SILENTLY. `docs/sponsor.md` is the contract's operational half.
 
@@ -9,7 +9,7 @@ session and this is not needed by most of them. The `governs:` line above is rea
 
 ---
 
-## Presenting sponsor (branch `biobuzz`) — DSIM presented by Offset Robotics
+## Presenting sponsor (branch `biobuzz`) — BFSIM presented by BF Robotics
 
 A LAUNCH + SEASON sponsorship of the APP, sold for the BIOBUZZ season with exclusivity.
 **`docs/sponsor.md` is the contract's operational half** — the placement inventory, the
@@ -22,12 +22,12 @@ any of this.
   is split off it because an image import would choke the `tsx` suite.
 - ⚠️ **`Season.presenter` IS A DIFFERENT FACT.** That is FIRST's sponsor of the GAME (DECODE
   presented by RTX), not ours and not for sale. Both lines are true on the home menu at once;
-  never fold one into the other. The home menu reads `DSIM`, then the Offset line
+  never fold one into the other. The home menu reads `BFSIM`, then the Offset line
   (`SponsorPresents`), then the game switcher, then the social pills and the menu. There is NO
   season line on home or in the footer any more (owner, 2026-09-23 — the `.ds-home-season` and
   `.ds-foot-season` lines are gone), so the season's presenter is not printed on the shell at
-  all; the footer's brand run is `DSIM` + `SponsorFooterMark` (`.ds-foot-brand`) alone. If a
-  season line ever comes back, keep it a separate item: inside the brand run, "DSIM · BIOBUZZ …
+  all; the footer's brand run is `BFSIM` + `SponsorFooterMark` (`.ds-foot-brand`) alone. If a
+  season line ever comes back, keep it a separate item: inside the brand run, "BFSIM · BIOBUZZ …
   PRESENTED BY OFFSET" read as Offset presenting the game (design review 22-04).
 - ⚠️ **THE IN-GAMEPLAY CHIP IS NOT AN AD, AND MUST NEVER BE ROUTED THROUGH `src/ads/`.** That
   gate renders nothing on touch, nothing under Electron and nothing for a supporter — i.e.
@@ -52,10 +52,10 @@ any of this.
 - **Artwork is FOUR files** (`src/assets/sponsors/offset-on-*.png` + `electron/sponsor-on-*.png`,
   the Electron pair duplicated because a `file://` page cannot resolve a Vite hash). The names
   say which SURFACE, not which ink — the sponsor calls the black cut "the dark logo" and the
-  site calls it `OffsetLogoLight.png`, so place a new file by looking at the pixels. Sizes are
+  site calls it `BfLogoLight.png`, so place a new file by looking at the pixels. Sizes are
   declared in `SPONSOR.logoW/logoH` and every placement reserves its box from that ratio
   before the image loads (`shiftaudit`); the smoke lane reads all four PNG headers.
-- **The report is DSIM's own analytics** (the admin Analytics tab's Sponsor report panel) —
+- **The report is BFSIM's own analytics** (the admin Analytics tab's Sponsor report panel) —
   `sponsor_shown` (the denominator), `sponsor_click` (per placement), our own sessions, and
   `player_joined` (fired in `UsernameGate`, the last step of signing up; it over-counts legacy
   accounts ONCE and `docs/sponsor.md` footnotes it). No identifiers. Vercel Web Analytics was

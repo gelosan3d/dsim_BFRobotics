@@ -1,5 +1,5 @@
 ---
-name: DSIM
+name: BFSIM
 description: Driver-practice sim for FTC games (DECODE, Chain Reaction, BIOBUZZ) — a driver-station UI wrapped around a live scored match.
 colors:
   bg: "#f9faf7"
@@ -125,13 +125,13 @@ components:
     padding: "4px 12px"
 ---
 
-# Design System: DSIM
+# Design System: BFSIM
 
 ## Overview
 
 **Creative North Star: "The Driver Station"**
 
-DSIM's chrome is built to feel like the physical control box a real FTC team stands behind during a match, not a generic web app shell. Every interactive surface reads as a keycap — a flat colored cap sitting on a slightly darker edge, sinking on hover and pressing flush on click via `transform`, never layout-shifting margin. Data that a driver would glance at mid-match (scores, timers, coordinates, ping) is set in a technical grotesk with tabular numerals; everything else — labels, menu copy, prose — is set in a rounded-geometric sans. The palette spends most of its area in quiet desaturated neutrals so that the two colors reserved for competition state — alliance red and alliance blue — read as genuinely alarming the instant they appear, the way a real field-control light does.
+BFSIM's chrome is built to feel like the physical control box a real FTC team stands behind during a match, not a generic web app shell. Every interactive surface reads as a keycap — a flat colored cap sitting on a slightly darker edge, sinking on hover and pressing flush on click via `transform`, never layout-shifting margin. Data that a driver would glance at mid-match (scores, timers, coordinates, ping) is set in a technical grotesk with tabular numerals; everything else — labels, menu copy, prose — is set in a rounded-geometric sans. The palette spends most of its area in quiet desaturated neutrals so that the two colors reserved for competition state — alliance red and alliance blue — read as genuinely alarming the instant they appear, the way a real field-control light does.
 
 The system is explicitly **dual-theme** (light/dark, user-toggled, WCAG-audited both ways via `npm run contrast`) and explicitly **three-zone**: chrome surfaces invert between themes (ink-on-light becomes ink-on-dark), fixed-hue fills keep one ink regardless of theme (alliance chips, gold), and anything drawn on the game canvas itself uses a third, non-inverting family (`on-field*`) because the field mat is hardcoded dark in both themes. Confusing these three is the single most common contrast bug in this codebase — see the Colors Named Rule below.
 
@@ -272,7 +272,7 @@ Selection has one vocabulary, written down in the comment above `.ds-rail-btn.on
 
 ### Home
 
-- The home screen reads DSIM, then the sponsor line, then the game switcher. Under the switcher sits ONE muted season line (`.ds-home-season`: full season name · program years). See `docs/area/sponsor.md`.
+- The home screen reads BFSIM, then the sponsor line, then the game switcher. Under the switcher sits ONE muted season line (`.ds-home-season`: full season name · program years). See `docs/area/sponsor.md`.
 
 ### HUD (game-screen chrome)
 

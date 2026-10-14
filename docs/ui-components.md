@@ -188,9 +188,9 @@ The look and the depth model are `DESIGN.md`. This file is only the inventory.
 
 | class | declared | used |
 |---|---|---|
-| `.ds-home` | src/ui/shell.css:1190 | 9 |
+| `.ds-home` | src/ui/shell.css:1190 | 7 |
 | `.ds-home-games` | src/ui/shell.css:1214 | 1 |
-| `.ds-home-link` | src/ui/shell.css:1343 | 4 |
+| `.ds-home-link` | src/ui/shell.css:1343 | 2 |
 | `.ds-home-links` | src/ui/shell.css:1229 | 1 |
 | `.ds-home-presents` | src/ui/shell.css:7520 | 1 |
 | `.ds-home-title` | src/ui/shell.css:1200 | 1 |
@@ -407,7 +407,7 @@ The look and the depth model are `DESIGN.md`. This file is only the inventory.
 
 | class | declared | used |
 |---|---|---|
-| `.ds-field` | src/ui/shell.css:2209 | 68 |
+| `.ds-field` | src/ui/shell.css:2209 | 67 |
 | `.ds-field-row` | src/ui/shell.css:2098 | 8 |
 
 ## `ds-fold` — 2
@@ -428,7 +428,7 @@ The look and the depth model are `DESIGN.md`. This file is only the inventory.
 
 | class | declared | used |
 |---|---|---|
-| `.ds-hint` | src/ui/shell.css:2134 | 183 |
+| `.ds-hint` | src/ui/shell.css:2134 | 182 |
 | `.ds-hint-caption` | src/ui/shell.css:4207 | 1 |
 
 ## `ds-homestats` — 2

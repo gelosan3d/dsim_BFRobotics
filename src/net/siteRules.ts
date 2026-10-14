@@ -45,7 +45,7 @@ export function bypassLine(s: GateInput, buildClosed: boolean, channel: string):
   const as = a.admin ? 'an admin' : a.groups.length ? groupPhrase(a.groups) : null;
   if (!as) return null;
   if (siteClosedByServer(s.lockdown) || buildClosed) {
-    return `${channel === 'alpha' ? 'Alpha' : 'DSIM'} is closed to players. You’re in as ${as}.`;
+    return `${channel === 'alpha' ? 'Alpha' : 'BFSIM'} is closed to players. You’re in as ${as}.`;
   }
   return `New matches are paused for players. You can still start them as ${as}.`;
 }

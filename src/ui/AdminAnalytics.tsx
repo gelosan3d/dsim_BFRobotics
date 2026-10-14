@@ -93,7 +93,7 @@ type EventPropRow = { name: string; key: string; val: string; views: number };
 
 /**
  * WHERE THE NUMBERS COME FROM (`HistoryInfo` in server/analytics.ts). Days before `ownFrom` are
- * Vercel Web Analytics' daily totals, from before DSIM counted itself; days from it on are ours.
+ * Vercel Web Analytics' daily totals, from before BFSIM counted itself; days from it on are ours.
  * The server folds them into every number the two share, and says what it could not fold in.
  */
 interface History {
@@ -646,7 +646,7 @@ function EventsPanel({ events, props }: { events: EventRow[]; props: EventPropRo
 // ---- where the history starts -------------------------------------------------
 
 /**
- * WHERE THE NUMBERS BEGIN, AND WHOSE THEY ARE. One line: the combined start, the day DSIM's own
+ * WHERE THE NUMBERS BEGIN, AND WHOSE THEY ARE. One line: the combined start, the day BFSIM's own
  * count takes over from the imported one (the chart marks it), and, when this range reaches the
  * imported days, anything they could not be counted into.
  */

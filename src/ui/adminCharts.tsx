@@ -156,7 +156,7 @@ export function TimeSeries({
   data: SeriesPoint[];
   grain: 'hour' | 'day';
   /**
-   * The first bucket counted by DSIM itself, when the buckets before it are Vercel Web
+   * The first bucket counted by BFSIM itself, when the buckets before it are Vercel Web
    * Analytics' imported days. A thin rule between the two marks the change of source.
    */
   split?: string;
@@ -251,7 +251,7 @@ export function TimeSeries({
             <line className="an-mark" x1={markX} x2={markX} y1={PAD.top} y2={H - PAD.bottom} />
             {/* each label only where it has room, clear of the axis numbers on the left */}
             {markX - PAD.left > 56 && <text className="an-axis" x={markX - 4} y={PAD.top + 10} textAnchor="end">Vercel</text>}
-            {W - PAD.right - markX > 40 && <text className="an-axis" x={markX + 4} y={PAD.top + 10} textAnchor="start">DSIM</text>}
+            {W - PAD.right - markX > 40 && <text className="an-axis" x={markX + 4} y={PAD.top + 10} textAnchor="start">BFSIM</text>}
           </g>
         )}
         <path d={area} fill={`url(#${id}-fill)`} />

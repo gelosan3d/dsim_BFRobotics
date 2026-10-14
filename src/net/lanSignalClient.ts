@@ -73,16 +73,16 @@ export class LanSignalClient implements LanSignalBus {
       try {
         ws = new WebSocket(url);
       } catch {
-        reject(new LanSignalError('Could not reach the DSIM server.', 'noserver'));
+        reject(new LanSignalError('Could not reach the BFSIM server.', 'noserver'));
         return;
       }
       this.ws = ws;
       ws.addEventListener('open', () => resolve());
-      ws.addEventListener('error', () => reject(new LanSignalError('Could not reach the DSIM server.', 'noserver')));
+      ws.addEventListener('error', () => reject(new LanSignalError('Could not reach the BFSIM server.', 'noserver')));
       ws.addEventListener('close', () => {
         this.ready = null;
         this.ws = null;
-        this.pending?.reject(new LanSignalError('Lost the connection to the DSIM server.', 'noserver'));
+        this.pending?.reject(new LanSignalError('Lost the connection to the BFSIM server.', 'noserver'));
         this.pending = null;
         if (!this.disposed) for (const cb of this.closedCbs) cb();
       });
@@ -135,7 +135,7 @@ export class LanSignalClient implements LanSignalBus {
       const timer = setTimeout(() => {
         if (this.pending?.want === want) {
           this.pending = null;
-          reject(new LanSignalError('The DSIM server did not answer.', 'timeout'));
+          reject(new LanSignalError('The BFSIM server did not answer.', 'timeout'));
         }
       }, REQUEST_TIMEOUT_MS);
       const done = <T,>(fn: (v: T) => void) => (v: T) => {

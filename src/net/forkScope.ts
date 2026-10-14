@@ -4,7 +4,7 @@
  * This is a personal fork of DSIM (`my-changes`). Its additions — the FTC25 control scheme's
  * slow mode, shooter presets, element buttons and target snap, the preset table on a robot
  * (`AssistConfig.manualShot`), Local versus — are for this device and for LAN rooms. The owner's
- * rule (2026-10-12): **nothing of these changes may reach anything that syncs to DSIM's own
+ * rule (2026-10-12): **nothing of these changes may reach anything that syncs to BFSIM's own
  * servers or leaderboards.** So:
  *
  *  - SOLO (no session): everything acts.
@@ -13,7 +13,7 @@
  *    (`tabHosting`): everything acts. The mark is on the session object, not a flag, so it can
  *    never outlive the match: a ranked match afterwards is a new session nobody marked. The room runs on a machine in the room, on this
  *    fork's own code.
- *  - ANY OTHER ROOM is on DSIM's servers: the FTC25 layout still drives, intakes and shoots, its
+ *  - ANY OTHER ROOM is on BFSIM's servers: the FTC25 layout still drives, intakes and shoots, its
  *    own buttons do nothing, and the robot is sent without its preset table.
  *
  * The other half of the rule — no run, match or setting carrying these changes is uploaded —
@@ -46,8 +46,8 @@ export function forkFeaturesAllowed(session: object | null | undefined): boolean
 /**
  * WAS THIS RUN PLAYED WITH THIS FORK'S FEATURES? Any seat spawned with the FTC25 preset table
  * (`AssistConfig.manualShot`) was driven with FTC25 controls — slow mode, presets, element
- * buttons and the target snap, none of which DSIM's own clients have. Such a run is kept on the
- * device and never uploaded to DSIM's servers (practice records, LAN history, the games-played
+ * buttons and the target snap, none of which BFSIM's own clients have. Such a run is kept on the
+ * device and never uploaded to BFSIM's servers (practice records, LAN history, the games-played
  * counter). A Local versus run is marked by its caller, since a second person on a DSim map
  * leaves nothing in the setups to see.
  */

@@ -13,62 +13,62 @@
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://www.playdsim.com/</loc>
+    <loc>https://bfsim.example/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode</loc>
+    <loc>https://bfsim.example/decode</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/chain</loc>
+    <loc>https://bfsim.example/chain</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/biobuzz</loc>
+    <loc>https://bfsim.example/biobuzz</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/modes</loc>
+    <loc>https://bfsim.example/decode/modes</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/configure/robot</loc>
+    <loc>https://bfsim.example/decode/configure/robot</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/records</loc>
+    <loc>https://bfsim.example/decode/records</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/download</loc>
+    <loc>https://bfsim.example/decode/download</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/changelogs</loc>
+    <loc>https://bfsim.example/decode/changelogs</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/contributors</loc>
+    <loc>https://bfsim.example/decode/contributors</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/privacy</loc>
+    <loc>https://bfsim.example/decode/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://www.playdsim.com/decode/terms</loc>
+    <loc>https://bfsim.example/decode/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

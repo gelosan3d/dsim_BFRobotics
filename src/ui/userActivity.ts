@@ -3,7 +3,7 @@
  *
  * The hooks already skip a HIDDEN tab, which covers minimised windows and
  * background tabs. This covers the case that rule misses: a tab that is visible
- * and abandoned. DSIM left open on a second monitor is `visible` by every check
+ * and abandoned. BFSIM left open on a second monitor is `visible` by every check
  * the browser offers, so it kept polling every 20s forever.
  *
  * That mattered more than it sounds. Neon suspends the database only after five

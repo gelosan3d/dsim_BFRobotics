@@ -1,4 +1,4 @@
-# DSIM multiplayer synchronization engine — review, cost model, and plan
+# BFSIM multiplayer synchronization engine — review, cost model, and plan
 
 **Measured 2026-09-11 at `1b72858`/`8cd4d61`. Re-verified claim-by-claim 2026-09-12 at
 `593ac86`, which is where the citations below point.** Companion to

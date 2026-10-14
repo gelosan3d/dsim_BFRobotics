@@ -29,13 +29,17 @@ import { APP_BLURB, fullNameOf, seasonFor, visibleSeasonsOn } from './seasons';
 const INDEXABLE = visibleSeasonsOn('stable');
 const indexable = (game: GameId): boolean => INDEXABLE.some((s) => s.key === game);
 
-/** the deployed origin — canonical/og:url must be absolute for scrapers */
-export const SITE_URL = 'https://www.playdsim.com';
+/** the deployed origin — canonical/og:url must be absolute for scrapers. This fork has no hosted
+ *  site of its own: set `VITE_SITE_URL` for a deployment, otherwise it is the page's own origin
+ *  ('' when there is no page, e.g. the headless smoke run). */
+export const SITE_URL: string =
+  ((import.meta.env?.VITE_SITE_URL as string | undefined) ?? '').trim().replace(/\/+$/, '') ||
+  (typeof location !== 'undefined' && /^https?:$/.test(location.protocol) ? location.origin : '');
 
-const HOME_TITLE = 'DSIM: Online FTC Driving Simulator';
+const HOME_TITLE = 'BFSIM: Online FTC Driving Simulator';
 /** the browser tab reads this on EVERY route — the per-route titles below only
  *  feed og:title / twitter:title (link previews). Keep in sync with `index.html`. */
-export const TAB_TITLE = 'DSIM presented by Offset Robotics';
+export const TAB_TITLE = 'BFSIM presented by BF Robotics';
 // the on-page sentence plus what you can do here. Descriptions are what shows
 // under the link in a search result — say what the page IS, don't sell it.
 // "DECODE or Chain Reaction" — named from the registry, so a hidden season cannot
@@ -52,7 +56,7 @@ export const HOME_DESC = `${APP_BLURB} Build a robot, drive ${gameList(INDEXABLE
 
 /** title + description for a route, keyed by the App's `Screen` union. */
 interface RouteMeta {
-  /** full <title>; the home route is the bare brand title (no ` · DSIM` suffix) */
+  /** full <title>; the home route is the bare brand title (no ` · BFSIM` suffix) */
   title: string;
   description: string;
 }
@@ -72,28 +76,28 @@ const ROUTE_META: Record<string, RouteMeta> = {
   records: {
     title: 'Leaderboards & records',
     description:
-      'DSIM leaderboards, personal bests, world records and career stats, by mode and drivetrain.',
+      'BFSIM leaderboards, personal bests, world records and career stats, by mode and drivetrain.',
   },
   lan: {
     title: 'LAN play',
     description:
-      'Host a DSIM match on your own computer and play with everyone on the same network.',
+      'Host a BFSIM match on your own computer and play with everyone on the same network.',
   },
   download: {
     title: 'Download the desktop app',
-    description: 'DSIM for Windows, macOS and Linux.',
+    description: 'BFSIM for Windows, macOS and Linux.',
   },
   contributors: {
     title: 'Contributors',
-    description: 'The people, sponsor and open-source projects behind DSIM.',
+    description: 'The people, sponsor and open-source projects behind BFSIM.',
   },
   changelogs: {
     title: 'Changelog',
-    description: 'Patch notes and release history for DSIM.',
+    description: 'Patch notes and release history for BFSIM.',
   },
   profile: {
     title: 'Player profile',
-    description: 'A DSIM player’s rating, records and recent matches.',
+    description: 'A BFSIM player’s rating, records and recent matches.',
   },
 };
 
@@ -134,7 +138,7 @@ function setCanonical(url: string): void {
  *     indexable page instead of being folded into the brand result — which is
  *     what makes them candidates to appear as sitelinks beneath it.
  *
- * A game title still ends in DSIM, so if a search engine ever prefers one of
+ * A game title still ends in BFSIM, so if a search engine ever prefers one of
  * them for a brand query the result is still recognisably the site.
  */
 export function applyRouteMeta(
@@ -161,16 +165,16 @@ export function applyRouteMeta(
   // game before this module existed) without burying the brand on the one page
   // search engines actually rank.
   const title = !meta
-    ? `${season} · DSIM`
+    ? `${season} · BFSIM`
     : screen === 'home'
       ? gameHome
-        ? `${fullNameOf(s)} · DSIM`
+        ? `${fullNameOf(s)} · BFSIM`
         : meta.title
-      : `${meta.title} · ${season} · DSIM`;
+      : `${meta.title} · ${season} · BFSIM`;
   document.title = TAB_TITLE;
   if (meta) {
     const description = gameHome
-      ? `${s.blurb} Drive it in DSIM, ${APP_BLURB[0].toLowerCase()}${APP_BLURB.slice(1, -1)}.`
+      ? `${s.blurb} Drive it in BFSIM, ${APP_BLURB[0].toLowerCase()}${APP_BLURB.slice(1, -1)}.`
       : meta.description;
     setMeta('name', 'description', description);
     setMeta('property', 'og:description', description);

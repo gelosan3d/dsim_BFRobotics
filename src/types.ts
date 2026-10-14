@@ -614,7 +614,7 @@ export interface RobotState {
   // --- Auto Pathing State (INERT) ---
   // DECODE's `.pp` auto paths were removed with DECODE (2026-10-12) and nothing reads these. They
   // STAY because Chain Reaction and BIOBUZZ still spawn every robot with them at rest, so they are
-  // in every world's JSON — `worldHash`, the snapshot codec and DSIM's own servers all see them.
+  // in every world's JSON — `worldHash`, the snapshot codec and BFSIM's own servers all see them.
   autoPathActive: boolean;
   currentPathSegmentIndex: number;
   pathSegmentProgress: number; // 0.0 to 1.0 along the current segment
@@ -920,7 +920,7 @@ export interface GameSettings {
   assists: AssistConfig;
   bindings: ControlBindings;
   /**
-   * WHICH CONTROLS ARE IN USE: `dsim` is DSIM's own (`bindings`), `ftc25` is team 2627's
+   * WHICH CONTROLS ARE IN USE: `dsim` is BFSIM's own (`bindings`), `ftc25` is team 2627's
    * DECODE-season TeleOp layout (`ftc25Bindings`, from moorlacks/FTC2627), which also lets the
    * driver pick the DECODE shooter's power (`AssistConfig.manualShot`, offline only). Read the
    * map in use through `activeBindings`, never either field directly. A NEW SIBLING, like
@@ -955,7 +955,7 @@ export interface GameSettings {
       shoot: number;
       intake: number;
       /** DECODE's classifier gate. No sound reads it since DECODE was removed (2026-10-12);
-       *  kept so the blob synced to a DSIM account is the one an unmodified client writes. */
+       *  kept so the blob synced to a BFSIM account is the one an unmodified client writes. */
       gate: number;
       beep: number;
       alert: number;
@@ -989,7 +989,7 @@ export interface GameSettings {
   perfDisplay: PerfDisplay;
   /**
    * DECODE'S OWN SETTINGS, OPAQUE. DECODE was removed from this fork (owner, 2026-10-12), but a
-   * synced DSIM account — and an unmodified DSIM client on it — still has DECODE, so its data is
+   * synced BFSIM account — and an unmodified BFSIM client on it — still has DECODE, so its data is
    * carried untouched rather than dropped: lifted out of a loaded blob by `coerceSettings` and put
    * back by `forAccount`. Nothing in this build reads inside it.
    */

@@ -74,7 +74,7 @@ function StorageInventory() {
       </div>
       <div className="ds-panel-body stack">
         <p className="ds-hint">
-          DSIM sets no cookies. These are the keys it writes to your browser’s own storage.
+          BFSIM sets no cookies. These are the keys it writes to your browser’s own storage.
           Clearing your browser data for this site removes all of them; nothing here is
           transmitted unless the row says so.
         </p>
@@ -96,7 +96,7 @@ function StorageGroup({ cat }: { cat: StorageCategory }) {
       </div>
       {rows.length === 0 ? (
         <div className="ds-panel-body">
-          <p className="ds-hint">None. DSIM stores nothing on your device for this purpose.</p>
+          <p className="ds-hint">None. BFSIM stores nothing on your device for this purpose.</p>
         </div>
       ) : (
         /* `.ds-panel` clips for its rounded corners, so a table wider than a phone needs its
@@ -236,7 +236,7 @@ function AdsRow() {
       </div>
       <div className="ds-panel-body stack start">
         <p className="ds-hint">
-          DSIM sets no cookies of its own. Where the web version shows advertising, Google
+          BFSIM sets no cookies of its own. Where the web version shows advertising, Google
           AdSense and its partners may set cookies or read a device identifier to serve and
           measure ads. Ads are <strong>non-personalised by default</strong>
           {AD_TFUAC ? ', and every request is tagged as being for a user below the age of consent'
@@ -354,7 +354,7 @@ function ExportRow() {
           </>
         ) : (
           <p className="ds-hint">
-            Sign in to export. Signed out, everything DSIM has is the browser storage listed
+            Sign in to export. Signed out, everything BFSIM has is the browser storage listed
             above.
           </p>
         )}

@@ -527,7 +527,7 @@ The old P2P lockstep/mesh/TURN/Supabase-lobby is DELETED. Full roadmap: `docs/ne
     label does not explain that.
   - **↓ Video** (`src/ui/replayVideo.ts`) is the one that LASTS: it stops being a
     re-simulation and becomes a recording, so it outlives every patch, needs no sim, and can be
-    sent to someone without DSIM. THREE FORMATS — **MP4/H.264 first and default**, then
+    sent to someone without BFSIM. THREE FORMATS — **MP4/H.264 first and default**, then
     WebM/VP9 and WebM/VP8 — and **all three go through WebCodecs**, so they all cost the same
     and the menu quotes it from the match's own length (`FAST_ENCODE_SPEED`, the measured 5×; a
     2:42 match saves in ~32s).

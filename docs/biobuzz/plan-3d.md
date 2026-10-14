@@ -524,7 +524,7 @@ unrated. Recorded in replays like any seat (the recorder records every setup's c
   `z/vz`. `BiobuzzState` grows by `physics`, spill tags and the deploy latch. Priced by
   `costprobe`.
 - **Caps**: `CLIENT_CAPS` gains `'bb3d'`. A join to a 3D room from a client without it is refused
-  with "Update DSIM to play this room." Old clients keep playing 2D-physics rooms and 2D-era
+  with "Update BFSIM to play this room." Old clients keep playing 2D-physics rooms and 2D-era
   replays untouched.
 - **Replays**: header gains `physics` (absent `'2d'`); playback dispatches on it. `REPLAY_FORMAT`
   unchanged (no new command bits). 3D replays are exact under the deterministic build.

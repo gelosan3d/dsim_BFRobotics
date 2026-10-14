@@ -134,7 +134,7 @@ export function AppShell({
           {APP_NAME}
         </button>
         {/* WHICH SEASON IS LOADED, on every shell screen (owner, 2026-09-22: "the UI does not show
-            which game mode I am in"). The app is DSIM and the season is what is loaded, so the
+            which game mode I am in"). The app is BFSIM and the season is what is loaded, so the
             two are separate words with a separator, not one name. Plain text, not a control: the
             game is switched on the home page. No aria-label: that is not allowed on a generic
             span, and the visible name is the whole message. */}

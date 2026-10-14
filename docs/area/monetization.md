@@ -17,7 +17,7 @@ Not yet deployed. `HANDOFF.md` has the full write-up; the load-bearing rules:
   is set, and are suppressed unconditionally in the Electron build (AdSense forbids app
   wrappers), on touch, and for supporters. `AdsProvider` FAILS CLOSED — ads stay off
   until the entitlement check settles, so a supporter never sees a flash of them.
-- **Ads are NON-PERSONALIZED by default and tagged TFUAC.** DSIM simulates FTC
+- **Ads are NON-PERSONALIZED by default and tagged TFUAC.** BFSIM simulates FTC
   (grades 7–12) and the sim is fully playable SIGNED OUT, so most impressions carry no
   age signal. `VITE_ADSENSE_PERSONALIZED=1` is a deliberate opt-in. TFCD (COPPA) stays
   off: the terms set 13+, so asserting child-directed would be inaccurate, not cautious.
@@ -65,7 +65,7 @@ Not yet deployed. `HANDOFF.md` has the full write-up; the load-bearing rules:
 - ⚠️ **`LEGAL_OPERATOR`/`LEGAL_JURISDICTION` in `src/legalText.ts` are PLACEHOLDERS.**
   Until filled, the Terms page shows a visible warning to every visitor. Fill them
   before taking a payment; do not guess them from a timezone or an email domain.
-- **FIRST-PARTY ANALYTICS — the admin console's Analytics tab.** DSIM measures itself now
+- **FIRST-PARTY ANALYTICS — the admin console's Analytics tab.** BFSIM measures itself now
   (`server/analytics.ts`, migration `0042`, `src/pageviews.ts`, `src/ui/AdminAnalytics.tsx`),
   and since September 2026 ONLY itself: the host's analytics script was dropped once the tab
   covered everything it showed. The first reason to build it was the thing a third party structurally

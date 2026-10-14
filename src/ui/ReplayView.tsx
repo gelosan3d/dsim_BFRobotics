@@ -86,7 +86,7 @@ const mmss = (sec: number): string => {
 const DIFFERENT_MATCH = 'so the same inputs would play back as a different match.';
 
 const REFUSAL_TEXT: Record<ReplayRefusal, (r: Replay) => string> = {
-  future: () => 'Recorded by a newer version of DSIM. Refresh the page, then open it again.',
+  future: () => 'Recorded by a newer version of BFSIM. Refresh the page, then open it again.',
   balance: (r) =>
     `Played on balance v${r.balanceVersion}; this build runs v${BALANCE_VERSION}. ` +
     `Robots drive and score differently now, ${DIFFERENT_MATCH}`,
@@ -94,13 +94,13 @@ const REFUSAL_TEXT: Record<ReplayRefusal, (r: Replay) => string> = {
     `Played on sim v${r.sim}; this build runs v${SIM_VERSION}. The physics or the rules have ` +
     `changed, ${DIFFERENT_MATCH}`,
   unstamped: () =>
-    'Recorded before DSIM tracked which sim version produced a replay, so there is no way to ' +
+    'Recorded before BFSIM tracked which sim version produced a replay, so there is no way to ' +
     'tell whether it would play back correctly.',
   tank: () =>
     'Recorded in an early format that had nowhere to store tank drive input, so the robot ' +
     'would not move.',
   // the only game a replay can be of that this build lacks is DECODE (removed 2026-10-12)
-  game: () => 'Recorded in DECODE, which this version of DSIM does not include.',
+  game: () => 'Recorded in DECODE, which this version of BFSIM does not include.',
 };
 
 /**
@@ -115,7 +115,7 @@ const DRIFT_TEXT: Record<'behaviour' | 'unstamped', (r: Replay) => string> = {
     `Recorded on sim v${r.sim}; this build runs v${SIM_VERSION}. It plays, but the ending may ` +
     'not land on exactly the saved score. The leaderboard figure is the real one.',
   unstamped: () =>
-    'Recorded before DSIM tracked which sim version produced a replay. It plays, but the ' +
+    'Recorded before BFSIM tracked which sim version produced a replay. It plays, but the ' +
     'ending may not land on exactly the saved score. The leaderboard figure is the real one.',
 };
 
@@ -756,7 +756,7 @@ export function ReplayView({
    * for something we could not reproduce anyway.
    *
    * The VIDEO is the one that lasts: it stops being a re-simulation and becomes a recording, so
-   * it outlives every patch, needs no sim to watch, and can be sent to someone without DSIM.
+   * it outlives every patch, needs no sim to watch, and can be sent to someone without BFSIM.
    * It is captured off the live canvas in REAL TIME (see `replayVideo.ts`), so a full match
    * takes a full match — the replay restarts from tick 0 and plays through while it records.
    *
@@ -769,7 +769,7 @@ export function ReplayView({
    *
    * The `replay` placement was declared from the start and counted nothing, so
    * the one surface with reach BEYOND our own traffic — a clip posted to Discord
-   * or YouTube, watched by people who never opened DSIM — was the only placement
+   * or YouTube, watched by people who never opened BFSIM — was the only placement
    * missing from the report. It is not an on-screen impression and `docs/sponsor.md`
    * reports it on its own line: this counts FILES PRODUCED with the mark in them,
    * which is a floor on the views they go on to earn, not an estimate of them.
@@ -1400,7 +1400,7 @@ export function ReplayView({
                       <em>{dataBytes ? `${Math.max(1, Math.round(dataBytes / 1024))} KB` : '.json'}</em>
                     </span>
                     <span className="dl-d">
-                      The input log. Plays in DSIM on balance v{BALANCE_VERSION}, sim v
+                      The input log. Plays in BFSIM on balance v{BALANCE_VERSION}, sim v
                       {SIM_VERSION}.
                     </span>
                   </button>

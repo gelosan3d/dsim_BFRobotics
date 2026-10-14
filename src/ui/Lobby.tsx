@@ -50,7 +50,7 @@ interface Props {
   config?: RoomConfig;
   /** is SOME account signed in — friends invitations need an account on both ends */
   signedIn?: boolean;
-  /** Saved DSIM display name, never the immutable auth-provider name. */
+  /** Saved BFSIM display name, never the immutable auth-provider name. */
   displayName?: string | null;
   /** Account context forwarded into the persistent room friends panel. */
   myUserId?: string | null;
@@ -377,7 +377,7 @@ export function Lobby({
   );
 
   // The profile request may resolve after this screen mounts. Adopt the saved
-  // DSIM display name while the player is still choosing a room, but never erase
+  // BFSIM display name while the player is still choosing a room, but never erase
   // a deliberate room-only name edit or mutate identity after joining.
   useEffect(() => {
     if (displayName && phase === 'entry' && !nameEditedRef.current) setName(displayName);
@@ -414,7 +414,7 @@ export function Lobby({
     startedRef.current = true;
     // pass the identity + room so the session can reclaim its slot on a reconnect
     const sess = new ServerSession(lobby.transport, lobby.isHost(), m, lobby.clientId, roomCode, false, lobby.seatToken);
-    // a LAN room's match may use this fork's features; a room on DSIM's servers may not
+    // a LAN room's match may use this fork's features; a room on BFSIM's servers may not
     if (lanConn.current) markLanSession(sess);
     onStart(sess);
   }
@@ -531,7 +531,7 @@ export function Lobby({
   }
 
   /** the assists this player's robot is sent with: under FTC25 controls a LAN room also gets the
-   *  shooter preset table (`seatAssists`); a room on DSIM's servers never does (`forkScope`) */
+   *  shooter preset table (`seatAssists`); a room on BFSIM's servers never does (`forkScope`) */
   function roomAssists(): AssistConfig {
     return lanConn.current ? seatAssists(settings) : settings.assists;
   }

@@ -36,7 +36,7 @@ export function LinkedAccounts() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get('link');
     if (!p) return;
-    if (p === 'taken') setError('That account is already linked to another DSIM profile.');
+    if (p === 'taken') setError('That account is already linked to another BFSIM profile.');
     else if (p === 'error') setError('Couldn’t finish linking. Try again.');
     // strip it so a reload does not repeat the message
     window.history.replaceState(null, '', window.location.pathname);

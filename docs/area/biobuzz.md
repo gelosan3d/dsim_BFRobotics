@@ -799,7 +799,7 @@ newest-first — it is never ranked, which is what keeps the two eras from meeti
       **[docs/biobuzz/free-cam-presets.md](../biobuzz/free-cam-presets.md)** carries the URLs, the
       quoted wording, what each vendor does NOT state, and which packages were DROPPED for want of
       a primary source (Inventor, Creo, NX, FreeCAD, SketchUp, Tinkercad). `dsim` IS the Onshape
-      mapping (owner: "DSIM default should also be very close to how the onshape one works") plus
+      mapping (owner: "BFSIM default should also be very close to how the onshape one works") plus
       left-drag orbit and Shift+left pan, because left is free here and the orbit camera already
       used it. `⌘` folds into Ctrl; ALT is ignored by a preset (so Onshape's own Alt+right
       constrained rotate is an orbit here) and exact in a custom layout.

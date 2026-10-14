@@ -705,7 +705,7 @@ const mkWorld = (
      A blob saved ON DECODE opens on the default game with the player's OWN archived BIOBUZZ
      robot — not their DECODE robot coerced into a BIOBUZZ one — and every piece of DECODE data
      (its loadout, seats, binding overrides, auto paths) rides along opaque, so the copy synced to
-     a DSIM account is not stripped of it: an unmodified DSIM client on that account still has it. */
+     a BFSIM account is not stripped of it: an unmodified BFSIM client on that account still has it. */
   {
     const decodeSpec = { ...DEFAULT_SPEC, name: 'DecodeBot', intake: 'vector' };
     const raw = {
@@ -893,7 +893,7 @@ const mkWorld = (
 // command field set). FTC25 binds every one of its actions on one controller and on two, with no
 // clash; the shooter presets are RESERVED (bound, but no game reads `shotPower` since DECODE
 // went, 2026-10-12) and `fireSel` acts only where the robot can physically choose; the snaps
-// turn to the season's target; and nothing this fork adds can reach DSIM's own servers (account
+// turn to the season's target; and nothing this fork adds can reach BFSIM's own servers (account
 // sync, run uploads, rooms on its servers).
 {
   const J = (v: unknown): string => JSON.stringify(v);
@@ -1071,7 +1071,7 @@ const mkWorld = (
       coerceAssists({ ...DEFAULT_ASSISTS, manualShot: [1, 1] }).manualShot === undefined,
   );
 
-  // ── NOTHING OF THIS FORK REACHES DSIM'S SERVERS: the account copy ──
+  // ── NOTHING OF THIS FORK REACHES BFSIM'S SERVERS: the account copy ──
   const mine: GameSettings = {
     ...def,
     controlScheme: 'ftc25',
@@ -1754,7 +1754,7 @@ const mkWorld = (
      on purpose, and pressed by accident it re-aims the sticks mid-match — the last thing to put
      on a button a thumb lands on. It has a default KEY (H), so the key half below still holds. */
   const PAD_DEFAULT_EXEMPT: readonly string[] = ['driveFrame'];
-  /* THE FTC25 CONTROLS' OWN ACTIONS ARE OUT OF THIS RULE ON THE DSIM MAP, ON PURPOSE (owner,
+  /* THE FTC25 CONTROLS' OWN ACTIONS ARE OUT OF THIS RULE ON THE BFSIM MAP, ON PURPOSE (owner,
      2026-10-12: DSim controls stay exactly as they were). They are team 2627's gamepad layout,
      unbound in `DEFAULT_BINDINGS` and not on the DSim screen. The other half of the rule binds
      them where they belong: every one has a pad bind on the FTC25 map (the block after this). */
@@ -3611,7 +3611,7 @@ function pushContest(A: Partial<RobotSpec>, B: Partial<RobotSpec>, seconds = 3):
    *    screen titled "LAN play" whose only control asked for somebody ELSE'S address. The
    *    reasonable reading of that is "hosting is broken", and a page that cannot host has to
    *    say so and say what to do instead — a browser tab cannot open a listening socket and
-   *    no amount of DSIM code changes that (`docs/lan-selfhost.md` shows the working).
+   *    no amount of BFSIM code changes that (`docs/lan-selfhost.md` shows the working).
    * 2. EVERY COPY BUTTON ON THIS PAGE WAS A NO-OP on the page it matters most on. The
    *    Clipboard API needs a SECURE CONTEXT; a guest is served from `http://192.168.x.x`,
    *    which is neither https nor `localhost`, so `navigator.clipboard` is `undefined`
@@ -10725,7 +10725,7 @@ const recordDrive: CommandSource = (tick) => {
   // and there is no CHAT category, because this game has no chat — offering one would
   // collect reports nobody could ever act on
   check(
-    'report: no chat/messaging category (DSIM has neither)',
+    'report: no chat/messaging category (BFSIM has neither)',
     !REPORT_REASONS.some((r) => /chat|message|voice/i.test(r)),
     REPORT_REASONS.join(','),
   );
@@ -15840,7 +15840,7 @@ const dumperSetup = (): RobotSetup => {
 
   // 7b. ⚠️ THE PAGE-VIEW SCRUBBERS (`src/pageviews.ts`).
   //
-  // The privacy promise DSIM's own analytics makes is that an id never leaves the browser —
+  // The privacy promise BFSIM's own analytics makes is that an id never leaves the browser —
   // not that it is deleted once it arrives, which is a different and weaker promise. That
   // makes these four pure functions the load-bearing part of the feature on this side of the
   // wire, and "verified by reading" is exactly what is not good enough for them.
@@ -18481,7 +18481,7 @@ const dumperSetup = (): RobotSetup => {
     bootSameFrame.length === 0,
     `same-frame: ${bootSameFrame.join(' | ')}`,
   );
-  const bootSponsor = bootExternal.find((a) => a.includes('offsetrobotics.com'));
+  const bootSponsor = bootExternal.find((a) => a.includes('github.com/gelosan3d/dsim_BFRobotics'));
   // the placement and its hand-written UTM tag are a contracted obligation
   // (docs/area/sponsor.md) — only HOW the link opens changed, so pin all three together
   check(
@@ -18490,7 +18490,7 @@ const dumperSetup = (): RobotSetup => {
       /utm_medium=loading/.test(bootSponsor) &&
       /target="_blank"/.test(bootSponsor) &&
       /rel="noreferrer"/.test(bootSponsor),
-    (bootSponsor ?? 'no offsetrobotics.com anchor').replace(/\s+/g, ' '),
+    (bootSponsor ?? 'no github.com/gelosan3d/dsim_BFRobotics anchor').replace(/\s+/g, ' '),
   );
 
   // ── the launch query, captured at module load ─────────────────────────────────

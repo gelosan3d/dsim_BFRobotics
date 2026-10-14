@@ -18,7 +18,7 @@ import { getViewPref } from '../games/biobuzz/graphics/store';
 import { setPracticeUploadBlocked } from './practiceRuns';
 
 /**
- * Boards + periods are per-game. DSIM's server reads a MISSING `game` as DECODE, which upstream
+ * Boards + periods are per-game. BFSIM's server reads a MISSING `game` as DECODE, which upstream
  * left out of the URL; this fork has no DECODE (2026-10-12), so every game it has names itself.
  * `needsGameParam` is the shared predicate so the query builders below cannot disagree.
  */
@@ -663,7 +663,7 @@ export function fetchReplay(id: string): Promise<Replay> {
 
 /** may anyone watch your versus match replays? Default FALSE, and retroactively so — see
  * migration 0037. A match is released only when EVERY player in it has this on. */
-/** the providers a DSIM account can link. */
+/** the providers a BFSIM account can link. */
 export type LinkProvider = 'github' | 'discord';
 
 /** which providers this server has credentials for, and which you have linked. */
@@ -2333,7 +2333,7 @@ export async function fetchMyExport(): Promise<AccountExport> {
 }
 
 /**
- * Delete the signed-in account and everything DSIM stores about it.
+ * Delete the signed-in account and everything BFSIM stores about it.
  *
  * Irreversible, so the server demands the literal string `DELETE` in the body —
  * a value no accidental or replayed request carries. Throws on failure: someone

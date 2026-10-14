@@ -3,7 +3,7 @@
  *
  * WHAT A DODGE IS. A ranked pairing is a contract between two (or four) people: the moment
  * the matchmaker stages a roster, everybody else's next few minutes depend on you showing
- * up. DSIM's flow gives that contract exactly three ways to fail, and all three end in
+ * up. BFSIM's flow gives that contract exactly three ways to fail, and all three end in
  * `Room.cancelPending` — the match dies and everyone requeues:
  *
  *   1. NO-SHOW       — paired, never connected inside the join grace

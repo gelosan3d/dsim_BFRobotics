@@ -32,7 +32,7 @@ export function Changelog() {
       <h1 className="ds-h1">Changes</h1>
 
       <section className="ds-panel cl-panel">
-        {/* NO PANEL TITLE. The eyebrow says "DSIM · Changes", the h1 says
+        {/* NO PANEL TITLE. The eyebrow says "BFSIM · Changes", the h1 says
             "Changes", and "What's changed" said it a third time inside 60px on a
             page holding exactly one panel. The GitHub link is the only thing in
             this header carrying information, so it is the only thing in it —

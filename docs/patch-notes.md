@@ -181,7 +181,7 @@ Do not restate them here; they drift. The ones that catch people writing notes:
 - ⚠️ **NO EM DASHES. None.** Not one, anywhere in a patch note. A dash-joined appositive is
   the single most-cited tell of machine-written prose, and every one of them is a full stop,
   a colon, a comma or a rewrite. This is stricter than the rest of the app's copy, and it is
-  deliberate: a note is the most-read prose DSIM publishes.
+  deliberate: a note is the most-read prose BFSIM publishes.
 - **Sentence case headings.** No Title Case, no ALL CAPS.
 - **No padding**: simply, just, please note, be sure to, feel free to. No "we're excited to".
 
@@ -203,7 +203,7 @@ every one below was written into a real draft of these notes and had to be pulle
 - **"X reads as X."** *Terrain reads as terrain* → say what the player sees: **"The robot
   lifts, casts a shadow and thumps."**
 - **"A is A"** restatements. *A pile pushes as a pile* → **"You can push a whole pile."**
-- **Grand openers.** *The biggest update DSIM has had.* Cut it. Open on the heading and the
+- **Grand openers.** *The biggest update BFSIM has had.* Cut it. Open on the heading and the
   headline bullets; let the content be the claim.
 
 The common fault is a sentence that sounds like it is saying something while carrying no
@@ -211,7 +211,7 @@ new fact. Read each bullet and ask what a player learns from it. If the answer i
 are pleased with it", delete it.
 - **Terminology is per game and a leak is a bug.** DECODE has **artifacts**; Chain Reaction
   has **particles**, and its ring is a **catalyst** (the *ring stand* is a different object).
-  Teleop is **driver-controlled**. DSIM is the app; DECODE and Chain Reaction are seasons of
+  Teleop is **driver-controlled**. BFSIM is the app; DECODE and Chain Reaction are seasons of
   it, never the product name.
 
 ### Write the fix, not the bug's history

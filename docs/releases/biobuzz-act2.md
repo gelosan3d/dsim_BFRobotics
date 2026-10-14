@@ -108,7 +108,7 @@ between the two.
 
 | step | action | check |
 |---|---|---|
-| T−60 min | Schedule maintenance: `curl -X POST "$GS/api/admin/maintenance?active=1&startsAt=<ms>&endsAt=<ms>&msg=DSIM+BIOBUZZ+Act+2+update&secret=$ADMIN_SECRET"` (or the admin console). Post the heads-up in the DSIM Discord. | `/api/presence` shows `maintenance`, `biting:false` |
+| T−60 min | Schedule maintenance: `curl -X POST "$GS/api/admin/maintenance?active=1&startsAt=<ms>&endsAt=<ms>&msg=BFSIM+BIOBUZZ+Act+2+update&secret=$ADMIN_SECRET"` (or the admin console). Post the heads-up in the BFSIM Discord. | `/api/presence` shows `maintenance`, `biting:false` |
 | T−0 | Window starts. Admins still get in. | `biting:true`; `/api/presence` rooms drain |
 | 1 | Neon: create branch `pre-act2-2026-09-xx` from production. This is the restore point. | branch listed |
 | 2 | Merge: `git push origin <frozen-sha>:main` (fast-forward; `main` is not protected). | `git log origin/main -1` = frozen SHA |
@@ -119,7 +119,7 @@ between the two.
 | 7 | Smoke as admin: one BIOBUZZ practice and one custom room (3D), one DECODE and one Chain Reaction match, open a replay, check the badge claim dialog on an account that placed in Act 1. Don't set a BIOBUZZ record before step 6. | no console errors |
 | 8 | Publish in the admin console: an `act` announcement (title `BIOBUZZ · Act 2 · Season 1`, tagline `A NEW ACT BEGINS`, body below), then the `patch` announcement (§4). | `/api/announcements` lists both |
 | 9 | Lift maintenance: `curl -X POST "$GS/api/admin/maintenance?active=0&secret=$ADMIN_SECRET"`. | `/api/presence` `maintenance:null` |
-| 10 | Post the DSIM Discord announcement (§5). The public FTC post (§6) can wait a day until the release has held up. | |
+| 10 | Post the BFSIM Discord announcement (§5). The public FTC post (§6) can wait a day until the release has held up. | |
 | 11 | Afterwards: HANDOFF entry, watch `/api/perf` and the capacity task for 3D room load, optional desktop build (`ELECTRON=1`) for the Google sign-in pop-up. | |
 
 Act announcement body:
@@ -206,8 +206,8 @@ secrets are not set. Paste everything inside the fence.
 - **Record Holder**: the solo record board's top 3, and each drivetrain's #1, when a season ends.
 - **Past acts and seasons are paid too**, in every game, BIOBUZZ Act 1 included.
 - **Claim each reward** when it arrives, then wear up to 3 badges beside your name.
-- [3] **Star DSIM on GitHub** and link GitHub in Profile › Account for the Stargazer badge and a star decal.
-- [3] **Boost the DSIM Discord** and link Discord for supporter perks while you boost.
+- [3] **Star the original DSIM on GitHub** and link GitHub in Profile › Account for the Stargazer badge and a star decal.
+- [3] **Boost the BFSIM Discord** and link Discord for supporter perks while you boost.
 - **Robot cosmetics**: chassis colour, accent, decal and number plate.
 
 ## Replays and history
@@ -232,12 +232,12 @@ secrets are not set. Paste everything inside the fence.
 - **Accounts**: reset a forgotten password, download everything we hold about you, and change your cookie choices at any time.
 ```
 
-## 5. DSIM Discord announcement
+## 5. BFSIM Discord announcement
 
 Heads-up for T−60 (§3):
 
 ```
-@everyone DSIM goes down for maintenance at <time> for the BIOBUZZ Act 2 update, for about 30 minutes. Finish your match before then. Matches already running are not cut off, but new ones can't start during the window.
+@everyone BFSIM goes down for maintenance at <time> for the BIOBUZZ Act 2 update, for about 30 minutes. Finish your match before then. Matches already running are not cut off, but new ones can't start during the window.
 ```
 
 Release post (after step 9):
@@ -262,16 +262,16 @@ Full patch notes are in the app under Changes. Play at https://playdsim.com. Tel
 
 Swap `#bug-reports` for the real channel. If the §1.3 secrets are set, add a bullet before
 "Download any replay":
-`• Star DSIM on GitHub or boost this server, then link the account in Profile › Account for the Stargazer badge or supporter perks.`
+`• Star the original DSIM on GitHub or boost this server, then link the account in Profile › Account for the Stargazer badge or supporter perks.`
 
 ## 6. Public FTC Discord post
 
 Check the server's self-promotion rules and post in the channel they allow.
 
 ```
-**DSIM: a free FTC driver-practice sim, now with BIOBUZZ in 3D**
+**BFSIM: a free FTC driver-practice sim, now with BIOBUZZ in 3D**
 
-DSIM runs in your browser: https://playdsim.com. No install, and a desktop app if you want one.
+BFSIM runs in your browser: https://playdsim.com. No install, and a desktop app if you want one.
 
 • BIOBUZZ presented by RTX (2026–27), DECODE (2025–26) and Chain Reaction
 • Build your robot: drivetrain, intake, launcher and where each one mounts
@@ -284,5 +284,5 @@ BIOBUZZ just moved to 3D physics on a field built from the official CAD, and Act
 
 Community and feedback: https://discord.gg/YB4tXnx7Pj
 
-DSIM is a community project and is not affiliated with or endorsed by FIRST.
+BFSIM is a community project and is not affiliated with or endorsed by FIRST.
 ```

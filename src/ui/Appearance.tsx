@@ -302,7 +302,7 @@ function RobotLook({ onRobotBuilder }: { onRobotBuilder?: () => void }) {
       ) : (
         <div className="ds-empty">
           <div className="big">No reward decals yet</div>
-          Star DSIM on GitHub, then connect it under Account, to unlock the star decal.
+          Star the original DSIM on GitHub, then connect it under Account, to unlock the star decal.
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 /**
  * Analytics events — the funnel, and the presenting sponsor's monthly report.
  *
- * Every event goes to DSIM's own sink (`trackEventBeacon` in `src/pageviews.ts` →
+ * Every event goes to BFSIM's own sink (`trackEventBeacon` in `src/pageviews.ts` →
  * `POST /api/a/ev` → `server/analytics.ts`) and is read on the admin console's Analytics tab,
  * next to the traffic and the product tables. Vercel Web Analytics was a second sink until
  * September 2026; it was removed once the dashboard covered what it showed, and its history was

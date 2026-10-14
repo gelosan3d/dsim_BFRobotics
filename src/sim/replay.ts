@@ -202,7 +202,7 @@ export class ReplayRecorder {
  *  • `future`     — recorded by a build NEWER than this one; the reader cannot parse it.
  *  • `balance`    — a different BALANCE_VERSION, i.e. robots perform differently now.
  *  • `behaviour`  — a different SIM_VERSION: same balance, changed physics/rules.
- *  • `unstamped`  — recorded before DSIM stamped SIM_VERSION at all, so which behaviour
+ *  • `unstamped`  — recorded before BFSIM stamped SIM_VERSION at all, so which behaviour
  *                    produced it is genuinely UNKNOWN rather than known-different.
  *  • `tank`       — a FORMAT-1 replay of a tank-steered robot, whose drive input the
  *                    container had nowhere to store.

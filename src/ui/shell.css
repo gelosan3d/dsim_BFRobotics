@@ -427,7 +427,7 @@
   top: 0;
   z-index: 10;
 }
-/* the loaded SEASON beside the app mark — muted, so DSIM stays the brand and the season reads
+/* the loaded SEASON beside the app mark — muted, so BFSIM stays the brand and the season reads
    as its state. The separator is its own span so the name alone is what a reader hears.
    PLAIN TEXT, and styled as such (design review 22-07): at 700 with tracking, beside the brand
    where a context switcher conventionally sits, it read as a control that did nothing. Body
@@ -1523,12 +1523,12 @@
   font-size: var(--ds-t-md);
   color: var(--ds-mut);
 }
-/* THE UI FACE, not mono (design review 01-04): "DSIM" is the wordmark the app bar's `.ds-mark`
+/* THE UI FACE, not mono (design review 01-04): "BFSIM" is the wordmark the app bar's `.ds-mark`
    sets in the UI face, and a season name is a name, not a reading — mono is for numbers a driver
    glances at. The sponsor credit inside carries its own face (`.sponsor-pre`). */
 .ds-foot-brand {
   /* TWO ITEMS, not one run: the app name (an anonymous flex item) and the sponsor
-     credit. Inline, "DSIM · DECODE 2025–26" ran straight into "PRESENTED BY" 8px away and
+     credit. Inline, "BFSIM · DECODE 2025–26" ran straight into "PRESENTED BY" 8px away and
      read as one line in two sizes, and a phone broke it mid-credit (design review 11-20). */
   display: inline-flex;
   flex-wrap: wrap;
@@ -5810,7 +5810,7 @@ button.bb-cell:where(:not(:disabled)):active {
 }
 
 @media (max-width: 640px) {
-  /* HOME IS THE MARK. The bar's DSIM mark already routes home (`AppShell`), so the rail's
+  /* HOME IS THE MARK. The bar's BFSIM mark already routes home (`AppShell`), so the rail's
      own Home item is the one to give up for the other four to fit ONE row at 375px. */
   .ds-rail-btn.home {
     display: none;
@@ -7770,14 +7770,14 @@ a.ds-cta {
   stroke: var(--ds-mut);
   stroke-width: 1;
 }
-/* where Vercel's imported days end and DSIM's own count begins: dotted, so it never reads
+/* where Vercel's imported days end and BFSIM's own count begins: dotted, so it never reads
    as the hover cursor */
 .an-mark {
   stroke: var(--ds-mut);
   stroke-width: 1;
   stroke-dasharray: 2 4;
 }
-/* "from Sep 22" beside a title or tile whose number is DSIM's own days only, while the range
+/* "from Sep 22" beside a title or tile whose number is BFSIM's own days only, while the range
    also reaches imported ones. Sentence case inside the caps title. */
 .an-own {
   font-family: var(--ds-font-ui);
@@ -8675,7 +8675,7 @@ a.ds-cta {
 }
 
 /* THE HOST COMMANDS. Numbered, because they are typed in order and a host who pastes the
-   fourth one first gets an error about a directory rather than about DSIM. The rows reuse
+   fourth one first gets an error about a directory rather than about BFSIM. The rows reuse
    `.ds-lan-url` — same affordance, the whole row copies — with `.compact` dropping the type
    from projector size to reading size: a join URL is read across a room, a command is read
    off the screen in front of you. */

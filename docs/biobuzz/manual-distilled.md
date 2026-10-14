@@ -1051,7 +1051,7 @@ manual, and a reader who goes to the cited page will not find them.
     "PIN ≤ 3 s (2-ft / 3-s release, pause/resume) … DECODE's pin detector, MAJOR tariff". DECODE's
     detector requires the victim to be ATTEMPTING TO MOVE — a clause **G421 does not contain**.
     Porting DECODE's `isPinning` unchanged would under-call BIOBUZZ pins. (`CLAUDE.md` documents that
-    DSIM already deviates from DECODE's own version of that clause; under BIOBUZZ the deviation
+    BFSIM already deviates from DECODE's own version of that clause; under BIOBUZZ the deviation
     becomes the literal rule.)
 
 ### Agreements worth recording

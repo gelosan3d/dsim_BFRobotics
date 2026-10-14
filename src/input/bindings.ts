@@ -44,7 +44,7 @@ export type KeyAction =
  * DRIVING (shared, every game): `slowHold` — held, the drive at `FTC25_SLOW_FACTOR`;
  * `snapAim` / `snapAlt` — their L1 / R1 heading snaps, re-aimed (owner, 2026-10-12) at the
  * season's TARGET: the robot turns its shooter to face it (`GameSimModule.aimHeading`, at input
- * level in `GameController`). The field-centric frame stays DSIM's own (owner, same day), so
+ * level in `GameController`). The field-centric frame stays BFSIM's own (owner, same day), so
  * their Options heading reset has nothing to reset and is not here.
  *
  * MECHANISMS: four shooter power PRESETS on the d-pad (what they set is `RobotCommand.shotPower`,
@@ -749,7 +749,7 @@ const NO_BUTTONS = (): Record<PadAction, number[]> => {
  *    have no way to fire. Gamepad 2's RT is still their shoot.
  *  - LB and RB are the snaps, so the place/catalyst role moves to X and the wheel-set swap to B.
  *    Flip front and Park mode are unbound: slow mode is their precision control.
- *  - Their Options heading reset is gone (DSIM's field-centric frame has no zero to reset), so
+ *  - Their Options heading reset is gone (BFSIM's field-centric frame has no zero to reset), so
  *    Options is Start match again, as on the DSim map.
  *  - Triangle + sticks (feeder servo calibration) has nothing to calibrate in a sim: dropped.
  *  - The pad's MENU button stays D-RIGHT on gamepad 1, which their driver never touches; the

@@ -1000,7 +1000,7 @@ export function App() {
     saveSettings(s);
     if (accountUserId) {
       clearTimeout(saveTimer.current);
-      // THE ACCOUNT GETS WHAT AN UNMODIFIED DSIM CLIENT WOULD WRITE: this fork's own settings
+      // THE ACCOUNT GETS WHAT AN UNMODIFIED BFSIM CLIENT WOULD WRITE: this fork's own settings
       // stay on the device (`forAccount`, `src/net/forkScope.ts`)
       saveTimer.current = setTimeout(() => void saveAccountSettings(forAccount(s)), 700);
     }
@@ -1147,7 +1147,7 @@ export function App() {
      *
      * The server gates a `'3d'`-physics room on `'bb3d'` at every door it has, and `rejoin` is
      * one of them (`physicsAllowed(r.physics, msg.caps)`). This frame advertised nothing, so a
-     * current client returning to its own live 3D match was answered with "Update DSIM to play
+     * current client returning to its own live 3D match was answered with "Update BFSIM to play
      * this room." — measured in a browser on 2026-09-18, and invisible in the smoke suite
      * because the lane tests the SERVER's four doors and this is the client's side of one.
      * The field has existed on the message type since Day 2 for exactly this; nothing sent it.
@@ -2268,10 +2268,10 @@ export function App() {
       )}
       {/* one-time "this sim isn't realistic" disclaimer for Chain Reaction */}
       {showChainDisclaimer && (
-        <OverlayDialog title="Chain Reaction in DSIM" onClose={dismissChainDisclaimer}>
+        <OverlayDialog title="Chain Reaction in BFSIM" onClose={dismissChainDisclaimer}>
           <p className="ds-sub overlay-sub">
             Chain Reaction is the <b>Unofficial FTC Discord’s CAD Competition</b> game.
-            DSIM’s version is a rough, for-fun approximation: <b>robots here don’t drive,
+            BFSIM’s version is a rough, for-fun approximation: <b>robots here don’t drive,
             shoot or score like the real ones will</b>, so don’t base CAD decisions on it.
           </p>
           {/* SENTENCE CASE, and `.ds-dialog-actions` to drop the all-caps
@@ -2362,7 +2362,7 @@ export function App() {
           <p className="ds-sub overlay-sub">
             {lockedOut
               ? maintenanceLine(maintenance) ??
-                'DSIM is down for maintenance. New games are paused.'
+                'BFSIM is down for maintenance. New games are paused.'
               : 'Server is restarting shortly. New games are paused for a moment.'}
           </p>
           <div className="overlay-buttons ds-dialog-actions">

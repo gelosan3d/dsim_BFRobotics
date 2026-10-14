@@ -2,7 +2,7 @@
   "name": "2ddecodesim",
   "private": true,
   "version": "0.1.3",
-  "description": "DSIM: an online 2D driving simulator for FIRST Tech Challenge.",
+  "description": "BFSIM: an online 2D driving simulator for FIRST Tech Challenge.",
   "author": "genius0412",
   "type": "module",
   "main": "electron/main.cjs",
@@ -55,7 +55,7 @@
   },
   "build": {
     "appId": "com.decodesim.app",
-    "productName": "DSIM",
+    "productName": "BFSIM",
     "files": [
       "dist/**/*",
       "dist-server/lan.mjs",
@@ -74,10 +74,10 @@
     "nsis": {
       "oneClick": true,
       "deleteAppDataOnUninstall": true,
-      "artifactName": "DSIM-Setup.${ext}"
+      "artifactName": "BFSIM-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "DSIM-Portable.${ext}"
+      "artifactName": "BFSIM-Portable.${ext}"
     },
     "mac": {
       "target": [
@@ -88,20 +88,20 @@
       ],
       "identity": null,
       "category": "public.app-category.games",
-      "artifactName": "DSIM-mac.${ext}"
+      "artifactName": "BFSIM-mac.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Game",
-      "artifactName": "DSIM-linux.${ext}"
+      "artifactName": "BFSIM-linux.${ext}"
     },
     "publish": [
       {
         "provider": "github",
-        "owner": "genius0412",
-        "repo": "dsim",
+        "owner": "gelosan3d",
+        "repo": "dsim_BFRobotics",
         "releaseType": "draft"
       }
     ]

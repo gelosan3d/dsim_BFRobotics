@@ -1,5 +1,5 @@
 
-# CLAUDE.md — DSIM, an FTC driver-practice simulator
+# CLAUDE.md — BFSIM, an FTC driver-practice simulator
 
 An FTC driver-practice sim hosting **more than one game**:
 
@@ -22,7 +22,7 @@ client that lean. BIOBUZZ 3D adds two LAZY chunks (Rapier 3D deterministic, Thre
 only when a 3D world is stepped or drawn locally; `npm run bundleaudit` ratchets every chunk. Deploys to Vercel zero-config; a Node/`ws` authoritative game server on
 Fly; Electron wrapper for the desktop build.
 
-**The app brand is DSIM; a game is a "season" (`src/seasons.ts`).** Keep them separate in
+**The app brand is BFSIM; a game is a "season" (`src/seasons.ts`).** Keep them separate in
 UI copy — BIOBUZZ/Chain Reaction are what is currently loaded, not the product name.
 
 > Read this file top-to-bottom once, then the guide for whatever you are about to touch —

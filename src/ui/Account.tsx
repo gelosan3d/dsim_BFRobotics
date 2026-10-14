@@ -271,7 +271,7 @@ function ReplayPrivacy() {
  *
  * Lives here rather than only on the Donate page because "when does my
  * subscription run out, and is it going to renew?" is an ACCOUNT question, and
- * making someone visit a page titled "Support DSIM" to answer it reads as a
+ * making someone visit a page titled "Support BFSIM" to answer it reads as a
  * second sales pitch. It also surfaces the one state a supporter genuinely needs
  * warning about: a membership that is active but NOT linked to a Ko-fi address,
  * which will simply stop at the end of the period with no renewal.
@@ -325,7 +325,7 @@ function Membership({ onDonate }: { onDonate?: () => void }) {
         )}
         {onDonate && (
           <button className="ds-btn ghost" onClick={onDonate}>
-            {ent?.supporter ? 'Manage membership' : 'Support DSIM'}
+            {ent?.supporter ? 'Manage membership' : 'Support BFSIM'}
           </button>
         )}
       </div>

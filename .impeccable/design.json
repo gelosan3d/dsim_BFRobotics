@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-08-05T00:00:00.000Z",
-  "title": "Design System: DSIM",
+  "title": "Design System: BFSIM",
   "extensions": {
     "colorMeta": {
       "accent": { "role": "primary", "displayName": "Driver Green", "canonical": "#366758" },
@@ -73,7 +73,7 @@
   ],
   "narrative": {
     "northStar": "The Driver Station",
-    "overview": "DSIM's chrome is built to feel like the physical control box a real FTC team stands behind during a match, not a generic web app shell. Every interactive surface reads as a keycap — a flat colored cap sitting on a slightly darker edge, sinking on hover and pressing flush on click via transform, never layout-shifting margin. Data that a driver would glance at mid-match (scores, timers, coordinates, ping) is set in a monospace face with tabular numerals; everything else — labels, menu copy, prose — is set in a rounded-geometric sans. The palette spends most of its area in quiet desaturated neutrals so that the two colors reserved for competition state — alliance red and alliance blue — read as genuinely alarming the instant they appear, the way a real field-control light does.\n\nThe system is explicitly dual-theme (light/dark, user-toggled, WCAG-audited both ways via npm run contrast) and explicitly three-zone: chrome surfaces invert between themes, fixed-hue fills keep one ink regardless of theme (alliance chips, gold), and anything drawn on the game canvas itself uses a third, non-inverting family (on-field*) because the field mat is hardcoded dark in both themes.",
+    "overview": "BFSIM's chrome is built to feel like the physical control box a real FTC team stands behind during a match, not a generic web app shell. Every interactive surface reads as a keycap — a flat colored cap sitting on a slightly darker edge, sinking on hover and pressing flush on click via transform, never layout-shifting margin. Data that a driver would glance at mid-match (scores, timers, coordinates, ping) is set in a monospace face with tabular numerals; everything else — labels, menu copy, prose — is set in a rounded-geometric sans. The palette spends most of its area in quiet desaturated neutrals so that the two colors reserved for competition state — alliance red and alliance blue — read as genuinely alarming the instant they appear, the way a real field-control light does.\n\nThe system is explicitly dual-theme (light/dark, user-toggled, WCAG-audited both ways via npm run contrast) and explicitly three-zone: chrome surfaces invert between themes, fixed-hue fills keep one ink regardless of theme (alliance chips, gold), and anything drawn on the game canvas itself uses a third, non-inverting family (on-field*) because the field mat is hardcoded dark in both themes.",
     "keyCharacteristics": [
       "Flat \"keycap\" pressables — offset hard shadow, no blur, moves via transform",
       "Monospace-for-data / sans-for-copy split, enforced per component",

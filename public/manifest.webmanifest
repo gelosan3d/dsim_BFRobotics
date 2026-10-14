@@ -1,6 +1,6 @@
 {
-  "name": "DSIM: Online FTC Driving Simulator",
-  "short_name": "DSIM",
+  "name": "BFSIM: Online FTC Driving Simulator",
+  "short_name": "BFSIM",
   "description": "An online driving simulator for FIRST Tech Challenge.",
   "start_url": "/",
   "scope": "/",

@@ -462,7 +462,7 @@ export const CLIENT_CAPS: string[] = ['strategy', 'startpose', 'game', 'standing
  * saying something different depending on which door you came through.
  */
 export const BB3D_CAP = 'bb3d';
-export const BB3D_REFUSAL = 'Update DSIM to play this room.';
+export const BB3D_REFUSAL = 'Update BFSIM to play this room.';
 
 /** may a client advertising `caps` be seated in a room running `physics`? A `'2d'` room
  *  admits everyone, exactly as it always did — that is the back-compat rule this whole gate

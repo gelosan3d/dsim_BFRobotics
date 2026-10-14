@@ -64,7 +64,7 @@ export function Privacy() {
     <div className="ds-legal-col">
       <LegalPage
         title="Privacy Policy"
-        sub="What DSIM collects, why, and how to get rid of it."
+        sub="What BFSIM collects, why, and how to get rid of it."
         body={PRIVACY_MD}
       />
       <YourData />

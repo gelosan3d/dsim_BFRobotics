@@ -2816,7 +2816,7 @@ function freeCamChecks(check: Check): void {
     type Row = [button: number, mods: string, want: FreeCamGesture | null];
     const M = (s: string) => ({ shift: s.includes('S'), ctrl: s.includes('C'), alt: s.includes('A') });
     const TABLE: Record<Exclude<FreeCamPreset, 'custom'>, readonly Row[]> = {
-      // DSIM is ONSHAPE plus left-drag orbit and shift+left pan (owner: "DSIM default should
+      // BFSIM is ONSHAPE plus left-drag orbit and shift+left pan (owner: "BFSIM default should
       // also be very close to how the onshape one works").
       dsim: [
         [2, '', 'orbit'],

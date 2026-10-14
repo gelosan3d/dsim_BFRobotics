@@ -37,7 +37,7 @@ export interface ShapingCtx {
   canPark: boolean;
   /**
    * MAY THE FTC25 EXTRAS ACT — slow mode, the presets, the element buttons, the snap? Everywhere
-   * this device or a LAN room runs the match; NOT in a room on DSIM's own servers (owner,
+   * this device or a LAN room runs the match; NOT in a room on BFSIM's own servers (owner,
    * 2026-10-12: nothing of this fork may reach them). There the FTC25 layout still drives,
    * intakes and shoots, and its own buttons do nothing.
    */
@@ -141,7 +141,7 @@ export class DriverShaping {
       if (input.powerPicked >= 0) this.shotPowerIdx = input.powerPicked;
       if (this.shotPowerIdx !== 0) cmd.shotPower = this.shotPowerIdx;
     } else {
-      // a room on DSIM's servers sees an ordinary command: the element buttons still SHOOT
+      // a room on BFSIM's servers sees an ordinary command: the element buttons still SHOOT
       // (`fire` is already set), they just do not ask for an element
       delete cmd.fireSel;
       delete cmd.shotPower;

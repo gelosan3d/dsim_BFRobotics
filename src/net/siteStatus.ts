@@ -17,7 +17,7 @@ import { setServerNotice } from './notice';
  *
  * ── FAIL OPEN ─────────────────────────────────────────────────────────────────────────────
  * An unreachable server OPENS the app. Free drive and practice work offline, and an outage
- * must not read as "DSIM is closed"; the server refuses writes on its own if it is up and
+ * must not read as "BFSIM is closed"; the server refuses writes on its own if it is up and
  * closed. The one exception is a build baked closed (`VITE_SITE_LOCKDOWN=1`, the alpha site):
  * that one starts closed and only the server can open it, by confirming the account.
  */

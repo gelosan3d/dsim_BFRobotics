@@ -697,7 +697,7 @@ export function net3dChecks(check: Check): void {
   // second half reads the server source.
   {
     check('caps: the refusal says exactly what the plan says it says',
-      BB3D_REFUSAL === 'Update DSIM to play this room.', BB3D_REFUSAL);
+      BB3D_REFUSAL === 'Update BFSIM to play this room.', BB3D_REFUSAL);
     check('caps: this build advertises the capability', CLIENT_CAPS.includes(BB3D_CAP));
     check('caps: a 3D room refuses a client with no caps at all', !physicsAllowed('3d', []));
     check('caps: ...and one whose caps predate it', !physicsAllowed('3d', ['strategy', 'startpose', 'game']));
@@ -726,7 +726,7 @@ export function net3dChecks(check: Check): void {
      *
      * A gate has two halves and only one of them was tested. `rejoin` declares `caps` on the
      * message type and `App.rejoinGame` sent the frame WITHOUT it, so a current client returning
-     * to its own live 3D match was refused with "Update DSIM to play this room." — the server
+     * to its own live 3D match was refused with "Update BFSIM to play this room." — the server
      * behaving exactly as designed, against a client that had simply not said what it could do.
      * Every frame the server gates must ADVERTISE, and these are the three that send one.
      */

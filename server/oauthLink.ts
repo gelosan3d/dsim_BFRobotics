@@ -77,7 +77,7 @@ export function linkConfigured(provider: LinkProvider): boolean {
 /**
  * THE STATE SECRET IS PER BOOT, ON PURPOSE.
  *
- * A stateless signed `state` is what carries the DSIM user id across the redirect without a
+ * A stateless signed `state` is what carries the BFSIM user id across the redirect without a
  * server-side session table. It needs a key, and a per-boot random one is better here than
  * another env var for the owner to manage and rotate: the only cost is that a link in flight
  * across a deploy has to be started again, and the failure direction is a refusal rather

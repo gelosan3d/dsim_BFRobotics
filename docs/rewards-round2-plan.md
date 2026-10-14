@@ -116,7 +116,7 @@ create index if not exists provider_links_user_idx on provider_links (user_id, p
 provider link needs the same guarantee *and* it needs to survive an unlink, because
 otherwise unlink-and-relink is a free reward mint (§6). Making
 `(provider, provider_user_id)` the PRIMARY KEY, and setting `unlinked_at` rather than
-deleting the row, means **one GitHub account can ever earn once, on one DSIM account,
+deleting the row, means **one GitHub account can ever earn once, on one BFSIM account,
 forever** — the same guarantee `profiles_kofi_email_idx` gives, extended over time.
 
 **Stored: the provider's immutable numeric id and two timestamps. Nothing else.** No
@@ -276,7 +276,7 @@ EVENT with no deadline attached. The honest reading is that `0044`'s permanence 
 MEMBERSHIP lapsing, not about the grantor withdrawing the thing granted, which is exactly
 what `revokeCosmetic` was already written for.
 
-**The farm is still dead either way**: §2.1 means one GitHub id earns on one DSIM account,
+**The farm is still dead either way**: §2.1 means one GitHub id earns on one BFSIM account,
 ever, so star→claim→unstar→repeat buys nothing now that the claim is also withdrawn.
 
 ### 3.2 A Discord boost → the supporter perk
@@ -450,7 +450,7 @@ The §3.1 guess is therefore half resolved, and the two asks split:
 
 Stage A in §7 ships with no linking at all, so none of this gates two thirds of the work.
 
-**Interaction with the existing auth.** A DSIM account is a Neon Auth user; GitHub and
+**Interaction with the existing auth.** A BFSIM account is a Neon Auth user; GitHub and
 Discord are *additional* providers linked to it, never a second way to sign in that
 creates a second account. `linkSocial` is the right call for that; `signIn.social` is
 not — it would create a new account for anyone who clicked it while signed out, and then
@@ -460,7 +460,7 @@ alt-farming (§6).
 
 **Stored, minimally:** the provider's numeric id and the link/unlink timestamps (§2.1).
 Not the login, not the email, not an avatar URL, not a token, not the list of guilds a
-person is in. Every one of those is either re-fetchable or none of DSIM's business.
+person is in. Every one of those is either re-fetchable or none of BFSIM's business.
 
 **Privacy text.** `src/legalText.ts:351-359` lists the processors (Neon, Fly, Vercel,
 Ko-fi/PayPal). GitHub and Discord join it, with one sentence each saying what is sent
@@ -474,7 +474,7 @@ later — the second is fine and is what the analytics feature itself did.
 **Unlinking.** `unlinkAccount` plus `unlinked_at` on the `provider_links` row. What
 survives: a permanent GitHub unlock stays (permanent ledger, §3.1); the boost floor stops
 being refreshed and lapses within the grace window (§3.2). Relinking the same provider id
-to a *different* DSIM account is refused by the primary key — one id, one account,
+to a *different* BFSIM account is refused by the primary key — one id, one account,
 forever.
 
 ---
@@ -530,8 +530,8 @@ this design. §1a is the argument for keeping it that way.
 
 | vector | defence | verdict |
 |---|---|---|
-| Star-farming with alt GitHub accounts | `provider_links` PK: one GitHub id earns once, ever, on one DSIM account | **free** — the schema already does it |
-| Star-farming with alt DSIM accounts | Each needs its own GitHub account (above) and, if `REQUIRE_VERIFIED_EMAIL` is on, its own verified address | **free** |
+| Star-farming with alt GitHub accounts | `provider_links` PK: one GitHub id earns once, ever, on one BFSIM account | **free** — the schema already does it |
+| Star-farming with alt BFSIM accounts | Each needs its own GitHub account (above) and, if `REQUIRE_VERIFIED_EMAIL` is on, its own verified address | **free** |
 | Unlink → relink elsewhere | `unlinked_at` instead of a delete; the PK row stays claimed | **free**, and it is the reason §2.1 is a table |
 | Star, claim, unstar | Nothing. The unlock is permanent | **not defended, on purpose** (§3.1) |
 | Boost for one day, keep the perk | `BOOST_GRACE` (7 d) is the whole exposure, and it self-expires | **not worth defending** — Discord's own minimum billing is a month, so the attacker pays more than the perk is worth |
@@ -626,7 +626,7 @@ Stated plainly rather than assumed, because each one can change a stage:
   methods exist; the project configuration is an owner dashboard question.
 - ~~Whether the Discord application can get the GUILD_MEMBERS privileged intent.~~
   **RESOLVED 2026-09-21 — it is a self-serve toggle at this size, see §10.4.**
-- GitHub's stargazer endpoint pagination and ETag behaviour at DSIM's star count — cheap
+- GitHub's stargazer endpoint pagination and ETag behaviour at BFSIM's star count — cheap
   at any plausible number, but the sweep's cost should be measured once rather than
   assumed.
 - Whether `PLACEMENT_GAMES` is the right floor for an *award* as opposed to a board
@@ -644,7 +644,7 @@ costing any future provider; §10.2 and §10.3 are the two the owner asked for.
 Every social reward is two problems that look like one, and conflating them is how a
 "just add Instagram too" lands in a sprint and stays there:
 
-- **LINKING** — prove this DSIM account owns that social account. OAuth, near-identical
+- **LINKING** — prove this BFSIM account owns that social account. OAuth, near-identical
   everywhere, and §2.1's `provider_links` already holds it: one row per `(provider,
   provider_user_id)`, primary key preventing the same social account earning twice.
   Adding a provider here is a row in a table and a button.
@@ -723,7 +723,7 @@ Researched against Meta's platform documentation and the 2026 API landscape:
 ⚠️ **SO "FOLLOW US ON INSTAGRAM FOR A REWARD" IS A TIER-4 ACTION AND MUST NOT SHIP AS AN
 AUTOMATED ONE.** The third-party scraper services that appear to solve this (Apify and
 similar) are not an option: they breach Instagram's terms, they break whenever the private
-endpoints move, they are a recurring cost, and they would have DSIM handling a list of
+endpoints move, they are a recurring cost, and they would have BFSIM handling a list of
 third parties who never consented to it. That is a large liability for one decal.
 
 **DECIDED 2026-09-21 (owner): NO INSTAGRAM FOLLOW REWARD.** Option 1 below. Nothing is
@@ -736,9 +736,9 @@ comment webhook) is the only route that does not involve scraping.
 1. **Do not reward an Instagram follow.** Recommended. Nothing to build, nothing to
    mislead anybody with.
 2. **Reward a VERIFIABLE Instagram action instead — a comment, which is tier 3.** The
-   `comments` webhook is real and supported. DSIM shows the player a one-time code, they
+   `comments` webhook is real and supported. BFSIM shows the player a one-time code, they
    comment it on a designated post, the webhook delivers the comment with its author's IG
-   id, DSIM matches the code and grants. It verifies ENGAGEMENT rather than a follow, and
+   id, BFSIM matches the code and grants. It verifies ENGAGEMENT rather than a follow, and
    it is honest about that. Cost: an Instagram Business/Creator account linked to a
    Facebook Page, a public webhook endpoint with signature verification, app review for
    comment permissions, and a code ledger with an expiry. Call it 2–3 days plus the review
@@ -765,7 +765,7 @@ the chance of refusal. **That was wrong, and it was wrong because of a rule that
 - ⚠️ **THE REVIEW THRESHOLD CHANGED ON 2026-06-10.** It is no longer "100 servers". It is now
   **10,000 unique users who can see the app across every server it is in**. Below that, an
   app turns privileged intents on and off in the Developer Portal with no review at all.
-- DSIM's bot would be in ONE guild. Unless that guild has ten thousand members, this is a
+- BFSIM's bot would be in ONE guild. Unless that guild has ten thousand members, this is a
   checkbox: Developer Portal → the app → Bot → Privileged Gateway Intents → Server Members
   Intent → Save.
 

@@ -539,13 +539,13 @@ The WIN/TIE verdict itself does exist and is shown: `winner` at `GameView.tsx:10
 
 **Why it matters**
 
-The RANKING POINTS section a player reads is short by the largest line in the table, 3 of a possible 6, and that line is the only one every match produces. DSIM runs no qualification tournament, so nothing accumulates RP and no MATCH point is affected; this is Table 10-2 presentation completeness.
+The RANKING POINTS section a player reads is short by the largest line in the table, 3 of a possible 6, and that line is the only one every match produces. BFSIM runs no qualification tournament, so nothing accumulates RP and no MATCH point is affected; this is Table 10-2 presentation completeness.
 
 **Suggested fix**
 
 Add `win` and `tie` to `BbRankPoints` (or one `winTie: 0|1|3`), set them in `bbScoreWorld`'s RP block, and add the rows to the RANKING POINTS section. Derive them from `world.match.scores[a].total`, not from `BbAllianceScore.total`: `score.ts:149-151` states that the latter deliberately excludes foul points, and `bbApplyScore` (`score.ts:391`) is what folds fouls in and zeroes a voided alliance, so using the wrong one reports the wrong winner in a foul-decided match. Award only at `phase === 'post'`: a live “WIN 3” that flips as the score crosses is not what “Completing a MATCH” means.
 
-**Confidence: high.** Verifier confirmed every factual point and lowered the severity from major, on the grounds that the verdict is already shown and no RP total accumulates anywhere in DSIM.
+**Confidence: high.** Verifier confirmed every factual point and lowered the severity from major, on the grounds that the verdict is already shown and no RP total accumulates anywhere in BFSIM.
 
 ---
 
@@ -840,7 +840,7 @@ Zero the whole `rp[a]` record when `world.match.scores[a].voided`, in the same l
 
 `robotsEnabled` returns true for `'auto'` (`src/sim/match.ts:76-79`) and `biobuzzStep` applies `commands.get(r.id)` whenever `enabled` (`step.ts:90,102`), so a human stick drives the robot for the whole AUTO period. BIOBUZZ also declares `autoPaths: false` (`sim.ts:76`) and never calls `updatePathTraversal`, so there is no autonomous-routine path either. LEAVE, AUTO PARK and any AUTO TIP are all earned by hand-driving.
 
-This is shared DSIM architecture rather than a BIOBUZZ defect. `src/sim/world.ts:134` shows DECODE takes the driver's command in AUTO too unless `r.autoPathActive`, and an auto path is an optional imported `.pp` file (`src/ui/MatchSetup.tsx:171-174`), so a DECODE player who has not imported one hand-drives their AUTO identically. Chain Reaction is the same. All three games' `autoPaths` values are deliberately pinned at `scripts/smoke.ts:16089-16091`, so `false` here is a recorded decision.
+This is shared BFSIM architecture rather than a BIOBUZZ defect. `src/sim/world.ts:134` shows DECODE takes the driver's command in AUTO too unless `r.autoPathActive`, and an auto path is an optional imported `.pp` file (`src/ui/MatchSetup.tsx:171-174`), so a DECODE player who has not imported one hand-drives their AUTO identically. Chain Reaction is the same. All three games' `autoPaths` values are deliberately pinned at `scripts/smoke.ts:16089-16091`, so `false` here is a recorded decision.
 
 **Why it matters**
 
@@ -1915,7 +1915,7 @@ Manual facts checked and found correctly implemented. Grouped by domain, dedupli
 - ⚠️ NO LONGER TRUE as of 2026-09-21. The RANKING POINTS section was removed from the results breakdown at the owner's request, so no RP reaches a player at all. The three lines are still computed (`score.ts`) and still ride the HUD slice (`BiobuzzFieldHud.rp`); restoring the section is one tuple in `biobuzzResultsRows`. See BB-11.
 - The WIN/TIE verdict is correctly determined and reported off `ScoreBreakdown.total`, which includes foul points and reads 0 for a voided alliance, so foul-decided and red-carded matches both resolve correctly. The same verdict is burned into exported replay video.
 - RP is recomputed from the world every tick rather than latched, and its inputs are already frozen by `post`.
-- DSIM's Glicko-2 ranking and per-game leaderboards do not read RP, which is correct: RP is an event-ranking concept and folding it into Glicko-2 would be the invention.
+- BFSIM's Glicko-2 ranking and per-game leaderboards do not read RP, which is correct: RP is an event-ranking concept and folding it into Glicko-2 would be the invention.
 
 **HIVE and CELL**
 

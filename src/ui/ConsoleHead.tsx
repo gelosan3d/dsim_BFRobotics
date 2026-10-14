@@ -3,7 +3,7 @@ import { APP_NAME } from '../seasons';
 import { Logo } from './Logo';
 
 /**
- * THE CONSOLE HEADER — Back + the DSIM mark, then the page title with its sub-line — for every
+ * THE CONSOLE HEADER — Back + the BFSIM mark, then the page title with its sub-line — for every
  * full-screen queue/join surface (Ranked, Record run, Custom room, Match strategy, LAN, Discord
  * lobbies). It was hand-copied into each of them (design review 02-01), and the copies had
  * drifted: some subs carried `.ds-sub-tight`, some did not, so title→sub was 12px on one page

@@ -10,7 +10,7 @@ import { muxMp4 } from './mp4';
  *
  * A video is the opposite. It stops being a re-simulation and becomes a recording, which means
  * it outlives every patch, needs no sim to watch, and can be shared with someone who does not
- * have DSIM at all.
+ * have BFSIM at all.
  *
  * ONE PATH NOW, and it is `VideoEncoder` (WebCodecs) plus the two little muxers next door. It
  * encodes frames the caller hands it, each carrying its own timestamp, so the replay can be

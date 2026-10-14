@@ -74,13 +74,13 @@ export function Download() {
           </div>
           <div className="ds-panel-body">
             {/* one sentence — the one the reader can act on. "No download needed.
-                DSIM runs in your mobile browser" restated the panel title, and
+                BFSIM runs in your mobile browser" restated the panel title, and
                 "The desktop builds below are for Windows, macOS, and Linux"
                 described the section directly beneath it, which is already headed
                 by its own platform labels. */}
             {embedded ? (
               <p className="ds-hint">
-                To run full-screen, open <b>playdsim.com</b> in your phone’s browser.
+                To run full-screen, open this site in your phone’s browser.
               </p>
             ) : (
               <p className="ds-hint">
@@ -91,7 +91,7 @@ export function Download() {
           </div>
         </div>
       ) : (
-        <p className="ds-sub">DSIM in its own window. Plays offline when you have no connection.</p>
+        <p className="ds-sub">BFSIM in its own window. Plays offline when you have no connection.</p>
       )}
 
       {/* `.ds-dl` owns the gaps: these cards cast hard offset shadows, and headings are

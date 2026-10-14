@@ -1,10 +1,15 @@
-# DSIM
+# BFSIM
 
 > ## About this fork
 >
-> This is **gelosan3d's fork** of [genius0412/dsim](https://github.com/genius0412/dsim), the
-> simulator behind [playdsim.com](https://www.playdsim.com/). Everything below the line is the
-> original project's README; this box covers what is different here.
+> **BFSIM** is **BF Robotics' fork** (maintained by gelosan3d) of
+> [genius0412/dsim](https://github.com/genius0412/dsim) — **DSIM, created by Dohun Kim** — the
+> simulator behind [playdsim.com](https://www.playdsim.com/). All of the simulator, game and
+> netcode work is the original author's and is used under the PolyForm Noncommercial License 1.0.0
+> (see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)). This fork is a **noncommercial** team
+> project: it is not affiliated with, endorsed by or sponsored by DSIM, its author or its sponsors.
+> The name, icons and logos here are **placeholders** for BF Robotics. Everything below the line is
+> the original project's README; this box covers what is different here.
 >
 > **What this fork adds**
 >
@@ -31,6 +36,12 @@
 > - `my-changes` holds this fork's work. Use it.
 > - `main` is kept as an unchanged copy of genius0412's `main`, so the original project's
 >   updates can be merged into `my-changes` without overwriting anything here.
+>
+> **Rebranded.** The app is named BFSIM, the icons and logos are placeholders, and the original's
+> site, Discord and Instagram links are removed or pointed at this repository. The presenting-sponsor
+> slot now reads "BF Robotics" (placeholder artwork). The desktop shell loads its bundled build; set
+> `BFSIM_SITE_URL` (and `VITE_SITE_URL` for the web build) if you host your own copy. Ads and the
+> supporter / Ko-fi tier have not been removed yet.
 >
 > These changes run only when you run this fork yourself. playdsim.com and the official desktop
 > app are the original project and do not include them.
@@ -81,7 +92,7 @@
 
 ---
 
-![DSIM](./dsim-logo.png)
+![BFSIM](./bfsim-logo.png)
 
 A 2D/3D driver-practice simulator for FIRST Tech Challenge. Vite + React +
 TypeScript on Canvas 2D, with a Rapier3D + Three.js path for games that use it.
@@ -96,13 +107,10 @@ Three games ("seasons") are playable:
 - **BIOBUZZ presented by RTX** (FTC 2026–27) — full match, scored and ranked,
   playable in 2D or 3D physics + view.
 
-## Play online
+## Play
 
-**[playdsim.com](https://www.playdsim.com/)** — no install required.
-
-[Discord](https://discord.gg/YB4tXnx7Pj) ·
-[Instagram](https://www.instagram.com/playdsim/) ·
-[Ko-fi](https://ko-fi.com/playdsim)
+Run it locally (see above). The original project is hosted at
+[playdsim.com](https://www.playdsim.com/); that is **not** this fork.
 
 ## Features
 

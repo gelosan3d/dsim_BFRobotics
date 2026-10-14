@@ -149,7 +149,7 @@ export function muxMp4(frames: Mp4Frame[], opts: Mp4Opts): Blob {
 
   const compressor = new Uint8Array(32); // a Pascal string: a length byte, then the name
   compressor[0] = 4;
-  compressor.set(TEXT.encode('DSIM'), 1);
+  compressor.set(TEXT.encode('BFSIM'), 1);
 
   const avc1 = box('avc1', [
     zeros(6), u16(1), // reserved, data_reference_index

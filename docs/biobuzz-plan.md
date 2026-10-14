@@ -71,9 +71,9 @@ or `App.tsx` during the sprint.
    `alpha` itself is red. **`alpha` keeps moving until kickoff**: the integration chat
    merges `origin/alpha` into `biobuzz` at the start of every session (see *Workflow*).
 3. **Copy-and-own CR's pollen-relevant machinery** into `src/games/biobuzz/`. BIOBUZZ is
-   a **full season** in DSIM terms, exactly like DECODE and Chain Reaction: its own
+   a **full season** in BFSIM terms, exactly like DECODE and Chain Reaction: its own
    `GameId`, its own `SEASONS` entry, its own boards/periods, its own game directory.
-   (CR was a CAD-competition game, but DSIM treats it as a full season; BIOBUZZ is the
+   (CR was a CAD-competition game, but BFSIM treats it as a full season; BIOBUZZ is the
    same shape with the official manual behind it.)
    ⚠️ **REVISED 2026-09-11, and the exception is the important part: GROUND POLLEN PHYSICS
    IS NOT COPIED AND NOT OWNED.** Copy-and-own is right for the drivetrain feel, the intake,

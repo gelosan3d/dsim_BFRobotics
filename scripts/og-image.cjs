@@ -8,7 +8,7 @@
  * the tagline changes. Electron is already a devDependency for `shiftaudit`, so
  * this adds no install weight and no image library.
  *
- * The palette is DSIM's dark theme (see :root[data-theme='dark'] in shell.css) —
+ * The palette is BFSIM's dark theme (see :root[data-theme='dark'] in shell.css) —
  * a link card sits on someone else's chat background, so it commits to one look
  * rather than trying to be theme-aware like the app.
  *
@@ -16,7 +16,7 @@
  * The card carries the mark too (`docs/sponsor.md`, the `og` row). This is the
  * one surface a person sees WITHOUT opening the app: every link anyone pastes
  * into a Discord server, an iMessage thread or a Slack channel renders it, and
- * every one of those was previously a DSIM impression with the sponsor absent.
+ * every one of those was previously a BFSIM impression with the sponsor absent.
  *
  * ⚠️ IT IS A BUILD ARTIFACT, NOT A RUNTIME PLACEMENT, so `SPONSOR.term` and
  * `VITE_SPONSOR=0` cannot take it down the way they take down the other six —
@@ -39,7 +39,7 @@ const OUT = path.join(__dirname, '..', 'public', 'og.png');
 const LOGO = path.join(__dirname, '..', 'public', 'icon-512.png');
 /** the DARK-SURFACE cut — this card is #20262c, so the near-white wordmark. The
  *  filenames say which SURFACE, not which ink; see the warning in docs/sponsor.md. */
-const SPONSOR_LOGO = path.join(__dirname, '..', 'src', 'assets', 'sponsors', 'offset-on-dark.png');
+const SPONSOR_LOGO = path.join(__dirname, '..', 'src', 'assets', 'sponsors', 'bf-on-dark.png');
 const SPONSOR_TS = path.join(__dirname, '..', 'src', 'sponsor.ts');
 
 app.disableHardwareAcceleration();
@@ -78,12 +78,12 @@ const SPONSOR_PRESENTS = sponsorField('presents');
 const day = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? Date.parse(`${iso}T00:00:00Z`) : NaN);
 const now = Date.now();
 const SPONSOR_ON = !(now < day(sponsorField('from'))) && !(now >= day(sponsorField('until')));
-/** height 46, width derived from the artwork's real 1735x438 so the lockup keeps
+/** height 46, width derived from the artwork's real 1600x400 so the lockup keeps
  *  the ratio every other placement reserves its box from. Taller than the app's
  *  own placements (h=14..32) because this card is 1200px wide and is READ AT
  *  THUMBNAIL SIZE in a chat list — a mark sized for a 32px in-app row disappears. */
 const SPONSOR_H = 46;
-const SPONSOR_W = Math.round((SPONSOR_H * 1735) / 438);
+const SPONSOR_W = Math.round((SPONSOR_H * 1600) / 400);
 const sponsorLogo =
   'data:image/png;base64,' + fs.readFileSync(SPONSOR_LOGO).toString('base64');
 /* EVERY placement carries the WORDS as well as the logo — "presented by" is the
@@ -138,7 +138,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
 </style></head><body>
   <div class="glow"></div>
   <p class="eyebrow">FIRST Tech Challenge</p>
-  <div class="row"><img src="${logo}" alt=""><b>DSIM</b></div>
+  <div class="row"><img src="${logo}" alt=""><b>BFSIM</b></div>
   <!-- APP_BLURB (src/seasons.ts) verbatim, then the three games, in SEASONS order.
        Same sentence the homepage and the meta description use — keep them identical. -->
   <p class="lead">

@@ -1,4 +1,4 @@
-# Can DSIM use more than one core?
+# Can BFSIM use more than one core?
 
 > **BUILT 2026-09-27** as Option A below (`server/roomHost.ts`, `server/roomWorker.ts`), behind
 > `SIM_WORKERS` (unset/0 = in-process, `auto` = one worker per vCPU beyond the first; production

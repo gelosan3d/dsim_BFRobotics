@@ -4,8 +4,12 @@ const https = require('https');
 const fs = require('fs');
 const lanHost = require('./lanHost.cjs');
 
-const SITE = 'https://www.playdsim.com';
-const LATEST_API = 'https://api.github.com/repos/genius0412/dsim/releases/latest';
+// This fork has no hosted site, so the shell loads its BUNDLED build. Set BFSIM_SITE_URL to a
+// deployment of your own and it loads that while online (offline still falls back to the bundle).
+const SITE = (process.env.BFSIM_SITE_URL || '').replace(/\/+$/, '');
+const RELEASES_PAGE = 'https://github.com/gelosan3d/dsim_BFRobotics/releases';
+const downloadPage = () => (SITE ? `${SITE}/download` : RELEASES_PAGE);
+const LATEST_API = 'https://api.github.com/repos/gelosan3d/dsim_BFRobotics/releases/latest';
 
 /**
  * THE SPLASH. See electron/splash.html for what it says and why.
@@ -75,7 +79,7 @@ function createWindow() {
     // tracks --ds-bg in src/ui/shell.css (and THEME_BG in src/theme.ts) — otherwise
     // the window flashes the wrong ground before the renderer first paints.
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#20262c' : '#f9faf7',
-    title: 'DSIM',
+    title: 'BFSIM',
   });
 
   // External links in the app all use target=_blank / window.open — send those to
@@ -126,7 +130,7 @@ function loadLocal(win) {
 }
 
 async function loadApp(win) {
-  if (await siteReachable()) {
+  if (SITE && (await siteReachable())) {
     // loadURL rejects if the page fails to load; ERR_ABORTED is a benign
     // client-side navigation (e.g. the SPA taking over), not a real failure.
     win.loadURL(SITE).catch((e) => {
@@ -151,7 +155,7 @@ function siteReachable() {
     };
     const req = https.request(
       `${SITE}/version.json`,
-      { method: 'HEAD', timeout: 2500, headers: { 'User-Agent': 'DSIM-desktop' } },
+      { method: 'HEAD', timeout: 2500, headers: { 'User-Agent': 'BFSIM-desktop' } },
       (res) => {
         res.resume();
         finish(res.statusCode > 0 && res.statusCode < 500);
@@ -240,7 +244,7 @@ function fetchLatestTag() {
   return new Promise((resolve, reject) => {
     const req = https.get(
       LATEST_API,
-      { headers: { 'User-Agent': 'DSIM-desktop', Accept: 'application/vnd.github+json' }, timeout: 8000 },
+      { headers: { 'User-Agent': 'BFSIM-desktop', Accept: 'application/vnd.github+json' }, timeout: 8000 },
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
@@ -280,7 +284,7 @@ async function promptUpdate(interactive) {
       dialog.showMessageBox({
         type: 'warning',
         message: 'Could not check for updates',
-        detail: 'Please try again later, or visit playdsim.com.',
+        detail: 'Please try again later, or check the releases page on GitHub.',
         buttons: ['OK'],
       });
     }
@@ -289,18 +293,18 @@ async function promptUpdate(interactive) {
   if (r.updateAvailable) {
     const { response } = await dialog.showMessageBox({
       type: 'info',
-      message: `A new version of DSIM is available (${r.latest}).`,
+      message: `A new version of BFSIM is available (${r.latest}).`,
       detail: `You have ${r.current}. Open the download page to update?`,
       buttons: ['Download', 'Later'],
       defaultId: 0,
       cancelId: 1,
     });
-    if (response === 0) shell.openExternal(`${SITE}/download`);
+    if (response === 0) shell.openExternal(downloadPage());
   } else if (interactive) {
     dialog.showMessageBox({
       type: 'info',
       message: 'You’re up to date.',
-      detail: `DSIM ${r.current} is the latest version.`,
+      detail: `BFSIM ${r.current} is the latest version.`,
       buttons: ['OK'],
     });
   }
@@ -314,7 +318,7 @@ ipcMain.handle('dsim:setAuto', (_e, v) => {
   setAutoCheck(v);
   return getAutoCheck();
 });
-ipcMain.handle('dsim:openDownload', () => shell.openExternal(`${SITE}/download`));
+ipcMain.handle('dsim:openDownload', () => shell.openExternal(downloadPage()));
 
 /**
  * GOOGLE SIGN-IN IN A POP-UP (owner, 2026-09-24: on the desktop app "clicking on the log in with
@@ -439,7 +443,7 @@ function buildMenu() {
       role: 'help',
       submenu: [
         ...(isMac ? [] : [checkItem, { type: 'separator' }]),
-        { label: 'DSIM on the web', click: () => shell.openExternal(SITE) },
+        { label: SITE ? 'BFSIM on the web' : 'BFSIM on GitHub', click: () => shell.openExternal(SITE || 'https://github.com/gelosan3d/dsim_BFRobotics') },
       ],
     },
   ];

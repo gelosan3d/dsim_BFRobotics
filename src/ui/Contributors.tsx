@@ -60,7 +60,7 @@ export function Contributors({ onOpenProfile }: { onOpenProfile: (username: stri
           lives there and only there; this page does not need its own. */}
 
       {/* THIRD-PARTY CREDITS. A separate panel rather than more cards in the grid above: these
-          are not people who worked on DSIM, and putting a stranger's name in "Built by" would
+          are not people who worked on BFSIM, and putting a stranger's name in "Built by" would
           credit them for something they did not do. Rows, not cards — a licence and a link are
           a table, and `docs/ui-standard.md` §6 says a row is label left, value right.
           `.credit-row` on `.ds-field`: plain `.cap` is a FORM FIELD caption, 12px and muted
@@ -116,7 +116,7 @@ export function Contributors({ onOpenProfile }: { onOpenProfile: (username: stri
           <div className="ds-field credit-row">
             <span className="cap">Source code</span>
             <p className="ds-hint">
-              DSIM is open source. The code is on{' '}
+              BFSIM is open source. The code is on{' '}
               <a href={LINKS.repo} target="_blank" rel="noreferrer">
                 GitHub
               </a>
@@ -135,16 +135,6 @@ export function Contributors({ onOpenProfile }: { onOpenProfile: (username: stri
                 CONTRIBUTING.md
               </a>{' '}
               says how to sign it.
-            </p>
-          </div>
-          <div className="ds-field credit-row">
-            <span className="cap">Community</span>
-            <p className="ds-hint">
-              Join the{' '}
-              <a href={LINKS.discord} target="_blank" rel="noreferrer">
-                Discord
-              </a>
-              .
             </p>
           </div>
         </div>

@@ -1029,7 +1029,7 @@ function BindEditor({
  * THE CONTROLS SCREEN: which controls are in use, how many controllers, which pad is being
  * edited, the FTC25 shooter presets, then the editor.
  *
- * TWO SCHEMES (`GameSettings.controlScheme`). "DSim controls" is DSIM's own map. "FTC25 controls"
+ * TWO SCHEMES (`GameSettings.controlScheme`). "DSim controls" is BFSIM's own map. "FTC25 controls"
  * is team 2627's DECODE-season TeleOp (moorlacks/FTC2627), on TWO controllers (their driver + operator)
  * or ONE (both on a single pad) — three maps in all, each kept whole, so switching is free in
  * every direction. The FTC25 controls' own rows (`FTC25_ONLY`) are not on the DSim screen.
@@ -1063,7 +1063,7 @@ export function ControlsSection(props: Props) {
             cols="two"
             onPick={onScheme}
             options={[
-              { v: 'dsim', t: 'DSim controls', d: 'DSIM’s own layout.' },
+              { v: 'dsim', t: 'DSim controls', d: 'BFSIM’s own layout.' },
               {
                 v: 'ftc25',
                 t: 'FTC25 controls',

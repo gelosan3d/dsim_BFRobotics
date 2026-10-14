@@ -200,7 +200,7 @@ export function saveLanRunLocal(
  */
 export function pendingLanUploads(): LanRunMeta[] {
   return readIndex()
-    // a match played with this fork's features is kept here and never sent to DSIM's cloud
+    // a match played with this fork's features is kept here and never sent to BFSIM's cloud
     // (`src/net/forkScope.ts`) — read off the body, so no flag can be missing
     .filter((m) => !m.remoteId && !m.refused && !lanBodyIsFork(m.id))
     // this build sends nothing of DECODE anywhere (see `pendingPracticeUploads`)

@@ -13,13 +13,13 @@
  *
  * ⚠️ THE FILENAMES SAY WHICH SURFACE, NOT WHICH INK, and they are spelled
  * `on-light` / `on-dark` precisely because the two conventions collide: the
- * sponsor's own files are `OffsetLogoLight.png` (a BLACK wordmark, for a light
- * surface) and `OffsetLogoDark.png` (a near-white one), while the sponsor
+ * sponsor's own files are `BfLogoLight.png` (a BLACK wordmark, for a light
+ * surface) and `BfLogoDark.png` (a near-white one), while the sponsor
  * describes the black cut as "the dark logo". Going by the label rather than by
  * the pixels puts white ink on a white page. See `docs/sponsor.md`.
  */
-import offsetOnLight from '../assets/sponsors/offset-on-light.png';
-import offsetOnDark from '../assets/sponsors/offset-on-dark.png';
+import offsetOnLight from '../assets/sponsors/bf-on-light.png';
+import offsetOnDark from '../assets/sponsors/bf-on-dark.png';
 
 const env = import.meta.env;
 

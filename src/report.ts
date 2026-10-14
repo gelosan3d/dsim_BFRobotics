@@ -2,7 +2,7 @@
  * PLAYER REPORTS — the shared vocabulary, used by the client picker, the server validator
  * and the moderation panel, so the three can never disagree about what a category means.
  *
- * THE CATEGORIES COME FROM THIS GAME, not from a generic list. DSIM has no chat, no voice
+ * THE CATEGORIES COME FROM THIS GAME, not from a generic list. BFSIM has no chat, no voice
  * and no direct messaging, so "abusive messages" is not a thing that can happen here and
  * offering it would collect reports nobody can act on. The surfaces a player can actually
  * misuse are:

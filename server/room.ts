@@ -1,7 +1,7 @@
 /* `crypto.randomUUID` rather than `node:crypto`'s, because this module is bundled for a
    BROWSER as well — the LAN host runs the room in a tab (`docs/lan-webrtc.md`) and a `node:`
    specifier is unresolvable there. The Web Crypto name is the same function and is available
-   on Node 19+ and in every browser DSIM supports. */
+   on Node 19+ and in every browser BFSIM supports. */
 const randomUUID = (): string => crypto.randomUUID();
 import { envVar } from './runtimeEnv';
 import * as C from '../src/config';

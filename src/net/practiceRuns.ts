@@ -83,7 +83,7 @@ export interface PracticeRunMeta {
   others?: number;
   /**
    * PLAYED WITH THIS FORK'S FEATURES (FTC25 controls, or a Local versus): kept on this device and
-   * NEVER uploaded to DSIM's servers (`src/net/forkScope.ts`). Absent on every other run.
+   * NEVER uploaded to BFSIM's servers (`src/net/forkScope.ts`). Absent on every other run.
    */
   localOnly?: boolean;
 }
@@ -206,7 +206,7 @@ export function savePracticeRun(replay: Replay, result: ReplayResult, localOnly 
  */
 export function pendingPracticeUploads(): PracticeRunMeta[] {
   return readIndex()
-    // a fork run never goes to DSIM's servers — and the BODY is checked too, so a run kept by a
+    // a fork run never goes to BFSIM's servers — and the BODY is checked too, so a run kept by a
     // build before `localOnly` existed cannot slip through on a missing flag
     .filter((m) => !m.remoteId && !m.localOnly && !bodyIsFork(m.id))
     // …and nor does a run of a game this build does not have (DECODE): it is the player's

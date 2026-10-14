@@ -245,7 +245,7 @@ that season has none) — then the bind panels —
   `GameSettings.controlScheme`, Controls ▸ Control scheme). FTC25 is team 2627's DECODE-season
   TeleOp (`TeleOP25` in moorlacks/FTC2627, used with permission), on TWO controllers (their driver
   + operator, `ftc25Bindings`) or ONE (`ftc25SingleBindings`, `GameSettings.ftc25Pads`). Read the
-  map in use through `activeBindings`, never a field directly. ⚠️ **DSIM CONTROLS MUST STAY EXACTLY
+  map in use through `activeBindings`, never a field directly. ⚠️ **BFSIM CONTROLS MUST STAY EXACTLY
   WHAT THEY WERE**: the nine FTC25 actions (`FTC25_ONLY`; the green / purple colour buttons went
   with DECODE, 2026-10-12) ship UNBOUND on the DSim map and are
   not on the DSim screen. That is why the smoke rule "every action has a default key and pad
@@ -261,7 +261,7 @@ that season has none) — then the bind panels —
     `GameSimModule.aimHeading` — Chain the goal opening, BIOBUZZ the own HIVE's
     taking cell (`snapAlt`: the other cell). Half power, tapering, done inside 1.5°
     (`FTC25_SNAP`); their fixed ±45° bang-bang landed anywhere in 35–53°. **The field-centric frame
-    is DSIM's own** (owner): their Options heading reset is gone.
+    is BFSIM's own** (owner): their Options heading reset is gone.
   - **The presets are the player's** (Controls ▸ Shooter presets, `GameSettings.ftc25Powers`, on the
     d-pad in both layouts). The TABLE rides on the robot (`AssistConfig.manualShot`, fractions)
     because a replay must reproduce a run whose presets were edited later; `RobotCommand.shotPower`
@@ -273,7 +273,7 @@ that season has none) — then the bind panels —
     `solveShotAtSpeed` power model). The d-pad binds, the editor and `ftc25Powers` stay, but
     `ACTION_GAMES` lists NO game for them (`RESERVED_ACTIONS`), so `effectiveBindings` empties them,
     they conflict with nothing, and the HUD's power readout stays hidden until a game uses them. On
-    the one-controller map that matters: the presets shared D-UP / D-LEFT with DSIM's drive toggles.
+    the one-controller map that matters: the presets shared D-UP / D-LEFT with BFSIM's drive toggles.
     Wiring BIOBUZZ's launcher up = list `'biobuzz'` for them in `ACTION_GAMES` and read
     `manualShot[shotPower]` in its shot.
 - **LOCAL VERSUS** (this fork): a practice seat may be **Player 2** (`PracticeSeatKind`), a second
@@ -282,13 +282,13 @@ that season has none) — then the bind panels —
   ONE-controller map (`singlePadBindings`) and player 1 loses the operator pad. One Player 2 seat at
   most. The Modes tile **Local versus** seats Player 2 as opponent 1 for THAT match only
   (`versusSeats`, never saved). Solo only.
-- ⚠️ **NOTHING OF THIS FORK REACHES DSIM'S OWN SERVERS** (owner, 2026-10-12;
+- ⚠️ **NOTHING OF THIS FORK REACHES BFSIM'S OWN SERVERS** (owner, 2026-10-12;
   `src/net/forkScope.ts`). The account copy of the settings is `forAccount(settings)` — no scheme, no
   FTC25 maps or presets, no gamepad 2, Player 2 written as None — and an account load keeps the
   device's own (`keepLocalForkFields`). A run with a FTC25 seat (`replayIsFork`) or a Local versus
   is kept on the device and never uploaded or counted (`localOnly`, and the backlog re-checks the
   BODY so a missing flag cannot leak one). In a room, the fork's features act only when the lobby
-  marked the SESSION as LAN (`markLanSession`) or this tab hosts it; a room on DSIM's servers gets
+  marked the SESSION as LAN (`markLanSession`) or this tab hosts it; a room on BFSIM's servers gets
   plain commands and assists with no preset table. LAN rooms on this fork's own server keep it all
   (`coerceAssists` keeps the table).
 - **AIM ASSIST IS ALWAYS ON, in BOTH games, and is NOT configurable.** `coerceAssists`
@@ -473,9 +473,9 @@ four `PERF_DISPLAY_BLURB` lines, an option's download size, and the R102 stow no
   (`BANNERS_DISMISSED_KEY`); an edit brings it back; a restart cannot be closed. Filtering is
   client-side by the current game and the build's channel (`visibleBanners`, siteRules.ts).
 - **THE CLOSED SCREEN** (`ClosedScreen.tsx`) replaces the whole app while the site is closed
-  to this viewer, for every URL. The way out (the redirect, "Go to DSIM") is the primary action
+  to this viewer, for every URL. The way out (the redirect, "Go to BFSIM") is the primary action
   and takes focus; the way in is Sign in, after which the status is asked again and the app
-  replaces the screen with no reload. Copy: DSIM or "Alpha" is closed, never a game name.
+  replaces the screen with no reload. Copy: BFSIM or "Alpha" is closed, never a game name.
 - HUD mimics the FTC live scoring display: red|timer|blue bar at the BOTTOM.
 - **No popup toasts over the field** — events go to the muted left-edge log; zone status lives
   in the top-right chips.
@@ -586,7 +586,7 @@ same arguments are not had again:
 - **A name always gets `SupporterBadge`, as a SIBLING** — see the badge rules above — and
   **`BadgeMarks` beside it** (the worn badges; titles folded into badges in 0049): see
   `docs/area/accounts.md` for the surfaces.
-- **Terminology.** DSIM is the app; BIOBUZZ and Chain Reaction are seasons (DECODE was one
+- **Terminology.** BFSIM is the app; BIOBUZZ and Chain Reaction are seasons (DECODE was one
   until this fork removed it). BIOBUZZ has POLLEN and NECTAR, CR has PARTICLES, and a leak
   either way is a bug. CR's ring is a **CATALYST**
   — the **RING STAND** is a different object in the same game, so the HUD chips that said
@@ -766,7 +766,7 @@ next step **REBUILDS** the world and stages that one, exactly as `startMatch`/`r
   collapsed friends chip (order 2) share the first line and the content takes its own
   (`.ds-body > .ds-main` order 3). The strips WRAP, they do not scroll. In a room, friends
   drops BELOW the console, capped at `min(42dvh, 360px)`. At ≤640px the rail's Home item goes
-  (the DSIM mark routes home), the subnav becomes an `auto-fit` grid, and the friends chip is
+  (the BFSIM mark routes home), the subnav becomes an `auto-fit` grid, and the friends chip is
   icon-only, its label visually hidden
   but still read. The profile hero is a CONTAINER query
   (`@container hero (max-width: 439px)`): picture + name on top, stats three across below.

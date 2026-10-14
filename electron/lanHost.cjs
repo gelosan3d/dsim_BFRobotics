@@ -52,7 +52,7 @@ let child = null;
  * 0.0.0.0:8787 the whole time. The panel's own Stop / Start buttons are two clicks a second
  * apart, and changing the port is literally stop-then-start — so the previous version's
  * window between them was not theoretical, and what came out of it was the WORST failure this
- * screen has: EADDRINUSE, reported as 'another copy of DSIM may already be hosting', about a
+ * screen has: EADDRINUSE, reported as 'another copy of BFSIM may already be hosting', about a
  * server the app itself had just stopped. So a stop is a PROMISE, and a start waits on it.
  */
 let stopping = null;
@@ -165,7 +165,7 @@ function status() {
 /**
  * The ONLY variables the parent may hand down.
  *
- * Nothing about DSIM is in here, deliberately — these are the ones a Node process needs to
+ * Nothing about BFSIM is in here, deliberately — these are the ones a Node process needs to
  * find its own libraries, its temp directory and the user's home on the three platforms. A
  * cloud secret cannot be inherited by being forgotten, because inheritance is not the default.
  */
@@ -253,7 +253,7 @@ async function start(app, opts = {}) {
 function lastProblem(code) {
   const line = [...log].reverse().find((l) => /EADDRINUSE|error|Error/.test(l));
   if (line && /EADDRINUSE/.test(line)) {
-    return 'That port is already in use. Another copy of DSIM may already be hosting — stop it, or pick a different port.';
+    return 'That port is already in use. Another copy of BFSIM may already be hosting — stop it, or pick a different port.';
   }
   return line
     ? `The server stopped: ${line}`

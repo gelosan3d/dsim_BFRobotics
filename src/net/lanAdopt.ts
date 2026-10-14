@@ -6,7 +6,7 @@ import { parseLanAddress } from './lanAddress';
  *
  * A guest at a venue is told one thing: open `http://192.168.1.5:8787`. That address IS the
  * server; asking them to then find a panel and type it in again would be asking them to
- * repeat back what they just did. So the client asks whether its own origin is a DSIM game
+ * repeat back what they just did. So the client asks whether its own origin is a BFSIM game
  * server, and adopts it if so.
  *
  * ⚠️ **IT IS A PROBE, NOT AN ASSUMPTION**, and the difference matters on a dev box: `npm run

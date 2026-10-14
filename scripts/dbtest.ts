@@ -773,10 +773,10 @@ async function main(): Promise<void> {
   {
     const m3 = await repo.setMaintenance({
       active: true, startsAt: null, endsAt: null, message: 'Alpha is closed', scope: 'site',
-      redirectUrl: 'https://playdsim.com', redirectLabel: 'Go to DSIM', bypass: ['beta', 'dev', 'contributor'],
+      redirectUrl: 'https://playdsim.com', redirectLabel: 'Go to BFSIM', bypass: ['beta', 'dev', 'contributor'],
     });
     check('lockdown: a SITE lockdown round-trips scope, redirect and bypass',
-      m3.scope === 'site' && m3.redirectUrl === 'https://playdsim.com' && m3.redirectLabel === 'Go to DSIM' &&
+      m3.scope === 'site' && m3.redirectUrl === 'https://playdsim.com' && m3.redirectLabel === 'Go to BFSIM' &&
       JSON.stringify(m3.bypass) === '["beta","dev","contributor"]', JSON.stringify(m3));
     check('lockdown: open-ended is allowed and bites now', repo.maintenanceBiting(m3));
     // an OLDER console posts none of the new fields: it must still mean "matches, nobody bypasses"
@@ -4736,7 +4736,7 @@ async function main(): Promise<void> {
     check('links: ...and it shows up as live', (await repo.providerLinks('gh-1')).length === 1);
     check('links: re-linking the SAME pair is fine (somebody undoing their own mistake)', (await repo.linkProvider('gh-1', 'github', '1001')) === true);
     check(
-      '⚠️ links: the SAME external account cannot be linked to a SECOND DSIM account',
+      '⚠️ links: the SAME external account cannot be linked to a SECOND BFSIM account',
       (await repo.linkProvider('gh-2', 'github', '1001')) === false,
     );
 

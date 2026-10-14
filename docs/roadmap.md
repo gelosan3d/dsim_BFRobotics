@@ -128,7 +128,7 @@ Sizes are working days for one agent; "exists" cites what the survey found so no
   Google OAuth in `AuthPanel.tsx`; JWT verification on the server (`jose`, JWKS). The SDK already
   exports `forgetPassword`, `resetPassword`, `sendVerificationEmail`, `verifyEmail`,
   `changeEmail` (see `node_modules/@neondatabase/auth/dist/better-auth-react-adapter-*.d.mts`);
-  DSIM's hand-typed `AuthClient` interface (`src/lib/authClient.ts`) omits them. No forgot-password,
+  BFSIM's hand-typed `AuthClient` interface (`src/lib/authClient.ts`) omits them. No forgot-password,
   no verification step, no terms acceptance; the legal text has one "last updated" date and no
   version.
 - **Design.** (a) Forgot password: a link on the sign-in form → `forgetPassword({email,
@@ -185,7 +185,7 @@ Sizes are working days for one agent; "exists" cites what the survey found so no
 - **Exists.** Google Funding Choices CMP for ad consent (`loadCmp`, `showConsentSettings`), the
   footer "Privacy & cookie settings" link that hides itself when the CMP offers no revocation
   entry, `/privacy` and `/terms` from `legalText.ts`, cookieless Vercel analytics (counts only; removed Sept 2026 for first-party analytics),
-  `ads.txt` generated at build; DSIM sets no cookies of its own; 15 `decodesim.*` localStorage
+  `ads.txt` generated at build; BFSIM sets no cookies of its own; 15 `decodesim.*` localStorage
   keys of which the privacy text lists a subset; no in-app data export; account deletion
   described in the text (the server cascade exists and is dbtested).
 - **Design.** (a) A single `STORAGE_KEYS` registry in code that every `localStorage` use imports,

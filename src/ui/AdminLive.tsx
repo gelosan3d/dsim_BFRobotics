@@ -536,11 +536,11 @@ function MaintenancePanel() {
         <div className="adm-pair">
           <label className="admin-field col">
             <span>Button link (https)</span>
-            <input type="url" className="ds-input" placeholder="https://playdsim.com" value={redirect} aria-invalid={!redirectOk} onChange={(e) => setRedirect(e.target.value)} />
+            <input type="url" className="ds-input" placeholder="https://example.org" value={redirect} aria-invalid={!redirectOk} onChange={(e) => setRedirect(e.target.value)} />
           </label>
           <label className="admin-field col">
             <span>Button label</span>
-            <input type="text" className="ds-input" maxLength={40} placeholder="Go to DSIM" value={redirectLabel} onChange={(e) => setRedirectLabel(e.target.value)} />
+            <input type="text" className="ds-input" maxLength={40} placeholder="Go to BFSIM" value={redirectLabel} onChange={(e) => setRedirectLabel(e.target.value)} />
           </label>
         </div>
       )}

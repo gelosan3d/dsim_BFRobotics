@@ -14,7 +14,7 @@
  * the production database only; a preview (alpha) export belongs in alpha's, and is stored as
  * source `vercel-preview` so the dashboard counts it under the alpha channel.
  *
- * The dashboard folds these days into its own numbers: every day before DSIM's own count began
+ * The dashboard folds these days into its own numbers: every day before BFSIM's own count began
  * is read from here, and imported days on or after it are ignored. Loading overlapping days is
  * therefore harmless.
  */

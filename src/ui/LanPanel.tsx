@@ -88,7 +88,7 @@ export function LanPanel({
    * judged against DECODE's start rules, cleared by the room, and nothing on screen said why.
    */
   game: GameId;
-  /** Saved DSIM display name — the same pre-fill `Lobby`'s own Your name field uses. */
+  /** Saved BFSIM display name — the same pre-fill `Lobby`'s own Your name field uses. */
   displayName?: string | null;
   /** Account context forwarded into the persistent room Friends panel. */
   myUserId?: string | null;
@@ -705,7 +705,7 @@ export function LanPanel({
                       )}
                       {skew && (
                         <p className="ds-hint warn">
-                          Your server runs a different DSIM build ({skew}) than this window ({appBuild()}).
+                          Your server runs a different BFSIM build ({skew}) than this window ({appBuild()}).
                           Play from <b>http://localhost:{port}</b> so everyone is on the same build.
                         </p>
                       )}

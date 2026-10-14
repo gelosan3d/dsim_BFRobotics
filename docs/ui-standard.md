@@ -1,4 +1,4 @@
-# DSIM UI standard
+# BFSIM UI standard
 
 **This document is STRICT.** Every rule below is a MUST unless it says otherwise. If a rule
 is wrong, change the rule here first and then change the code — do not make an exception in

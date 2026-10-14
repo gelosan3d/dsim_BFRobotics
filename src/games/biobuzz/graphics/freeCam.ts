@@ -251,7 +251,7 @@ export function dollyFreeCamToward(s: FreeCamState, factor: number, floorX: numb
  *
  * A CAD preset leaves the LEFT button unbound on purpose — it is "select" in all of them, and
  * here that keeps it free for the start-position editor. `dsim` is the exception and it is
- * deliberate: it is ONSHAPE's mapping (owner: "DSIM default should also be very close to how the
+ * deliberate: it is ONSHAPE's mapping (owner: "BFSIM default should also be very close to how the
  * onshape one works") plus left-drag orbit and shift+left pan, because this app's OTHER
  * spectator camera has always orbited on a left-drag and a player who cycles `orbit` → `free`
  * should not have the gesture disappear under their hand.
@@ -514,7 +514,7 @@ export const FREE_CAM_PRESET_HINT: Record<FreeCamPreset, string> = {
 };
 
 export const FREE_CAM_PRESET_LABEL: Record<FreeCamPreset, string> = {
-  dsim: 'DSIM',
+  dsim: 'BFSIM',
   onshape: 'Onshape',
   solidworks: 'SolidWorks',
   fusion: 'Fusion',

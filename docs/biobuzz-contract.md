@@ -254,7 +254,7 @@ phase extras); B's `hudRobot.ts` builds `robot` (mechanism state, hopper, action
 
 ## 6. Terminology
 
-DSIM is the app; BIOBUZZ is the season. The scoring element is **POLLEN** (never "ball",
+BFSIM is the app; BIOBUZZ is the season. The scoring element is **POLLEN** (never "ball",
 "artifact", or "particle" in user-visible text). Every other element takes the manual's
 ALL-CAPS defined term exactly. Foul lines name the ACT, not the place.
 

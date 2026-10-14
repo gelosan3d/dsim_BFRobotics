@@ -9,7 +9,7 @@
 
 /**
  * SEGMENTS THAT INTRODUCE AN ID. `/replay/<uuid>` and `/profile/<username>` are the two
- * routes DSIM has today (`parseScreen` in `src/ui/App.tsx`), and the segment after either one
+ * routes BFSIM has today (`parseScreen` in `src/ui/App.tsx`), and the segment after either one
  * is a value that identifies a match or a person.
  *
  * Named rather than pattern-matched because the NAME is the reliable part: a username is

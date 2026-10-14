@@ -1,4 +1,4 @@
-# DSIM — https://www.playdsim.com
+# BFSIM
 #
 # NOTE: this file has to EXIST for /robots.txt to work at all. vercel.json
 # rewrites every unmatched path to /index.html, and Vercel only skips that
@@ -42,4 +42,3 @@ Disallow: /biobuzz/admin
 Disallow: /biobuzz/gallery
 Disallow: /admin
 
-Sitemap: https://www.playdsim.com/sitemap.xml

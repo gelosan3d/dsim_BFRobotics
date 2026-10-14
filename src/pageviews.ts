@@ -1,5 +1,5 @@
 /**
- * THE PAGEVIEW AND EVENT BEACON — the client half of DSIM's own analytics, and since the host's
+ * THE PAGEVIEW AND EVENT BEACON — the client half of BFSIM's own analytics, and since the host's
  * analytics script was removed (September 2026) the only one. `server/analytics.ts` receives it
  * and `src/ui/AdminAnalytics.tsx` reads it, next to the product tables.
  *

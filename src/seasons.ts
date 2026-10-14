@@ -1,18 +1,18 @@
 /**
  * App branding + the SEASON registry.
  *
- * The product is **DSIM** — a 2D/3D FTC driver-practice simulator. Each FTC-style
+ * The product is **BFSIM** — a 2D/3D FTC driver-practice simulator. Each FTC-style
  * game is a "season"; this fork plays two (BIOBUZZ, Chain Reaction — DECODE was
  * removed on 2026-10-12). `src/sim/` is the SHARED deterministic core used by every
  * season; a season's own rules live in `src/games/<id>/`. This module is the
  * seam for adding a future season: register another `Season` here, flip
  * `playable: true` once its rules land, and the UI (season badge/picker) picks it
- * up automatically. Keep the APP name ("DSIM") separate from the SEASON name
+ * up automatically. Keep the APP name ("BFSIM") separate from the SEASON name
  * (e.g. "BIOBUZZ") everywhere in the UI — the brand is the app, a season is just
  * whichever game is currently loaded.
  */
 
-export const APP_NAME = 'DSIM';
+export const APP_NAME = 'BFSIM';
 /** One plain sentence saying what this is. Reused as the first sentence of the
  * meta description (`src/seo.ts`) — so it is also the line that shows up in a
  * search result and a pasted-link preview. The static copy in `index.html` and
@@ -22,9 +22,7 @@ export const APP_BLURB = 'An online driving simulator for FIRST Tech Challenge.'
 
 /** external links surfaced in the footer / download page */
 export const LINKS = {
-  repo: 'https://github.com/genius0412/dsim',
-  discord: 'https://discord.gg/YB4tXnx7Pj',
-  instagram: 'https://www.instagram.com/playdsim/',
+  repo: 'https://github.com/gelosan3d/dsim_BFRobotics',
   /** Ko-fi page - donations + the supporter membership tier. The Donate screen
    *  reads it from this one place; the webhook (server/api.ts) is what actually
    *  grants the tier once a payment is claimed. */
