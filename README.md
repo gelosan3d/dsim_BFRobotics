@@ -3,7 +3,7 @@
 > ## About this fork
 >
 > **BFSIM** is **BF Robotics' fork** (maintained by gelosan3d) of
-> [genius0412/dsim](https://github.com/genius0412/dsim) — **DSIM, created by Dohun Kim** — the
+> [genius0412/dsim](https://github.com/genius0412/dsim) (**DSIM, created by Dohun Kim**) the
 > simulator behind [playdsim.com](https://www.playdsim.com/). All of the simulator, game and
 > netcode work is the original author's and is used under the PolyForm Noncommercial License 1.0.0
 > (see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)). This fork is a **noncommercial** team
@@ -41,7 +41,8 @@
 > site, Discord and Instagram links are removed or pointed at this repository. The presenting-sponsor
 > slot now reads "BF Robotics" (placeholder artwork). The desktop shell loads its bundled build; set
 > `BFSIM_SITE_URL` (and `VITE_SITE_URL` for the web build) if you host your own copy. Ads and the
-> supporter / Ko-fi tier have not been removed yet.
+> supporter / Ko-fi tier have not been removed yet. The software is intended for INTERNAL use, and
+> we are not claiming any of Dohun Kim's work. All works are attributed appropriately. 
 >
 > These changes run only when you run this fork yourself. playdsim.com and the official desktop
 > app are the original project and do not include them.
